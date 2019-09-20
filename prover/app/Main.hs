@@ -12,7 +12,11 @@ import Lib
 
 processInput :: Text -> IO ()
 processInput input = do
-    forM_ (splitLines input) $ \line -> putStrLn (show line)
+    let ls = splitLines input
+    let groups = groupIndentedLines ls
+    forM_ groups $ \group -> do
+        putStrLn "---"
+        forM_ group $ \line -> putStrLn (show line)
 
 main :: IO ()
 main = getArgs >>= \args -> case args of
