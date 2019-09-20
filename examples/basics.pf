@@ -1,0 +1,11 @@
+IsContr(A : Type)
+    := Σ (a : A) Π (b : B) a = b
+
+IsProp(A : Type)
+    := Π (a : A, b : A) a = b
+
+Fiber(A : Type, B : Type, f : A → B, b : B) : Type
+    := Σ (a : A) f(a) = b
+
+IsEquiv(A : Type, B : Type, f : A → B) : Type
+    := Π (b : B) IsContr(Fiber(A, B, f, b))
