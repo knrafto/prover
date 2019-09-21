@@ -17,6 +17,11 @@ processInput input = do
     forM_ groups $ \group -> do
         putStrLn "---"
         forM_ group $ \line -> putStrLn (show line)
+        forM_ groups $ \group -> do
+            putStrLn "---"
+            forM_ group $ \line ->
+                forM_ (tokenizeLine line) $ \token ->
+                    putStrLn (show token)
 
 main :: IO ()
 main = getArgs >>= \args -> case args of
