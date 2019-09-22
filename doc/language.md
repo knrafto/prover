@@ -2,7 +2,7 @@ The core language is based on univalent type theory (see HoTT book).
 
 # Lexical structure
 
-Whitespace is one of ` ` (space), `\t`, `\r`, `\n`.
+Whitespace are space, tab, newline, carriage return, form feed, and vertical tab.
 Comments start with '#'.
 
 The symbols `(`, `)` and `,` are "punctuation", and are always treated as a
