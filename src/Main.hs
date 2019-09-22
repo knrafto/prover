@@ -6,12 +6,15 @@ import           System.IO
 import           Data.Text                      ( Text )
 import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec
+import           Text.Pretty.Simple
 
 import Syntax
 import Parser
 
 compile :: Text -> IO ()
-compile = parseTest defns
+compile input = case parse defns "" input of
+    Left e -> putStr (errorBundlePretty e)
+    Right x -> pPrint x
 
 main :: IO ()
 main = getArgs >>= \args -> case args of

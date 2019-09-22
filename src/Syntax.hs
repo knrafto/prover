@@ -15,7 +15,7 @@ type Params = [(Text, Expr)]
 
 data Expr
     = Var Text
-    | Call Expr [Expr]
+    | Apply Expr [Expr]
     | Sigma Params Expr
     | Pi Params Expr
     | Lambda Params Expr

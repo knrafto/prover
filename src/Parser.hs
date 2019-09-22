@@ -61,11 +61,11 @@ expr = do
     x <- atom
     rest x
   where
-    rest x = callExpr x <|> equals x <|> arrow x <|> return x
+    rest x = apply x <|> equals x <|> arrow x <|> return x
 
-    callExpr x = do
+    apply x = do
         args <- parens $ expr `sepBy1` symbol ','
-        rest (Call x args)
+        rest (Apply x args)
 
     equals x = do
         reservedWord "="
