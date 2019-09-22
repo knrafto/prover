@@ -10,5 +10,5 @@ Features:
 ```
 cd prover/
 stack build
-stack exec prover-exe -- ../examples/basics.pf
+stack exec prover -- ../examples/basics.pf
 ```
