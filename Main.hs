@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Monad
-import System.Environment
-import System.IO
+import           Control.Monad
+import           System.Environment
+import           System.IO
 
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
-import Data.Void
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
+import qualified Data.Text.IO                  as Text
+import           Data.Void
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer    as L
 
 -- AST
 type Module = [Defn]
@@ -51,13 +51,17 @@ isWordChar :: Char -> Bool
 isWordChar c = c `notElem` (" \t\r\n\f\v#()," :: [Char])
 
 reservedWord :: Text -> Parser ()
-reservedWord w = lexeme . try $ (string w *> notFollowedBy (satisfy isWordChar))
+reservedWord w =
+    lexeme . try $ (string w *> notFollowedBy (satisfy isWordChar))
 
 identifier :: Parser Text
 identifier = lexeme . try $ do
     w <- takeWhile1P (Just "word character") isWordChar
-    when (w `elem` reservedWords) $
-        fail $ "keyword " ++ Text.unpack w ++ " is reserved and cannot be used as an identifier"
+    when (w `elem` reservedWords) $ fail
+        (  "keyword "
+        ++ Text.unpack w
+        ++ " is reserved and cannot be used as an identifier"
+        )
     return w
   where
     reservedWords :: [Text]
@@ -71,18 +75,21 @@ expr = Var <$> identifier  -- TODO
 
 params :: Parser Params
 params = between (symbol '(') (symbol ')') $ param `sepBy1` symbol ','
-  where
-    param = (,) <$> identifier <* reservedWord ":" <*> expr
+    where param = (,) <$> identifier <* reservedWord ":" <*> expr
 
 defn :: Parser Defn
 defn = L.nonIndented sc $ do
     name <- identifier
-    ps <- params
+    ps   <- params
     reservedWord ":"
     t <- expr
     reservedWord ":="
     b <- expr
-    return $ Defn { defnName = name, defnParams = ps, defnType = t, defnBody = b }
+    return $ Defn { defnName   = name
+                  , defnParams = ps
+                  , defnType   = t
+                  , defnBody   = b
+                  }
 
 compile :: Text -> IO ()
 compile = parseTest (many defn <* eof)
