@@ -23,6 +23,7 @@ dependencies:
 executables:
   prover:
     main:                Main.hs
+    source-dirs:         src
     ghc-options:
     - -threaded
     - -rtsopts
