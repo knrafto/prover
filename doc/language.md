@@ -38,11 +38,13 @@ param = name [: expr]
 expr =
     name
     literal
+    ( expr )
     expr ( expr [, expr]* )
     expr = expr
     expr → expr
     Σ params expr
     Π params expr
     λ params expr
-    ( expr )
 ```
+
+Here "=" takes precedence over "→", and "→" is right-associative.

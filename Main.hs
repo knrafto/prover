@@ -31,8 +31,8 @@ data Expr
     | Sigma Params Expr
     | Pi Params Expr
     | Lambda Params Expr
+    | Equals Expr Expr
     | Arrow Expr Expr
-    | Eq Expr Expr
     deriving (Show)
 
 -- Lots of parsing stuff from https://markkarpov.com/megaparsec/megaparsec.html
@@ -70,11 +70,39 @@ identifier = lexeme . try $ do
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
 
+parens :: Parser a -> Parser a
+parens = between (symbol '(') (symbol ')')
+
+atom :: Parser Expr
+atom = Var <$> identifier
+   <|> parens expr
+   <|> Sigma <$ reservedWord "Σ" <*> params <*> expr
+   <|> Pi <$ reservedWord "Π" <*> params <*> expr
+   <|> Lambda <$ reservedWord "λ" <*> params <*> expr
+
 expr :: Parser Expr
-expr = Var <$> identifier  -- TODO
+expr = do
+    x <- atom
+    rest x
+  where
+    rest x = callExpr x <|> equals x <|> arrow x <|> return x
+
+    callExpr x = do
+        args <- parens $ expr `sepBy1` symbol ','
+        rest (Call x args)
+
+    equals x = do
+        reservedWord "="
+        y <- expr
+        return (Equals x y)
+
+    arrow x = do
+        reservedWord "→"
+        y <- expr
+        return (Arrow x y)
 
 params :: Parser Params
-params = between (symbol '(') (symbol ')') $ param `sepBy1` symbol ','
+params = parens $ param `sepBy1` symbol ','
     where param = (,) <$> identifier <* reservedWord ":" <*> expr
 
 defn :: Parser Defn
