@@ -8,7 +8,6 @@ Features:
 # Building
 
 ```
-cd prover/
 stack build
-stack exec prover -- ../examples/basics.pf
+stack exec prover -- examples/basics.pf
 ```
