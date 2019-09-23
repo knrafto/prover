@@ -5,6 +5,7 @@ import Data.Text (Text)
 data Statement
     = Define Text Params Expr Expr
     | Assume Text Expr
+    | Prove Expr
     deriving (Show)
 
 type Params = [(Text, Expr)]

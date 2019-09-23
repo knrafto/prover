@@ -34,6 +34,7 @@ a definition, or a command.
 statement = directive | definition
 directive =
     :assume expr : expr
+    :prove expr
 definition = name [ params ] [ : expr ] := expr
 params = ( param [, param]* )
 param = name [: expr]

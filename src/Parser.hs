@@ -41,7 +41,7 @@ identifier = lexeme . try $ do
     return w
   where
     reservedWords :: [Text]
-    reservedWords = [":", ":=", "=", "Σ", "Π", "λ", "→", ":assume"]
+    reservedWords = [":", ":=", "=", "Σ", "Π", "λ", "→", ":assume", ":prove"]
 
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
@@ -76,23 +76,26 @@ params :: Parser Params
 params = parens $ param `sepBy1` symbol ','
     where param = (,) <$> identifier <* reservedWord ":" <*> expr
 
-assume :: Parser Statement
-assume = do
-    reservedWord ":assume"
-    name <- identifier
-    reservedWord ":"
-    t <- expr
-    return (Assume name t)
-
 define :: Parser Statement
-define = do
-    name <- identifier
-    ps   <- params
-    reservedWord ":"
-    t <- expr
-    reservedWord ":="
-    b <- expr
-    return (Define name ps t b)
+define = Define
+    <$> identifier
+    <*> params
+    <* reservedWord ":"
+    <*> expr
+    <* reservedWord ":="
+    <*> expr
+
+assume :: Parser Statement
+assume = Assume
+    <$ reservedWord ":assume"
+    <*> identifier
+    <* reservedWord ":"
+    <*> expr
+
+prove :: Parser Statement
+prove = Prove
+    <$ reservedWord ":assume"
+    <*> expr
 
 statement :: Parser Statement
 statement = L.nonIndented sc $ assume <|> define
