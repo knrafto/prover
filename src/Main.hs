@@ -9,7 +9,7 @@ import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec
 import           Text.Pretty.Simple
 
-import Syntax
+import TypeCheck
 import Parser
 
 panic :: String -> IO a
@@ -25,6 +25,9 @@ main = do
         [] -> panic "usage: prover FILE"
     withFile path ReadMode $ \handle -> do
         input <- Text.hGetContents handle
-        case parse statements path input of
-            Left e -> putStr (errorBundlePretty e)
-            Right x -> pPrint x
+        stmts <- case parse statements path input of
+            Left e -> panic (errorBundlePretty e)
+            Right x -> return x
+        pPrint stmts
+        ctx <- typeCheck stmts
+        pPrint ctx
