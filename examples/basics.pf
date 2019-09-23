@@ -1,11 +1,16 @@
+:assume Id : Π (A : Type) A → A → Type
+
 IsContr(A : Type) : Type
-    := Σ (a : A) Π (b : B) a = b
+    := Σ (a : A) Π (b : B) Id(A, a, b)
 
 IsProp(A : Type) : Type
-    := Π (a : A, b : A) a = b
+    := Π (a : A, b : A) Id(A, a, b)
+
+IsSet(A : Type) : Type
+    := Π (a : A, b : A) Π (p : Id(A, a, b), q : Id(A, a, b)) Id(Id(A, a, b), p, q)
 
 Fiber(A : Type, B : Type, f : A → B, b : B) : Type
-    := Σ (a : A) f(a) = b
+    := Σ (a : A) Id(B, f(a), b)
 
 IsEquiv(A : Type, B : Type, f : A → B) : Type
     := Π (b : B) IsContr(Fiber(A, B, f, b))

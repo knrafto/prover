@@ -25,13 +25,15 @@ TODO: reserve all words starting with `:`?
 # File structure
 
 At top-level, the file is broken into statements, where indented lines are
-treated as a continuation of the previous command.
+treated as a continuation of the previous statement. A statement is either
+a definition, or a command. 
 
 # Grammar
 
 ```
 statement = directive | definition
-directive = :prove expr  (matches any :word)
+directive =
+    :assume expr : expr
 definition = name [ params ] [ : expr ] := expr
 params = ( param [, param]* )
 param = name [: expr]
@@ -40,11 +42,10 @@ expr =
     literal
     ( expr )
     expr ( expr [, expr]* )
-    expr = expr
     expr → expr
     Σ params expr
     Π params expr
     λ params expr
 ```
 
-Here "=" takes precedence over "→", and "→" is right-associative.
+Here "→" is right-associative.

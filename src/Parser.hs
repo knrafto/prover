@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Parser (defns) where
+module Parser (statements) where
 
 import Control.Monad
 
@@ -41,7 +41,7 @@ identifier = lexeme . try $ do
     return w
   where
     reservedWords :: [Text]
-    reservedWords = [":", ":=", "=", "Σ", "Π", "λ", "→"]
+    reservedWords = [":", ":=", "=", "Σ", "Π", "λ", "→", ":assume"]
 
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
@@ -61,16 +61,11 @@ expr = do
     x <- atom
     rest x
   where
-    rest x = apply x <|> equals x <|> arrow x <|> return x
+    rest x = apply x <|> arrow x <|> return x
 
     apply x = do
         args <- parens $ expr `sepBy1` symbol ','
         rest (Apply x args)
-
-    equals x = do
-        reservedWord "="
-        y <- expr
-        return (Equals x y)
 
     arrow x = do
         reservedWord "→"
@@ -81,19 +76,26 @@ params :: Parser Params
 params = parens $ param `sepBy1` symbol ','
     where param = (,) <$> identifier <* reservedWord ":" <*> expr
 
-defn :: Parser Defn
-defn = L.nonIndented sc $ do
+assume :: Parser Statement
+assume = do
+    reservedWord ":assume"
+    name <- identifier
+    reservedWord ":"
+    t <- expr
+    return (Assume name t)
+
+define :: Parser Statement
+define = do
     name <- identifier
     ps   <- params
     reservedWord ":"
     t <- expr
     reservedWord ":="
     b <- expr
-    return $ Defn { defnName   = name
-                  , defnParams = ps
-                  , defnType   = t
-                  , defnBody   = b
-                  }
+    return (Define name ps t b)
 
-defns :: Parser Module
-defns = many defn <* eof
+statement :: Parser Statement
+statement = L.nonIndented sc $ assume <|> define
+
+statements :: Parser [Statement]
+statements = many statement <* eof
