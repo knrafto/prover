@@ -12,6 +12,7 @@ type Params = [(Text, Expr)]
 
 data Expr
     = Var Text
+    | Universe
     | Apply Expr [Expr]
     | Sigma Params Expr
     | Pi Params Expr

@@ -41,7 +41,7 @@ identifier = lexeme . try $ do
     return w
   where
     reservedWords :: [Text]
-    reservedWords = [":", ":=", "=", "Σ", "Π", "λ", "→", ":assume", ":prove"]
+    reservedWords = [":", ":=", "Σ", "Π", "λ", "→", "Type", ":assume", ":prove"]
 
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
@@ -52,6 +52,7 @@ parens = between (symbol '(') (symbol ')')
 atom :: Parser Expr
 atom = Var <$> identifier
    <|> parens expr
+   <|> Universe <$ reservedWord "Type"
    <|> Sigma <$ reservedWord "Σ" <*> params <*> expr
    <|> Pi <$ reservedWord "Π" <*> params <*> expr
    <|> Lambda <$ reservedWord "λ" <*> params <*> expr

@@ -12,12 +12,14 @@ reserved, and are treated specially in the syntax:
 
 ```
 :
-=
 :=
 →
 Σ
 Π
 λ
+Type
+:assume
+:prove
 ```
 
 TODO: reserve all words starting with `:`?
@@ -50,3 +52,7 @@ expr =
 ```
 
 Here "→" is right-associative.
+
+# Type theory
+
+Dependent type theory. Type : Type for now.
