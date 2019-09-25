@@ -24,7 +24,7 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
 isWordChar :: Char -> Bool
-isWordChar c = c `notElem` (" \t\r\n\f\v#()," :: [Char])
+isWordChar c = c `notElem` (" \t\r\n\f\v#(),." :: [Char])
 
 reservedWord :: Text -> Parser ()
 reservedWord w =
@@ -53,9 +53,9 @@ atom :: Parser Expr
 atom = Var <$> identifier
    <|> parens expr
    <|> Universe <$ reservedWord "Type"
-   <|> Sigma <$ reservedWord "Σ" <*> params <*> expr
-   <|> Pi <$ reservedWord "Π" <*> params <*> expr
-   <|> Lambda <$ reservedWord "λ" <*> params <*> expr
+   <|> Sigma <$ reservedWord "Σ" <*> params <* symbol '.' <*> expr
+   <|> Pi <$ reservedWord "Π" <*> params <* symbol '.' <*> expr
+   <|> Lambda <$ reservedWord "λ" <*> params <* symbol '.' <*> expr
 
 expr :: Parser Expr
 expr = do
