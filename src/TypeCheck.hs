@@ -34,6 +34,8 @@ data Term
     = Var Context !Int
     -- Γ ⊢ Type : Type
     | Universe Context
+    -- Γ ⊢ a : A
+    | Assume Context Text Term
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
     | Pi Term Term
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ b : B then Γ ⊢ λ (x : A). b : Π (x : A). B
@@ -46,8 +48,9 @@ data Term
 
 -- Extracts the context from a term.
 domain :: Term -> Context
-domain (Var ctx i) = ctx
+domain (Var ctx _) = ctx
 domain (Universe ctx) = ctx
+domain (Assume ctx _ _) = ctx
 -- TODO: store context in the term itself?
 domain (Pi a b) = domain a
 domain (Lam a b) = domain a
@@ -61,6 +64,7 @@ weaken ctx k (Var ctx' i)
     | i < k = Var ctx i
     | otherwise = Var ctx (i + contextLength ctx - contextLength ctx')
 weaken ctx k (Universe _) = Universe ctx
+weaken ctx k (Assume _ n a) = Assume ctx n (weaken ctx k a)
 weaken ctx k (Pi a b) =
     let a' = weaken ctx k a
         b' = weaken (extend ctx a') (k + 1) b
@@ -83,6 +87,7 @@ subst ctx e (Var ctx' i)
     | i == contextLength ctx - contextLength ctx' = weaken ctx 0 e
     | otherwise = Var ctx (i - 1)
 subst ctx e (Universe _) = Universe ctx
+subst ctx e (Assume _ n t) = Assume ctx n (subst ctx e t)
 subst ctx e (Pi a b) =
         let a' = subst ctx e a
             b' = subst (extend ctx a') e b
@@ -101,6 +106,7 @@ subst ctx e (Sigma a b) =
 termType :: Term -> Term
 termType (Var ctx i) = weaken ctx 0 (contextLookup ctx i)
 termType t@(Universe ctx) = t
+termType (Assume _ _ t) = t
 termType t@(Pi a b) = Universe (domain t)
 termType (Lam a b) = Pi a (termType b)
 termType t@(App f x) = case termType f of
@@ -109,9 +115,11 @@ termType t@(App f x) = case termType f of
 termType t@(Sigma a b) = Universe (domain t)
 
 -- Reduces each term to a normal form. The only judgemental equality is β-reduction.
+-- TODO: do contexts have to be normalized?
 normalize :: Term -> Term
 normalize t@(Var _ _) = t
 normalize t@(Universe _) = t
+normalize (Assume ctx n a) = Assume ctx n (normalize a)
 normalize (Pi a b) = Pi (normalize a) (normalize b)
 normalize (Lam a b) = Lam (normalize a) (normalize b)
 normalize (App f x) = case normalize f of
