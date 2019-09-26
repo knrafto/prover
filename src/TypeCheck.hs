@@ -11,7 +11,7 @@ import qualified Syntax
 -- dependent types. We leave variables unnamed, and use De Bruijn indexes.
 -- In this representation, the "outermost" type has index 0.
 newtype Context = Context [Term]
-    deriving (Show)
+    deriving (Eq, Show)
 
 -- The empty context.
 emptyContext :: Context
@@ -27,7 +27,8 @@ contextLength (Context ts) = length ts
 contextLookup :: Context -> Int -> Term
 contextLookup (Context ts) i = ts !! i 
 
--- A term represents a derivation of a judgement Γ ⊢ a : A.
+-- A term represents a derivation of a judgment Γ ⊢ a : A.
+-- Equality represents syntactic equality (not judgmental equality)
 data Term
     -- Γ ⊢ x_i : A_i
     = Var Context !Int
@@ -41,7 +42,7 @@ data Term
     | App Term Term 
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
     | Sigma Term Term
-    deriving (Show)
+    deriving (Eq, Show)
 
 -- Extracts the context from a term.
 domain :: Term -> Context
@@ -96,7 +97,7 @@ subst ctx e (Sigma a b) =
         b' = subst (extend ctx a') e b
     in Sigma a' b'
 
--- From the judgement Γ ⊢ a : A, it is derivable that Γ ⊢ A : Type.
+-- From the judgment Γ ⊢ a : A, it is derivable that Γ ⊢ A : Type.
 termType :: Term -> Term
 termType (Var ctx i) = weaken ctx 0 (contextLookup ctx i)
 termType t@(Universe ctx) = t
@@ -106,3 +107,18 @@ termType t@(App f x) = case termType f of
     Pi a b -> subst (domain x) x b
     _ -> error $ "termType: type of function is not a Π-type" ++ show t
 termType t@(Sigma a b) = Universe (domain t)
+
+-- Reduces each term to a normal form. The only judgemental equality is β-reduction.
+normalize :: Term -> Term
+normalize t@(Var _ _) = t
+normalize t@(Universe _) = t
+normalize (Pi a b) = Pi (normalize a) (normalize b)
+normalize (Lam a b) = Lam (normalize a) (normalize b)
+normalize (App f x) = case normalize f of
+    Lam a b -> normalize (subst (domain x) (normalize x) b)
+    f' -> App f' (normalize x)
+normalize (Sigma a b) = Sigma (normalize a) (normalize b)
+
+-- Decides judgmental equality.
+equal :: Term -> Term -> Bool
+equal t1 t2 = normalize t1 == normalize t2
