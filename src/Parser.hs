@@ -55,7 +55,7 @@ atom = Var <$> identifier
    <|> Universe <$ reservedWord "Type"
    <|> Sigma <$ reservedWord "Σ" <*> params <* symbol '.' <*> expr
    <|> Pi <$ reservedWord "Π" <*> params <* symbol '.' <*> expr
-   <|> Lambda <$ reservedWord "λ" <*> params <* symbol '.' <*> expr
+   <|> Lam <$ reservedWord "λ" <*> params <* symbol '.' <*> expr
 
 expr :: Parser Expr
 expr = do
@@ -66,7 +66,7 @@ expr = do
 
     apply x = do
         args <- parens $ expr `sepBy1` symbol ','
-        rest (Apply x args)
+        rest (App x args)
 
     arrow x = do
         reservedWord "→"
