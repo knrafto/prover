@@ -29,5 +29,3 @@ main = do
             Left e -> panic (errorBundlePretty e)
             Right x -> return x
         pPrint stmts
-        ctx <- typeCheck stmts
-        pPrint ctx

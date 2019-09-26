@@ -5,50 +5,104 @@ import           Data.Text                      ( Text )
 
 import qualified Syntax
 
-type Id = Int
+-- This description of type theory is based on §A.2 in the HoTT book.
 
-data Name = Name Text !Id
-    deriving (Eq, Show)
-
-data Expr
-    = Var Name
-    | Universe !Int
-    | Apply Expr Expr
-    | Sigma Name Expr Expr
-    | Pi Name Expr Expr
-    | Lambda Name Expr Expr
+-- A context is roughly a list of variables. It represents a "tower" of
+-- dependent types. We leave variables unnamed, and use De Bruijn indexes.
+-- In this representation, the "outermost" type has index 0.
+newtype Context = Context [Term]
     deriving (Show)
 
--- Names, mapping types and optional definitions.
-type Context = [(Name, (Expr, Maybe Expr))]
+-- The empty context.
+emptyContext :: Context
+emptyContext = Context []
 
-lookupType :: Context -> Name -> Maybe Expr
-lookupType ctx n = fst <$> lookup n ctx
+-- The "variable" rule; if Γ ⊢ A : Type, then we may form the context (Γ, A).
+extend :: Context -> Term -> Context
+extend (Context ts) t = Context (t : ts)
 
-data TcState = TcState
-    { nextId :: !Int
-    , globalCtx :: Context
-    } deriving (Show)
+contextLength :: Context -> Int
+contextLength (Context ts) = length ts
 
-initialState :: TcState
-initialState = TcState
-    { nextId = 0
-    , globalCtx = []
-    }
+contextLookup :: Context -> Int -> Term
+contextLookup (Context ts) i = ts !! i 
 
--- Typechecking monad.
-type TcM a = StateT TcState IO a
+-- A term represents a derivation of a judgement Γ ⊢ a : A.
+data Term
+    -- Γ ⊢ x_i : A_i
+    = Var Context !Int
+    -- Γ ⊢ Type : Type
+    | Universe Context
+    -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
+    | Pi Term Term
+    -- If Γ ⊢ A : Type and Γ, x : A ⊢ b : B then Γ ⊢ λ (x : A). b : Π (x : A). B
+    | Lam Term Term
+    -- If Γ ⊢ f : Π (x : A). B and Γ ⊢ a : A then Γ ⊢ f(a) : B[a/x]
+    | App Term Term 
+    -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
+    | Sigma Term Term
+    deriving (Show)
 
-typeCheckStatement :: Syntax.Statement -> TcM ()
-typeCheckStatement stmt = case stmt of
-    Syntax.Define ident params ty body -> return ()  -- TODO
-    Syntax.Assume ident ty -> return ()  -- TODO
-    Syntax.Prove ty -> return ()  -- TODO
+-- Extracts the context from a term.
+domain :: Term -> Context
+domain (Var ctx i) = ctx
+domain (Universe ctx) = ctx
+-- TODO: store context in the term itself?
+domain (Pi a b) = domain a
+domain (Lam a b) = domain a
+domain (App f x) = domain f
+domain (Sigma a b) = domain a
 
-typeCheckStatements :: [Syntax.Statement] -> TcM ()
-typeCheckStatements = mapM_ typeCheckStatement
+-- If Γ, Θ ⊢ a : A, then Γ, Δ, Θ ⊢ a : A.
+-- The first argument is the new context Γ, Δ, Θ; the second is the length of Θ.
+weaken :: Context -> Int -> Term -> Term
+weaken ctx k (Var ctx' i)
+    | i < k = Var ctx i
+    | otherwise = Var ctx (i + contextLength ctx - contextLength ctx')
+weaken ctx k (Universe _) = Universe ctx
+weaken ctx k (Pi a b) =
+    let a' = weaken ctx k a
+        b' = weaken (extend ctx a') (k + 1) b
+    in Pi a' b'
+weaken ctx k (Lam a b) =
+    let a' = weaken ctx k a
+        b' = weaken (extend ctx a') (k + 1) b
+    in Lam a' b'
+weaken ctx k (App f x) = App (weaken ctx k f) (weaken ctx k x)
+weaken ctx k (Sigma a b) =
+    let a' = weaken ctx k a
+        b' = weaken (extend ctx a') (k + 1) b
+    in Pi a' b'
 
-typeCheck :: [Syntax.Statement] -> IO Context
-typeCheck stmts = do
-    (_, s) <- runStateT (typeCheckStatements stmts) initialState
-    return (globalCtx s)
+-- If Γ ⊢ a : A and Γ, x : A, Δ ⊢ b : B, then Γ, Δ ⊢ b[a/x] : B[a/x].
+-- The first argument is the new context Γ, Δ.
+subst :: Context -> Term -> Term -> Term
+subst ctx e (Var ctx' i)
+    | i < contextLength ctx - contextLength ctx' = Var ctx i
+    | i == contextLength ctx - contextLength ctx' = weaken ctx 0 e
+    | otherwise = Var ctx (i - 1)
+subst ctx e (Universe _) = Universe ctx
+subst ctx e (Pi a b) =
+        let a' = subst ctx e a
+            b' = subst (extend ctx a') e b
+        in Pi a' b'
+subst ctx e (Lam a b) =
+    let a' = subst ctx e a
+        b' = subst (extend ctx a') e b
+    in Lam a' b'
+subst ctx e (App f x) = App (subst ctx e f) (subst ctx e x)
+subst ctx e (Sigma a b) =
+    let a' = subst ctx e a
+        b' = subst (extend ctx a') e b
+    in Sigma a' b'
+
+-- From the judgement Γ ⊢ a : A, it is derivable that Γ ⊢ A : Type.
+termType :: Term -> Term
+termType (Var ctx i) = weaken ctx 0 (contextLookup ctx i)
+termType t@(Universe ctx) = t
+termType t@(Pi a b) = Universe (domain t)
+termType (Lam a b) = Pi a (termType b)
+termType t@(App f x) = case termType f of
+    Pi a b -> subst (domain x) x b
+    _ -> error $ "termType: type of function is not a Π-type" ++ show t
+termType t@(Sigma a b) = Universe (domain t)
