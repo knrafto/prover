@@ -3,19 +3,17 @@ module Syntax where
 import Data.Text (Text)
 
 data Statement
-    = Define Text Params Expr Expr
+    = Define Text Expr
     | Assume Text Expr
     | Prove Expr
     deriving (Show)
 
-type Params = [(Text, Expr)]
-
 data Expr
     = Var Text
     | Universe
-    | Pi Params Expr
+    | Pi Text Expr Expr
     | Arrow Expr Expr
-    | Lam Params Expr
+    | Lam Text Expr Expr
     | App Expr [Expr]
-    | Sigma Params Expr
+    | Sigma Text Expr Expr
     deriving (Show)

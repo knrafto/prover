@@ -35,20 +35,18 @@ a definition, or a command.
 ```
 statement = directive | definition
 directive =
-    :assume expr : expr
+    :assume name : expr
     :prove expr
-definition = name [ params ] : expr := expr
-params = ( param [, param]* )
-param = name : expr
+definition = name := expr
 expr =
     name
     literal
     ( expr )
     expr ( expr [, expr]* )
     expr → expr
-    Σ params . expr
-    Π params . expr
-    λ params . expr
+    Σ ( name : expr ) . expr
+    Π ( name : expr ) . expr
+    λ ( name : expr ) . expr
 ```
 
 Here "→" is right-associative.

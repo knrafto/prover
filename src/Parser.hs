@@ -46,16 +46,19 @@ identifier = lexeme . try $ do
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
 
-parens :: Parser a -> Parser a
-parens = between (symbol '(') (symbol ')')
-
 atom :: Parser Expr
 atom = Var <$> identifier
-   <|> parens expr
+   <|> symbol '(' *> expr <* symbol ')'
    <|> Universe <$ reservedWord "Type"
-   <|> Sigma <$ reservedWord "Σ" <*> params <* symbol '.' <*> expr
-   <|> Pi <$ reservedWord "Π" <*> params <* symbol '.' <*> expr
-   <|> Lam <$ reservedWord "λ" <*> params <* symbol '.' <*> expr
+   <|> Sigma <$ reservedWord "Σ"
+        <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
+        <* symbol '.' <*> expr
+   <|> Pi <$ reservedWord "Π"
+        <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
+        <* symbol '.' <*> expr
+   <|> Lam <$ reservedWord "λ"
+        <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
+        <* symbol '.' <*> expr
 
 expr :: Parser Expr
 expr = do
@@ -65,7 +68,9 @@ expr = do
     rest x = apply x <|> arrow x <|> return x
 
     apply x = do
-        args <- parens $ expr `sepBy1` symbol ','
+        symbol '('
+        args <- expr `sepBy1` symbol ','
+        symbol ')'
         rest (App x args)
 
     arrow x = do
@@ -73,30 +78,14 @@ expr = do
         y <- expr
         return (Arrow x y)
 
-params :: Parser Params
-params = parens $ param `sepBy1` symbol ','
-    where param = (,) <$> identifier <* reservedWord ":" <*> expr
-
 define :: Parser Statement
-define = Define
-    <$> identifier
-    <*> params
-    <* reservedWord ":"
-    <*> expr
-    <* reservedWord ":="
-    <*> expr
+define = Define <$> identifier <* reservedWord ":=" <*> expr
 
 assume :: Parser Statement
-assume = Assume
-    <$ reservedWord ":assume"
-    <*> identifier
-    <* reservedWord ":"
-    <*> expr
+assume = Assume <$ reservedWord ":assume" <*> identifier <* reservedWord ":" <*> expr
 
 prove :: Parser Statement
-prove = Prove
-    <$ reservedWord ":assume"
-    <*> expr
+prove = Prove <$ reservedWord ":assume" <*> expr
 
 statement :: Parser Statement
 statement = L.nonIndented sc $ assume <|> define
