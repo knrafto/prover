@@ -29,3 +29,5 @@ main = do
             Left e -> panic (errorBundlePretty e)
             Right x -> return x
         pPrint stmts
+        tcState <- typeCheck stmts
+        pPrint tcState

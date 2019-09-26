@@ -1,7 +1,13 @@
 module TypeCheck where
 
 import           Control.Monad.State
+import           Data.List
+import           Data.Map.Strict                ( Map )
+import qualified Data.Map.Strict as Map
 import           Data.Text                      ( Text )
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as L
+import           Text.Pretty.Simple
 
 import qualified Syntax
 
@@ -33,7 +39,7 @@ data Term
     = Var Context !Int
     -- Γ ⊢ Type : Type
     | Universe Context
-    -- Γ ⊢ a : A
+    -- If Γ ⊢ A : Type, then by assumption Γ ⊢ a : A
     | Assume Context Text Term
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
     | Pi Term Term
@@ -81,10 +87,12 @@ weaken ctx k (Sigma a b) =
 -- If Γ ⊢ a : A and Γ, x : A, Δ ⊢ b : B, then Γ, Δ ⊢ b[a/x] : B[a/x].
 -- The first argument is the new context Γ, Δ.
 subst :: Context -> Term -> Term -> Term
-subst ctx e (Var ctx' i)
-    | i < contextLength ctx - contextLength ctx' = Var ctx i
-    | i == contextLength ctx - contextLength ctx' = weaken ctx 0 e
+subst ctx e (Var _ i)
+    | i < k = Var ctx i
+    | i == k = weaken ctx 0 e
     | otherwise = Var ctx (i - 1)
+  where
+    k = contextLength ctx - contextLength (domain e)
 subst ctx e (Universe _) = Universe ctx
 subst ctx e (Assume _ n t) = Assume ctx n (subst ctx e t)
 subst ctx e (Pi a b) =
@@ -108,7 +116,7 @@ termType t@(Universe ctx) = t
 termType (Assume _ _ t) = t
 termType t@(Pi a b) = Universe (domain t)
 termType (Lam a b) = Pi a (termType b)
-termType t@(App f x) = case termType f of
+termType t@(App f x) = case normalize (termType f) of
     Pi a b -> subst (domain x) x b
     _ -> error $ "termType: type of function is not a Π-type" ++ show t
 termType t@(Sigma a b) = Universe (domain t)
@@ -139,3 +147,87 @@ normalize (Sigma a b) = Sigma (normalize a) (normalize b)
 -- Decides judgmental equality.
 judgmentallyEqual :: Term -> Term -> Bool
 judgmentallyEqual t1 t2 = syntacticallyEqual (normalize t1) (normalize t2)
+
+data TcState = TcState
+    -- Global definitions, and their values.
+    { tcDefinitions :: Map Text Term
+    -- Global assumptions, and their types.
+    , tcAssumptions :: Map Text Term
+    } deriving (Show)
+
+initialState :: TcState
+initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty }
+
+type TcM a = StateT TcState IO a
+
+checkIsType :: Term -> TcM ()
+checkIsType t = case normalize (termType t) of
+    Universe _ -> return ()
+    _ -> fail "not a type"
+
+typeCheckApp :: Term -> [Term] -> TcM Term
+typeCheckApp f [] = return f
+typeCheckApp f (arg : args) = do
+    (a, b) <- case normalize (termType f) of
+        Pi a b -> return (a, b)
+        _ -> fail $ "not a Π-type"
+    unless (judgmentallyEqual a (termType arg)) $
+        fail $ "argument type of:\n" ++ L.unpack (pShow f)
+            ++ "\nnamely:\n" ++ L.unpack (pShow a)
+            ++ "\ndoes not match type of:\n" ++ L.unpack (pShow arg)
+            ++ "\nnamely:\n" ++ L.unpack (pShow (normalize (termType arg)))
+    typeCheckApp (App f arg) args
+
+typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
+typeCheckExpr ctx names (Syntax.Var name) = do
+    definitions <- gets tcDefinitions
+    assumptions <- gets tcAssumptions
+    case () of
+        _ | Just i <- elemIndex name names ->
+                return (Var ctx i)
+          | Just body <- Map.lookup name definitions ->
+                return (weaken ctx 0 body)
+          | Just ty <- Map.lookup name assumptions ->
+                return (Assume ctx name (weaken ctx 0 ty))
+          | otherwise ->
+                fail $ "unbound name " ++ Text.unpack name
+typeCheckExpr ctx names Syntax.Universe = return (Universe ctx)
+typeCheckExpr ctx names (Syntax.Pi name a b) = do
+    a' <- typeCheckExpr ctx names a
+    checkIsType a'
+    b' <- typeCheckExpr (extend ctx a') (name : names) b
+    checkIsType b'
+    return (Pi a' b')
+typeCheckExpr ctx names (Syntax.Arrow a b) = do
+    a' <- typeCheckExpr ctx names a
+    checkIsType a'
+    b' <- typeCheckExpr ctx names b
+    checkIsType b'
+    return (Pi a' (weaken (extend ctx a') 0 b'))
+typeCheckExpr ctx names (Syntax.Lam name a b) = do
+    a' <- typeCheckExpr ctx names a
+    checkIsType a'
+    b' <- typeCheckExpr (extend ctx a') (name : names) b
+    return (Lam a' b')
+typeCheckExpr ctx names (Syntax.App f args) = do
+    f' <- typeCheckExpr ctx names f
+    args' <- mapM (typeCheckExpr ctx names) args
+    typeCheckApp f' args'
+typeCheckExpr ctx names (Syntax.Sigma name a b) = do
+    a' <- typeCheckExpr ctx names a
+    checkIsType a'
+    b' <- typeCheckExpr (extend ctx a') (name : names) b
+    checkIsType b'
+    return (Sigma a' b')
+
+typeCheckStatement :: Syntax.Statement -> TcM ()
+typeCheckStatement (Syntax.Define name body) = do
+    body' <- typeCheckExpr emptyContext [] body
+    modify $ \s -> s { tcDefinitions = Map.insert name body' (tcDefinitions s) }
+typeCheckStatement (Syntax.Assume name ty) = do
+    ty' <- typeCheckExpr emptyContext [] ty
+    modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
+typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
+
+typeCheck :: [Syntax.Statement] -> IO TcState
+typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
