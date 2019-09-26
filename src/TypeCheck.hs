@@ -11,7 +11,7 @@ import qualified Syntax
 -- dependent types. We leave variables unnamed, and use De Bruijn indexes.
 -- In this representation, the "outermost" type has index 0.
 newtype Context = Context [Term]
-    deriving (Eq, Show)
+    deriving (Show)
 
 -- The empty context.
 emptyContext :: Context
@@ -28,7 +28,6 @@ contextLookup :: Context -> Int -> Term
 contextLookup (Context ts) i = ts !! i 
 
 -- A term represents a derivation of a judgment Γ ⊢ a : A.
--- Equality represents syntactic equality (not judgmental equality)
 data Term
     -- Γ ⊢ x_i : A_i
     = Var Context !Int
@@ -44,7 +43,7 @@ data Term
     | App Term Term 
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
     | Sigma Term Term
-    deriving (Eq, Show)
+    deriving (Show)
 
 -- Extracts the context from a term.
 domain :: Term -> Context
@@ -114,8 +113,18 @@ termType t@(App f x) = case termType f of
     _ -> error $ "termType: type of function is not a Π-type" ++ show t
 termType t@(Sigma a b) = Universe (domain t)
 
+-- Decides syntactic equality.
+syntacticallyEqual :: Term -> Term -> Bool
+syntacticallyEqual (Var _ i) (Var _ j) = i == j
+syntacticallyEqual (Universe _) (Universe _) = True
+syntacticallyEqual (Assume _ n _) (Assume _ m _) = n == m
+syntacticallyEqual (Pi a b) (Pi c d) = syntacticallyEqual a c && syntacticallyEqual b d
+syntacticallyEqual (Lam a b) (Lam c d) = syntacticallyEqual a c && syntacticallyEqual b d
+syntacticallyEqual (App f x) (Pi g y) = syntacticallyEqual f g && syntacticallyEqual x y
+syntacticallyEqual (Sigma a b) (Sigma c d) = syntacticallyEqual a c && syntacticallyEqual b d
+syntacticallyEqual _ _ = False
+
 -- Reduces each term to a normal form. The only judgemental equality is β-reduction.
--- TODO: do contexts have to be normalized?
 normalize :: Term -> Term
 normalize t@(Var _ _) = t
 normalize t@(Universe _) = t
@@ -128,5 +137,5 @@ normalize (App f x) = case normalize f of
 normalize (Sigma a b) = Sigma (normalize a) (normalize b)
 
 -- Decides judgmental equality.
-equal :: Term -> Term -> Bool
-equal t1 t2 = normalize t1 == normalize t2
+judgmentallyEqual :: Term -> Term -> Bool
+judgmentallyEqual t1 t2 = syntacticallyEqual (normalize t1) (normalize t2)
