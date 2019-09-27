@@ -4,8 +4,8 @@ IsContr := λ (A : Type). Σ (a : A). Π (b : A). Id(A, a, b)
 
 IsProp := λ (A : Type). Π (a : A). Π (b : A). Id(A, a, b)
 
-# IsSet := λ (A : Type). Π (a : A). Π (b : A).
-#     Π (p : Id(A, a, b)). Π (q : Id(A, a, b)). Id(Id(A, a, b), p, q)
+IsSet := λ (A : Type). Π (a : A). Π (b : A).
+    Π (p : Id(A, a, b)). Π (q : Id(A, a, b)). Id(Id(A, a, b), p, q)
 
 Fiber := λ (A : Type). λ (B : Type). λ (f : A → B). λ (b : B).
     Σ (a : A). Id(B, f(a), b)

@@ -141,7 +141,7 @@ syntacticallyEqual (Universe _) (Universe _) = True
 syntacticallyEqual (Assume _ n _) (Assume _ m _) = n == m
 syntacticallyEqual (Pi a b) (Pi c d) = syntacticallyEqual a c && syntacticallyEqual b d
 syntacticallyEqual (Lam a b) (Lam c d) = syntacticallyEqual a c && syntacticallyEqual b d
-syntacticallyEqual (App f x) (Pi g y) = syntacticallyEqual f g && syntacticallyEqual x y
+syntacticallyEqual (App f x) (App g y) = syntacticallyEqual f g && syntacticallyEqual x y
 syntacticallyEqual (Sigma a b) (Sigma c d) = syntacticallyEqual a c && syntacticallyEqual b d
 syntacticallyEqual _ _ = False
 
