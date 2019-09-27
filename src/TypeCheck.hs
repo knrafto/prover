@@ -6,8 +6,6 @@ import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict as Map
 import           Data.Text                      ( Text )
 import qualified Data.Text as Text
-import qualified Data.Text.Lazy as L
-import           Text.Pretty.Simple
 
 import qualified Syntax
 
@@ -17,7 +15,6 @@ import qualified Syntax
 -- dependent types. We leave variables unnamed, and use De Bruijn indexes.
 -- In this representation, the "outermost" type has index 0.
 newtype Context = Context [Term]
-    deriving (Show)
 
 -- The empty context.
 emptyContext :: Context
@@ -49,7 +46,23 @@ data Term
     | App Term Term 
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
     | Sigma Term Term
-    deriving (Show)
+
+showsTerm :: Term -> ShowS
+showsTerm (Var _ i) = showString "V" . shows i
+showsTerm (Universe _) = showString "Type"
+showsTerm (Assume _ n _) = showString (Text.unpack n)
+showsTerm (Pi a b) =
+    showString "Π " . showParen True (showsTerm a) . showString " " . showsTerm b
+showsTerm (Lam a b) =
+    showString "λ " . showParen True (showsTerm a) . showString " " . showsTerm b
+showsTerm (App f x) =
+    -- TODO: only show function parens sometimes
+    showParen True (showsTerm f) . showParen True (showsTerm x)
+showsTerm (Sigma a b) =
+    showString "Σ " . showParen True (showsTerm a) . showString " " . showsTerm b
+
+showTerm :: Term -> String
+showTerm t = showsTerm t ""
 
 -- Extracts the context from a term.
 domain :: Term -> Context
@@ -118,7 +131,7 @@ termType t@(Pi a b) = Universe (domain t)
 termType (Lam a b) = Pi a (termType b)
 termType t@(App f x) = case normalize (termType f) of
     Pi a b -> subst (domain x) x b
-    _ -> error $ "termType: type of function is not a Π-type" ++ show t
+    _ -> error $ "termType: type of function is not a Π-type" ++ showTerm t
 termType t@(Sigma a b) = Universe (domain t)
 
 -- Decides syntactic equality.
@@ -153,7 +166,7 @@ data TcState = TcState
     { tcDefinitions :: Map Text Term
     -- Global assumptions, and their types.
     , tcAssumptions :: Map Text Term
-    } deriving (Show)
+    }
 
 initialState :: TcState
 initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty }
@@ -172,10 +185,10 @@ typeCheckApp f (arg : args) = do
         Pi a b -> return (a, b)
         _ -> fail $ "not a Π-type"
     unless (judgmentallyEqual a (termType arg)) $
-        fail $ "argument type of:\n" ++ L.unpack (pShow f)
-            ++ "\nnamely:\n" ++ L.unpack (pShow a)
-            ++ "\ndoes not match type of:\n" ++ L.unpack (pShow arg)
-            ++ "\nnamely:\n" ++ L.unpack (pShow (normalize (termType arg)))
+        fail $ "argument type of:\n" ++ showTerm f
+            ++ "\nnamely:\n" ++ showTerm a
+            ++ "\ndoes not match type of:\n" ++ showTerm arg
+            ++ "\nnamely:\n" ++ showTerm (normalize (termType arg))
     typeCheckApp (App f arg) args
 
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term

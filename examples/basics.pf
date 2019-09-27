@@ -10,8 +10,8 @@ IsProp := λ (A : Type). Π (a : A). Π (b : A). Id(A, a, b)
 Fiber := λ (A : Type). λ (B : Type). λ (f : A → B). λ (b : B).
     Σ (a : A). Id(B, f(a), b)
 
-# IsEquiv := λ (A : Type). λ (B : Type). λ (f : A → B).
-#     Π (b : B). IsContr(Fiber(A, B, f, b))
+IsEquiv := λ (A : Type). λ (B : Type). λ (f : A → B).
+    Π (b : B). IsContr(Fiber(A, B, f, b))
 
-# IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
-#     Π (b : B). IsProp(Fiber(A, B, f, b))
+IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
+    Π (b : B). IsProp(Fiber(A, B, f, b))

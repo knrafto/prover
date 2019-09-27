@@ -1,10 +1,13 @@
 module Main where
 
+import           Control.Monad
 import           System.Environment
 import           System.Exit
 import           System.IO
 
+import qualified Data.Map.Strict               as Map
 import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
 import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec
 import           Text.Pretty.Simple
@@ -30,4 +33,11 @@ main = do
             Right x -> return x
         pPrint stmts
         tcState <- typeCheck stmts
-        pPrint tcState
+        forM_ (Map.toList (tcAssumptions tcState)) $ \(k, v) -> do
+            putStr (Text.unpack k)
+            putStr " : "
+            putStrLn (showTerm v)
+        forM_ (Map.toList (tcDefinitions tcState)) $ \(k, v) -> do
+            putStr (Text.unpack k)
+            putStr " := "
+            putStrLn (showTerm v)
