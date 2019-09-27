@@ -31,7 +31,8 @@ main = do
         stmts <- case parse statements path input of
             Left e -> panic (errorBundlePretty e)
             Right x -> return x
-        pPrint stmts
+        -- TODO: add flag to control printing
+        -- pPrint stmts
         tcState <- typeCheck stmts
         forM_ (Map.toList (tcAssumptions tcState)) $ \(k, v) -> do
             putStr (Text.unpack k)
