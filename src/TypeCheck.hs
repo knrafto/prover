@@ -235,10 +235,10 @@ typeCheckExpr ctx names (Syntax.Sigma name a b) = do
 
 typeCheckStatement :: Syntax.Statement -> TcM ()
 typeCheckStatement (Syntax.Define name body) = do
-    body' <- typeCheckExpr emptyContext [] body
+    body' <- normalize <$> typeCheckExpr emptyContext [] body
     modify $ \s -> s { tcDefinitions = Map.insert name body' (tcDefinitions s) }
 typeCheckStatement (Syntax.Assume name ty) = do
-    ty' <- typeCheckExpr emptyContext [] ty
+    ty' <- normalize <$> typeCheckExpr emptyContext [] ty
     modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
 typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
 
