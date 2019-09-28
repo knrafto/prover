@@ -74,10 +74,10 @@ domain (Var ctx _) = ctx
 domain (Universe ctx) = ctx
 domain (Assume ctx _ _) = ctx
 -- TODO: store context in the term itself?
-domain (Pi a b) = domain a
-domain (Lam a b) = domain a
-domain (App f x) = domain f
-domain (Sigma a b) = domain a
+domain (Pi a _) = domain a
+domain (Lam a _) = domain a
+domain (App f _) = domain f
+domain (Sigma a _) = domain a
 
 -- If Γ, Θ ⊢ a : A, then Γ, Δ, Θ ⊢ a : A.
 -- The first argument is the new context Γ, Δ, Θ; the second is the length of Θ.
@@ -85,7 +85,7 @@ weaken :: Context -> Int -> Term -> Term
 weaken ctx k (Var ctx' i)
     | i < k = Var ctx i
     | otherwise = Var ctx (i + contextLength ctx - contextLength ctx')
-weaken ctx k (Universe _) = Universe ctx
+weaken ctx _ (Universe _) = Universe ctx
 weaken ctx k (Assume _ n a) = Assume ctx n (weaken ctx k a)
 weaken ctx k (Pi a b) =
     let a' = weaken ctx k a
@@ -110,7 +110,7 @@ subst ctx e (Var _ i)
     | otherwise = Var ctx (i - 1)
   where
     k = contextLength ctx - contextLength (domain e)
-subst ctx e (Universe _) = Universe ctx
+subst ctx _ (Universe _) = Universe ctx
 subst ctx e (Assume _ n t) = Assume ctx n (subst ctx e t)
 subst ctx e (Pi a b) =
         let a' = subst ctx e a
@@ -129,14 +129,14 @@ subst ctx e (Sigma a b) =
 -- From the judgment Γ ⊢ a : A, it is derivable that Γ ⊢ A : Type.
 termType :: Term -> Term
 termType (Var ctx i) = weaken ctx 0 (contextLookup ctx i)
-termType t@(Universe ctx) = t
+termType t@(Universe _) = t
 termType (Assume _ _ t) = t
-termType t@(Pi a b) = Universe (domain t)
+termType t@(Pi _ _) = Universe (domain t)
 termType (Lam a b) = Pi a (termType b)
 termType t@(App f x) = case normalize (termType f) of
-    Pi a b -> subst (domain x) x b
+    Pi _ b -> subst (domain x) x b
     _ -> error $ "termType: type of function is not a Π-type" ++ showTerm t
-termType t@(Sigma a b) = Universe (domain t)
+termType t@(Sigma _ _) = Universe (domain t)
 
 -- Decides syntactic equality.
 syntacticallyEqual :: Term -> Term -> Bool
@@ -157,7 +157,7 @@ normalize (Assume ctx n a) = Assume ctx n (normalize a)
 normalize (Pi a b) = Pi (normalize a) (normalize b)
 normalize (Lam a b) = Lam (normalize a) (normalize b)
 normalize (App f x) = case normalize f of
-    Lam a b -> normalize (subst (domain x) (normalize x) b)
+    Lam _ b -> normalize (subst (domain x) (normalize x) b)
     f' -> App f' (normalize x)
 normalize (Sigma a b) = Sigma (normalize a) (normalize b)
 
@@ -185,8 +185,8 @@ checkIsType t = case normalize (termType t) of
 typeCheckApp :: Term -> [Term] -> TcM Term
 typeCheckApp f [] = return f
 typeCheckApp f (arg : args) = do
-    (a, b) <- case normalize (termType f) of
-        Pi a b -> return (a, b)
+    a <- case normalize (termType f) of
+        Pi a _ -> return a
         _ -> fail $ "not a Π-type"
     unless (judgmentallyEqual a (termType arg)) $
         fail $ "argument type of:\n" ++ showTerm f
@@ -208,7 +208,7 @@ typeCheckExpr ctx names (Syntax.Var name) = do
                 return (Assume ctx name (weaken ctx 0 ty))
           | otherwise ->
                 fail $ "unbound name " ++ Text.unpack name
-typeCheckExpr ctx names Syntax.Universe = return (Universe ctx)
+typeCheckExpr ctx _ Syntax.Universe = return (Universe ctx)
 typeCheckExpr ctx names (Syntax.Pi name a b) = do
     a' <- typeCheckExpr ctx names a
     checkIsType a'

@@ -35,8 +35,8 @@ showArgs [e] = showExprPrec 0 e
 showArgs (e:es) = showExprPrec 1 e . showString ", " . showArgs es
 
 showExprPrec :: Int -> Expr -> ShowS
-showExprPrec d (Var n) = showString (Text.unpack n)
-showExprPrec d Universe = showString "Type"
+showExprPrec _ (Var n) = showString (Text.unpack n)
+showExprPrec _ Universe = showString "Type"
 showExprPrec d (Pi n a b) = showBinder d "Π" n a b
 showExprPrec d (Arrow a b) = showParen (d > arrowPrec) $
     showExprPrec (arrowPrec + 1) a .

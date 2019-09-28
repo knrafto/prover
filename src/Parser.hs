@@ -85,10 +85,10 @@ assume :: Parser Statement
 assume = Assume <$ reservedWord ":assume" <*> identifier <* reservedWord ":" <*> expr
 
 prove :: Parser Statement
-prove = Prove <$ reservedWord ":assume" <*> expr
+prove = Prove <$ reservedWord ":prove" <*> expr
 
 statement :: Parser Statement
-statement = L.nonIndented sc $ assume <|> define
+statement = L.nonIndented sc $ assume <|> prove <|> define
 
 statements :: Parser [Statement]
 statements = many statement <* eof
