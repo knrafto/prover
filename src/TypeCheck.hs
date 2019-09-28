@@ -95,7 +95,7 @@ weaken ctx k (App f x) = App (weaken ctx k f) (weaken ctx k x)
 weaken ctx k (Sigma a b) =
     let a' = weaken ctx k a
         b' = weaken (extend ctx a') (k + 1) b
-    in Pi a' b'
+    in Sigma a' b'
 
 -- If Γ ⊢ a : A and Γ, x : A, Δ ⊢ b : B, then Γ, Δ ⊢ b[a/x] : B[a/x].
 -- The first argument is the new context Γ, Δ.
