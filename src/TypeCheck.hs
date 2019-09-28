@@ -47,22 +47,26 @@ data Term
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
     | Sigma Term Term
 
-showsTerm :: Term -> ShowS
-showsTerm (Var _ i) = showString "V" . shows i
-showsTerm (Universe _) = showString "Type"
-showsTerm (Assume _ n _) = showString (Text.unpack n)
-showsTerm (Pi a b) =
-    showString "Π " . showParen True (showsTerm a) . showString " " . showsTerm b
-showsTerm (Lam a b) =
-    showString "λ " . showParen True (showsTerm a) . showString " " . showsTerm b
-showsTerm (App f x) =
-    -- TODO: only show function parens sometimes
-    showParen True (showsTerm f) . showParen True (showsTerm x)
-showsTerm (Sigma a b) =
-    showString "Σ " . showParen True (showsTerm a) . showString " " . showsTerm b
+varName :: Context -> Int -> Text
+varName ctx i = Text.pack ("x" ++ show (contextLength ctx - i - 1))
+
+-- Translates a term back into syntax. Variables are named x0, x1, etc. in the
+-- order they appear.
+prettyTerm :: Term -> Syntax.Expr
+prettyTerm (Var ctx i) = Syntax.Var (varName ctx i)
+prettyTerm (Universe _) = Syntax.Universe
+prettyTerm (Assume _ n _) = Syntax.Var n
+-- TODO: pretty-print Pi as Arrow if possible
+prettyTerm (Pi a b) = Syntax.Pi (varName (domain b) 0) (prettyTerm a) (prettyTerm b)
+prettyTerm (Lam a b) = Syntax.Lam (varName (domain b) 0) (prettyTerm a) (prettyTerm b)
+prettyTerm t@(App _ _) = let (f, args) = collectApps t in Syntax.App (prettyTerm f) (map prettyTerm (reverse args))
+  where
+    collectApps (App f x) = let (f', args) = collectApps f in (f', x : args) 
+    collectApps f = (f, [])
+prettyTerm (Sigma a b) = Syntax.Sigma (varName (domain b) 0) (prettyTerm a) (prettyTerm b)
 
 showTerm :: Term -> String
-showTerm t = showsTerm t ""
+showTerm t = Syntax.showExpr (prettyTerm t)
 
 -- Extracts the context from a term.
 domain :: Term -> Context
