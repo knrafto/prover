@@ -47,27 +47,6 @@ data Term
     -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
     | Sigma Term Term
 
-varName :: Context -> Int -> Text
-varName ctx i = Text.pack ("x" ++ show (contextLength ctx - i - 1))
-
--- Translates a term back into syntax. Variables are named x0, x1, etc. in the
--- order they appear.
-prettyTerm :: Term -> Syntax.Expr
-prettyTerm (Var ctx i) = Syntax.Var (varName ctx i)
-prettyTerm (Universe _) = Syntax.Universe
-prettyTerm (Assume _ n _) = Syntax.Var n
--- TODO: pretty-print Pi as Arrow if possible
-prettyTerm (Pi a b) = Syntax.Pi (varName (domain b) 0) (prettyTerm a) (prettyTerm b)
-prettyTerm (Lam a b) = Syntax.Lam (varName (domain b) 0) (prettyTerm a) (prettyTerm b)
-prettyTerm t@(App _ _) = let (f, args) = collectApps t in Syntax.App (prettyTerm f) (map prettyTerm (reverse args))
-  where
-    collectApps (App f x) = let (f', args) = collectApps f in (f', x : args) 
-    collectApps f = (f, [])
-prettyTerm (Sigma a b) = Syntax.Sigma (varName (domain b) 0) (prettyTerm a) (prettyTerm b)
-
-showTerm :: Term -> String
-showTerm t = Syntax.showExpr (prettyTerm t)
-
 -- Extracts the context from a term.
 domain :: Term -> Context
 domain (Var ctx _) = ctx
@@ -133,9 +112,9 @@ termType t@(Universe _) = t
 termType (Assume _ _ t) = t
 termType t@(Pi _ _) = Universe (domain t)
 termType (Lam a b) = Pi a (termType b)
-termType t@(App f x) = case normalize (termType f) of
+termType (App f x) = case normalize (termType f) of
     Pi _ b -> subst (domain x) x b
-    _ -> error $ "termType: type of function is not a Π-type" ++ showTerm t
+    _ -> error "termType: type of function is not a Π-type"
 termType t@(Sigma _ _) = Universe (domain t)
 
 -- Decides syntactic equality.
@@ -189,10 +168,7 @@ typeCheckApp f (arg : args) = do
         Pi a _ -> return a
         _ -> fail $ "not a Π-type"
     unless (judgmentallyEqual a (termType arg)) $
-        fail $ "argument type of:\n" ++ showTerm f
-            ++ "\nnamely:\n" ++ showTerm a
-            ++ "\ndoes not match type of:\n" ++ showTerm arg
-            ++ "\nnamely:\n" ++ showTerm (normalize (termType arg))
+        fail "argument type of function does not match type of argument"
     typeCheckApp (App f arg) args
 
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
