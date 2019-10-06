@@ -11,138 +11,96 @@ import qualified Syntax
 
 -- This description of type theory is based on §A.2 in the HoTT book.
 
--- A context is roughly a list of variables. It represents a "tower" of
--- dependent types. We leave variables unnamed, and use De Bruijn indexes.
--- In this representation, the "outermost" type has index 0.
-newtype Context = Context [Term]
+-- A context is roughly a list of types. It represents a "tower" of dependent
+-- types. We leave variables unnamed, and use De Bruijn indexes.
+data Context
+    -- () ctx
+    = Empty
+    -- If Γ ⊢ A : Type, then (Γ, A) ctx
+    | Extend Term
 
--- The empty context.
-emptyContext :: Context
-emptyContext = Context []
-
--- The "variable" rule; if Γ ⊢ A : Type, then we may form the context (Γ, A).
-extend :: Context -> Term -> Context
-extend (Context ts) t = Context (t : ts)
-
-contextLength :: Context -> Int
-contextLength (Context ts) = length ts
-
-contextLookup :: Context -> Int -> Term
-contextLookup (Context ts) i = ts !! i 
-
--- A term represents a derivation of a judgment Γ ⊢ a : A.
+-- A term represents a derivation of a judgement Γ ⊢ a : A.
 data Term
-    -- Γ ⊢ x_i : A_i
-    = Var Context !Int
     -- Γ ⊢ Type : Type
-    | Universe Context
-    -- If Γ ⊢ A : Type, then by assumption Γ ⊢ a : A
-    | Assume Context Text Term
-    -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
+    = Universe Context
+    -- An assumption () ⊢ a : A.
+    | Assume Term Text
+    -- If Γ ⊢ A : Type and Γ ⊢ b : B, then (Γ, A) ⊢ ↑b : ↑B
+    -- We use this instead of traditional de Bruijn indices, similar to the
+    -- 'bound' library for Haskell.
+    | Weaken Term Term
+    -- If Γ ⊢ A : Type, then (Γ, A) ⊢ v : ↑A
+    -- Corresponds to de Bruijn index 0.
+    | Var Term
+    -- If Γ ⊢ A : Type and (Γ, A) ⊢ B : Type, then Γ ⊢ Π A B : Type
     | Pi Term Term
-    -- If Γ ⊢ A : Type and Γ, x : A ⊢ b : B then Γ ⊢ λ (x : A). b : Π (x : A). B
+    -- If Γ ⊢ A : Type and (Γ, A) ⊢ b : B then Γ ⊢ λ A b : Π A B
     | Lam Term Term
-    -- If Γ ⊢ f : Π (x : A). B and Γ ⊢ a : A then Γ ⊢ f(a) : B[a/x]
-    | App Term Term 
-    -- If Γ ⊢ A : Type and Γ, x : A ⊢ B : Type then Γ ⊢ Π (x : A). B : Type
+    -- If Γ ⊢ A : Type and (Γ, A) ⊢ B : Type and Γ ⊢ f : Π A B and Γ ⊢ a : A,
+    -- then Γ ⊢ f(a) : B[a]
+    | App Term Term Term Term 
+    -- If Γ ⊢ A : Type and (Γ, A) ⊢ B : Type, then Γ ⊢ Σ A B : Type
     | Sigma Term Term
 
 -- Extracts the context from a term.
-domain :: Term -> Context
-domain (Var ctx _) = ctx
-domain (Universe ctx) = ctx
-domain (Assume ctx _ _) = ctx
--- TODO: store context in the term itself?
-domain (Pi a _) = domain a
-domain (Lam a _) = domain a
-domain (App f _) = domain f
-domain (Sigma a _) = domain a
+context :: Term -> Context
+context (Universe _Γ) = _Γ
+context (Assume _ _) = Empty
+context (Weaken _A _) = Extend _A
+context (Var _A) = Extend _A
+context (Pi _A _B) = context _A
+context (Lam _A _) = context _A
+context (App _A _ _ _) = context _A
+context (Sigma _A _B) = context _A
 
--- If Γ, Θ ⊢ a : A, then Γ, Δ, Θ ⊢ a : A.
--- The first argument is the new context Γ, Δ, Θ; the second is the length of Θ.
-weaken :: Context -> Int -> Term -> Term
-weaken ctx k (Var ctx' i)
-    | i < k = Var ctx i
-    | otherwise = Var ctx (i + contextLength ctx - contextLength ctx')
-weaken ctx _ (Universe _) = Universe ctx
-weaken ctx k (Assume _ n a) = Assume ctx n (weaken ctx k a)
-weaken ctx k (Pi a b) =
-    let a' = weaken ctx k a
-        b' = weaken (extend ctx a') (k + 1) b
-    in Pi a' b'
-weaken ctx k (Lam a b) =
-    let a' = weaken ctx k a
-        b' = weaken (extend ctx a') (k + 1) b
-    in Lam a' b'
-weaken ctx k (App f x) = App (weaken ctx k f) (weaken ctx k x)
-weaken ctx k (Sigma a b) =
-    let a' = weaken ctx k a
-        b' = weaken (extend ctx a') (k + 1) b
-    in Sigma a' b'
-
--- If Γ ⊢ a : A and Γ, x : A, Δ ⊢ b : B, then Γ, Δ ⊢ b[a/x] : B[a/x].
--- The first argument is the new context Γ, Δ.
-subst :: Context -> Term -> Term -> Term
-subst ctx e (Var _ i)
-    | i < k = Var ctx i
-    | i == k = weaken ctx 0 e
-    | otherwise = Var ctx (i - 1)
-  where
-    k = contextLength ctx - contextLength (domain e)
-subst ctx _ (Universe _) = Universe ctx
-subst ctx e (Assume _ n t) = Assume ctx n (subst ctx e t)
-subst ctx e (Pi a b) =
-        let a' = subst ctx e a
-            b' = subst (extend ctx a') e b
-        in Pi a' b'
-subst ctx e (Lam a b) =
-    let a' = subst ctx e a
-        b' = subst (extend ctx a') e b
-    in Lam a' b'
-subst ctx e (App f x) = App (subst ctx e f) (subst ctx e x)
-subst ctx e (Sigma a b) =
-    let a' = subst ctx e a
-        b' = subst (extend ctx a') e b
-    in Sigma a' b'
-
--- From the judgment Γ ⊢ a : A, it is derivable that Γ ⊢ A : Type.
+-- Extracts the type of a term.
 termType :: Term -> Term
-termType (Var ctx i) = weaken ctx 0 (contextLookup ctx i)
-termType t@(Universe _) = t
-termType (Assume _ _ t) = t
-termType t@(Pi _ _) = Universe (domain t)
-termType (Lam a b) = Pi a (termType b)
-termType (App f x) = case normalize (termType f) of
-    Pi _ b -> subst (domain x) x b
-    _ -> error "termType: type of function is not a Π-type"
-termType t@(Sigma _ _) = Universe (domain t)
+termType (Universe _Γ) = Universe _Γ
+termType (Assume _A _) = _A
+termType (Weaken _A b) = Weaken _A (termType b)
+termType (Var _A) = Weaken _A _A
+termType (Pi _A _B) = Universe (context _A)
+termType (Lam _A b) = Pi _A (termType b)
+termType (App _ _B _ a) = subst a _B
+termType (Sigma _A _B) = Universe (context _A)
 
--- Decides syntactic equality.
-syntacticallyEqual :: Term -> Term -> Bool
-syntacticallyEqual (Var _ i) (Var _ j) = i == j
-syntacticallyEqual (Universe _) (Universe _) = True
-syntacticallyEqual (Assume _ n _) (Assume _ m _) = n == m
-syntacticallyEqual (Pi a b) (Pi c d) = syntacticallyEqual a c && syntacticallyEqual b d
-syntacticallyEqual (Lam a b) (Lam c d) = syntacticallyEqual a c && syntacticallyEqual b d
-syntacticallyEqual (App f x) (App g y) = syntacticallyEqual f g && syntacticallyEqual x y
-syntacticallyEqual (Sigma a b) (Sigma c d) = syntacticallyEqual a c && syntacticallyEqual b d
-syntacticallyEqual _ _ = False
+-- If Γ ⊢ a : A and (Γ, A) ⊢ b : B, then Γ ⊢ b[a] : B[a].
+subst :: Term -> Term -> Term
+subst a = subst' (SubstTerm a)
 
--- Reduces each term to a normal form. The only judgemental equality is β-reduction.
+-- Auxiliary type to help with `subst` below. An element represents a
+-- substitution of context Δ → Γ. Given a substitution σ : Δ → Γ, we get a
+-- contravariant action on terms σ* : Term Γ A → Term Δ (σ* A), implemented
+-- by `subst'` below.
+data Subst
+    -- Given Γ ⊢ a : A, we get a substitution Γ → (Γ, A) 
+    = SubstTerm Term
+    -- Given a substitution σ : Δ → Γ, we get a substitution
+    -- (Δ, σ* A) → (Γ, A).
+    | SubstExtend Subst Term
+
+substDomain :: Subst -> Context
+substDomain (SubstTerm t) = context t
+substDomain (SubstExtend σ _A) = Extend (subst' σ _A)
+
+subst' :: Subst -> Term -> Term
+subst' σ (Universe _) = Universe (substDomain σ)
+subst' _ (Assume _ _) = error "subst': Assume has empty context"
+subst' (SubstTerm _) (Weaken _ b) = b
+subst' (SubstExtend σ _) (Weaken _A b) = Weaken (subst' σ _A) (subst' σ b)
+subst' (SubstTerm t) (Var _) = t
+subst' (SubstExtend σ _) (Var _A) = Var (subst' σ _A)
+subst' σ (Pi _A _B) = Pi (subst' σ _A) (subst' (SubstExtend σ _A) _B)
+subst' σ (Lam _A b) = Lam (subst' σ _A) (subst' (SubstExtend σ _A) b)
+subst' σ (App _A _B f a) = App (subst' σ _A) (subst' (SubstExtend σ _A) _B) (subst' σ f) (subst' σ a)
+subst' σ (Sigma _A _B) = Sigma (subst' σ _A) (subst' (SubstExtend σ _A) _B)
+
+-- Rules for definitional equality:
+-- * Weakening commutes with Pi, Lam, App, and Sigma
+-- * β-conversion
+-- * η-conversion
 normalize :: Term -> Term
-normalize t@(Var _ _) = t
-normalize t@(Universe _) = t
-normalize (Assume ctx n a) = Assume ctx n (normalize a)
-normalize (Pi a b) = Pi (normalize a) (normalize b)
-normalize (Lam a b) = Lam (normalize a) (normalize b)
-normalize (App f x) = case normalize f of
-    Lam _ b -> normalize (subst (domain x) (normalize x) b)
-    f' -> App f' (normalize x)
-normalize (Sigma a b) = Sigma (normalize a) (normalize b)
-
--- Decides judgmental equality.
-judgmentallyEqual :: Term -> Term -> Bool
-judgmentallyEqual t1 t2 = syntacticallyEqual (normalize t1) (normalize t2)
+normalize = _
 
 data TcState = TcState
     -- Global definitions, and their values.
@@ -156,12 +114,71 @@ initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty }
 
 type TcM a = StateT TcState IO a
 
+typeCheck :: [Syntax.Statement] -> IO TcState
+typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
+
+typeCheckStatement :: Syntax.Statement -> TcM ()
+typeCheckStatement (Syntax.Define name body) = do
+    body' <- normalize <$> typeCheckExpr Empty [] body
+    modify $ \s -> s { tcDefinitions = Map.insert name body' (tcDefinitions s) }
+typeCheckStatement (Syntax.Assume name ty) = do
+    ty' <- normalize <$> typeCheckExpr Empty [] ty
+    modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
+typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
+
+typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
+typeCheckExpr _Γ names (Syntax.Var name) = do
+    definitions <- gets tcDefinitions
+    assumptions <- gets tcAssumptions
+    case () of
+        _ | Just i <- elemIndex name names ->
+                return _
+          | Just body <- Map.lookup name definitions ->
+                return _
+          | Just ty <- Map.lookup name assumptions ->
+                return _
+          | otherwise ->
+                fail $ "unbound name: " ++ Text.unpack name
+typeCheckExpr _Γ _ Syntax.Universe = return (Universe _Γ)
+typeCheckExpr _Γ names (Syntax.Pi name _A _B) = do
+    _A' <- typeCheckExpr _Γ names _A
+    checkIsType _A'
+    _B' <- typeCheckExpr (Extend _A') (name : names) _B
+    checkIsType _B'
+    return (Pi _A' _B')
+typeCheckExpr _Γ names (Syntax.Arrow _A _B) = do
+    _A' <- typeCheckExpr _Γ names _A
+    checkIsType _A'
+    _B' <- typeCheckExpr _Γ names _B
+    checkIsType _B'
+    return (Pi _A' (Weaken _A' _B'))
+typeCheckExpr _Γ names (Syntax.Lam name _A b) = do
+    _A' <- typeCheckExpr _Γ names _A
+    checkIsType _A'
+    b' <- typeCheckExpr (Extend _A') (name : names) b
+    return (Lam _A' b')
+typeCheckExpr _Γ names (Syntax.App f args) = do
+    f' <- typeCheckExpr _Γ names f
+    args' <- mapM (typeCheckExpr _Γ names) args
+    typeCheckApp f' args'
+typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
+    _A' <- typeCheckExpr _Γ names _A
+    checkIsType _A'
+    _B' <- typeCheckExpr (Extend _A') (name : names) _B
+    checkIsType _B'
+    return (Sigma _A' _B')
+
 checkIsType :: Term -> TcM ()
+checkIsType = _
+{-
 checkIsType t = case normalize (termType t) of
     Universe _ -> return ()
     _ -> fail "not a type"
+-}
 
 typeCheckApp :: Term -> [Term] -> TcM Term
+typeCheckApp = _
+{-
 typeCheckApp f [] = return f
 typeCheckApp f (arg : args) = do
     a <- case normalize (termType f) of
@@ -170,57 +187,4 @@ typeCheckApp f (arg : args) = do
     unless (judgmentallyEqual a (termType arg)) $
         fail "argument type of function does not match type of argument"
     typeCheckApp (App f arg) args
-
-typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
-typeCheckExpr ctx names (Syntax.Var name) = do
-    definitions <- gets tcDefinitions
-    assumptions <- gets tcAssumptions
-    case () of
-        _ | Just i <- elemIndex name names ->
-                return (Var ctx i)
-          | Just body <- Map.lookup name definitions ->
-                return (weaken ctx 0 body)
-          | Just ty <- Map.lookup name assumptions ->
-                return (Assume ctx name (weaken ctx 0 ty))
-          | otherwise ->
-                fail $ "unbound name " ++ Text.unpack name
-typeCheckExpr ctx _ Syntax.Universe = return (Universe ctx)
-typeCheckExpr ctx names (Syntax.Pi name a b) = do
-    a' <- typeCheckExpr ctx names a
-    checkIsType a'
-    b' <- typeCheckExpr (extend ctx a') (name : names) b
-    checkIsType b'
-    return (Pi a' b')
-typeCheckExpr ctx names (Syntax.Arrow a b) = do
-    a' <- typeCheckExpr ctx names a
-    checkIsType a'
-    b' <- typeCheckExpr ctx names b
-    checkIsType b'
-    return (Pi a' (weaken (extend ctx a') 0 b'))
-typeCheckExpr ctx names (Syntax.Lam name a b) = do
-    a' <- typeCheckExpr ctx names a
-    checkIsType a'
-    b' <- typeCheckExpr (extend ctx a') (name : names) b
-    return (Lam a' b')
-typeCheckExpr ctx names (Syntax.App f args) = do
-    f' <- typeCheckExpr ctx names f
-    args' <- mapM (typeCheckExpr ctx names) args
-    typeCheckApp f' args'
-typeCheckExpr ctx names (Syntax.Sigma name a b) = do
-    a' <- typeCheckExpr ctx names a
-    checkIsType a'
-    b' <- typeCheckExpr (extend ctx a') (name : names) b
-    checkIsType b'
-    return (Sigma a' b')
-
-typeCheckStatement :: Syntax.Statement -> TcM ()
-typeCheckStatement (Syntax.Define name body) = do
-    body' <- normalize <$> typeCheckExpr emptyContext [] body
-    modify $ \s -> s { tcDefinitions = Map.insert name body' (tcDefinitions s) }
-typeCheckStatement (Syntax.Assume name ty) = do
-    ty' <- normalize <$> typeCheckExpr emptyContext [] ty
-    modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
-typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
-
-typeCheck :: [Syntax.Statement] -> IO TcState
-typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
+-}
