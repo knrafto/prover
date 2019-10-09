@@ -9,80 +9,82 @@ import qualified Data.Text as Text
 
 import qualified Syntax
 
--- This description of type theory is based on §A.2 in the HoTT book.
+-- This description of type theory is based on:
+-- Type Theory in Type Theory using Quotient Inductive Types
+-- Thorsten Altenkirch, Ambrus Kaposi
+-- http://www.cs.nott.ac.uk/~psztxa/publ/tt-in-tt.pdf
 
--- A context is roughly a list of types. It represents a "tower" of dependent
--- types. We leave variables unnamed, and use De Bruijn indexes.
+-- ... with some modifications. We don't have a separate "Ty" concept, and
+-- we represent variables and substitutions less "categorically".
+
 data Context
-    -- () ctx
+    -- ∙ is a context
     = Empty
-    -- If Γ ⊢ A : Type, then (Γ, A) ctx
+    -- If A : Tm Γ U, then (Γ, A) is a context
     | Extend Term
 
--- A term represents a derivation of a judgement Γ ⊢ a : A.
+-- A substitution between contexts.
+data Subst
+    -- Given A : Tm Γ U, we get a substitution (Γ , A) → Γ
+    = SubstWeaken Term
+    -- Given a : Tm Γ A, we get a substitution Γ → (Γ, A) 
+    | SubstTerm Term
+    -- Given a substitution σ : Δ → Γ, we get a substitution
+    -- σ ↑ A : (Δ, A[σ]) → (Γ, A).
+    | SubstExtend Subst Term
+
+substDomain :: Subst -> Context
+substDomain (SubstWeaken _A) = Extend _A
+substDomain (SubstTerm a) = context a
+substDomain (SubstExtend σ _A) = Extend (Apply σ _A)
+
+substCodomain :: Subst -> Context
+substCodomain (SubstWeaken _A) = context _A
+substCodomain (SubstTerm a) = Extend (termType a)
+substCodomain (SubstExtend σ _A) = Extend _A
+
 data Term
-    -- Γ ⊢ Type : Type
+    -- U : Tm Γ U
     = Universe Context
-    -- An assumption () ⊢ a : A.
+    -- A named assumption in Tm ∙ A.
     | Assume Term Text
-    -- If Γ ⊢ A : Type and Γ ⊢ b : B, then (Γ, A) ⊢ ↑b : ↑B
-    -- We use this instead of traditional de Bruijn indices, similar to the
-    -- 'bound' library for Haskell.
-    | Weaken Term Term
-    -- If Γ ⊢ A : Type, then (Γ, A) ⊢ v : ↑A
-    -- Corresponds to de Bruijn index 0.
+    -- If σ : Subst Δ Γ and t : Tm Γ A, then t[σ] : Tm Δ A[σ].
+    | Apply Subst Term
+    -- If A : Tm Γ U, then v : Tm (Γ, A) A[wk].
     | Var Term
-    -- If Γ ⊢ A : Type and (Γ, A) ⊢ B : Type, then Γ ⊢ Π A B : Type
+    -- If A : Tm Γ U and B : Tm (Γ, A) U, then Π A B : Tm Γ U
     | Pi Term Term
-    -- If Γ ⊢ A : Type and (Γ, A) ⊢ b : B then Γ ⊢ λ A b : Π A B
+    -- If A : Tm Γ U and b : Tm (Γ, A) B, then lam(b) : Tm (Π A B)
     | Lam Term Term
-    -- If Γ ⊢ A : Type and (Γ, A) ⊢ B : Type and Γ ⊢ f : Π A B and Γ ⊢ a : A,
-    -- then Γ ⊢ f(a) : B[a]
-    | App Term Term Term Term 
-    -- If Γ ⊢ A : Type and (Γ, A) ⊢ B : Type, then Γ ⊢ Σ A B : Type
+    -- If A : Tm Γ U and B : Tm (Γ, A) U and and f : Tm (Π A B),
+    -- then app(f) : Tm (Γ, A) B
+    | App Term Term Term 
+    -- If A : Tm Γ U and B : Tm (Γ, A) U, then Σ A B : Tm Γ U
     | Sigma Term Term
 
 -- Extracts the context from a term.
 context :: Term -> Context
 context (Universe _Γ) = _Γ
 context (Assume _ _) = Empty
-context (Weaken _A _) = Extend _A
+context (Apply σ _) = substDomain σ
 context (Var _A) = Extend _A
 context (Pi _A _B) = context _A
 context (Lam _A _) = context _A
-context (App _A _ _ _) = context _A
+context (App _A _ _) = Extend _A
 context (Sigma _A _B) = context _A
 
 -- Extracts the type of a term.
 termType :: Term -> Term
 termType (Universe _Γ) = Universe _Γ
 termType (Assume _A _) = _A
-termType (Weaken _A b) = Weaken _A (termType b)
-termType (Var _A) = Weaken _A _A
+termType (Apply σ t) = Apply σ (termType t)
+termType (Var _A) = Apply (SubstWeaken _A) _A
 termType (Pi _A _B) = Universe (context _A)
 termType (Lam _A b) = Pi _A (termType b)
-termType (App _ _B _ a) = subst a _B
+termType (App _ _B _) = _B
 termType (Sigma _A _B) = Universe (context _A)
 
--- If Γ ⊢ a : A and (Γ, A) ⊢ b : B, then Γ ⊢ b[a] : B[a].
-subst :: Term -> Term -> Term
-subst a = subst' (SubstTerm a)
-
--- Auxiliary type to help with `subst` below. An element represents a
--- substitution of context Δ → Γ. Given a substitution σ : Δ → Γ, we get a
--- contravariant action on terms σ* : Term Γ A → Term Δ (σ* A), implemented
--- by `subst'` below.
-data Subst
-    -- Given Γ ⊢ a : A, we get a substitution Γ → (Γ, A) 
-    = SubstTerm Term
-    -- Given a substitution σ : Δ → Γ, we get a substitution
-    -- (Δ, σ* A) → (Γ, A).
-    | SubstExtend Subst Term
-
-substDomain :: Subst -> Context
-substDomain (SubstTerm t) = context t
-substDomain (SubstExtend σ _A) = Extend (subst' σ _A)
-
+{-
 subst' :: Subst -> Term -> Term
 subst' σ (Universe _) = Universe (substDomain σ)
 subst' _ (Assume _ _) = error "subst': Assume has empty context"
@@ -94,6 +96,7 @@ subst' σ (Pi _A _B) = Pi (subst' σ _A) (subst' (SubstExtend σ _A) _B)
 subst' σ (Lam _A b) = Lam (subst' σ _A) (subst' (SubstExtend σ _A) b)
 subst' σ (App _A _B f a) = App (subst' σ _A) (subst' (SubstExtend σ _A) _B) (subst' σ f) (subst' σ a)
 subst' σ (Sigma _A _B) = Sigma (subst' σ _A) (subst' (SubstExtend σ _A) _B)
+-}
 
 -- Rules for definitional equality:
 -- * Weakening commutes with Pi, Lam, App, and Sigma
@@ -151,7 +154,7 @@ typeCheckExpr _Γ names (Syntax.Arrow _A _B) = do
     checkIsType _A'
     _B' <- typeCheckExpr _Γ names _B
     checkIsType _B'
-    return (Pi _A' (Weaken _A' _B'))
+    return (Pi _A' (Apply (SubstWeaken _A') _B'))
 typeCheckExpr _Γ names (Syntax.Lam name _A b) = do
     _A' <- typeCheckExpr _Γ names _A
     checkIsType _A'
