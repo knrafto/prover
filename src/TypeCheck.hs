@@ -23,24 +23,36 @@ data Context
     -- If A : Tm Γ U, then (Γ, A) is a context
     | Extend Term
 
+instance Show Context where
+    showsPrec _ Empty = showString "∙"
+    showsPrec _ _Γ = showParen True (go _Γ)
+      where
+        go Empty = showString "∙"
+        go (Extend _A) = go (context _A) . showString ", " . shows _A
+
 -- A substitution between contexts.
 data Subst
     -- Given A : Tm Γ U, we get a substitution (Γ , A) → Γ
     = SubstWeaken Term
-    -- Given a : Tm Γ A, we get a substitution Γ → (Γ, A) 
+    -- Given t : Tm Γ A, we get a substitution Γ → (Γ, A) 
     | SubstTerm Term
     -- Given a substitution σ : Δ → Γ, we get a substitution
     -- σ ↑ A : (Δ, A[σ]) → (Γ, A).
     | SubstExtend Subst Term
 
+instance Show Subst where
+    showsPrec _ (SubstWeaken _A) = showString "wk"
+    showsPrec _ (SubstTerm t) = showString "⟨" . shows t . showString "⟩"
+    showsPrec _ (SubstExtend σ _A) = shows σ . showString " ↑ " . shows _A
+
 substDomain :: Subst -> Context
 substDomain (SubstWeaken _A) = Extend _A
-substDomain (SubstTerm a) = context a
+substDomain (SubstTerm t) = context t
 substDomain (SubstExtend σ _A) = Extend (Apply σ _A)
 
 substCodomain :: Subst -> Context
 substCodomain (SubstWeaken _A) = context _A
-substCodomain (SubstTerm a) = Extend (termType a)
+substCodomain (SubstTerm t) = Extend (termType t)
 substCodomain (SubstExtend σ _A) = Extend _A
 
 data Term
@@ -52,15 +64,25 @@ data Term
     | Apply Subst Term
     -- If A : Tm Γ U, then v : Tm (Γ, A) A[wk].
     | Var Term
-    -- If A : Tm Γ U and B : Tm (Γ, A) U, then Π A B : Tm Γ U
+    -- If A : Tm Γ U and B : Tm (Γ, A) U, then Π(A, B) : Tm Γ U
     | Pi Term Term
-    -- If A : Tm Γ U and b : Tm (Γ, A) B, then lam(b) : Tm (Π A B)
+    -- If A : Tm Γ U and b : Tm (Γ, A) B, then λ(b) : Tm Π(A, B)
     | Lam Term Term
-    -- If A : Tm Γ U and B : Tm (Γ, A) U and and f : Tm (Π A B),
+    -- If A : Tm Γ U and B : Tm (Γ, A) U and and f : Tm Π(A, B),
     -- then app(f) : Tm (Γ, A) B
     | App Term Term Term 
-    -- If A : Tm Γ U and B : Tm (Γ, A) U, then Σ A B : Tm Γ U
+    -- If A : Tm Γ U and B : Tm (Γ, A) U, then Σ(A, B) : Tm Γ U
     | Sigma Term Term
+
+instance Show Term where
+    showsPrec _ (Universe _) = showString "U"
+    showsPrec _ (Assume _ n) = showString (Text.unpack n)
+    showsPrec _ (Apply σ t) = shows t . showString "[" . shows σ . showString "]"
+    showsPrec _ (Var _) = showsString "V"
+    showsPrec _ (Pi _A _B) = showString "Π(" . shows _A . showString ", " . shows _B . showString ")"
+    showsPrec _ (Lam _ b) = showString "λ(" . shows b . showString ")"
+    showsPrec _ (App _ _ f) = showString "app(" . shows f . showString ")"
+    showsPrec _ (Sigma _A _B) = showString "Σ(" . shows _A . showString ", " . shows _B . showString ")"
 
 -- Extracts the context from a term.
 context :: Term -> Context
