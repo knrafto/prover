@@ -106,26 +106,33 @@ termType (Lam _A b) = Pi _A (termType b)
 termType (App _ _B _) = _B
 termType (Sigma _A _B) = Universe (context _A)
 
-{-
-subst' :: Subst -> Term -> Term
-subst' σ (Universe _) = Universe (substDomain σ)
-subst' _ (Assume _ _) = error "subst': Assume has empty context"
-subst' (SubstTerm _) (Weaken _ b) = b
-subst' (SubstExtend σ _) (Weaken _A b) = Weaken (subst' σ _A) (subst' σ b)
-subst' (SubstTerm t) (Var _) = t
-subst' (SubstExtend σ _) (Var _A) = Var (subst' σ _A)
-subst' σ (Pi _A _B) = Pi (subst' σ _A) (subst' (SubstExtend σ _A) _B)
-subst' σ (Lam _A b) = Lam (subst' σ _A) (subst' (SubstExtend σ _A) b)
-subst' σ (App _A _B f a) = App (subst' σ _A) (subst' (SubstExtend σ _A) _B) (subst' σ f) (subst' σ a)
-subst' σ (Sigma _A _B) = Sigma (subst' σ _A) (subst' (SubstExtend σ _A) _B)
--}
+-- TODO: this is probably incomplete.
+subst :: Subst -> Term -> Term
+subst σ (Universe _) = Universe (substDomain σ)
+subst (SubstTerm t) (Var _) = t
+subst (SubstExtend σ _) (Var _A) = Var (subst σ _A)
+subst σ (Pi _A _B) = Pi (subst σ _A) (subst (SubstExtend σ _A) _B)
+subst σ (Lam _A b) = Lam (subst σ _A) (subst (SubstExtend σ _A) b)
+subst σ (Sigma _A _B) = Sigma (subst σ _A) (subst (SubstExtend σ _A) _B)
+subst σ t = Apply σ t
 
 -- Rules for definitional equality:
 -- * Weakening commutes with Pi, Lam, App, and Sigma
 -- * β-conversion
 -- * η-conversion
 normalize :: Term -> Term
-normalize = id  -- TODO
+normalize t@(Universe _) = t
+normalize t@(Assume _ _) = t
+normalize (Apply σ t) = subst σ (normalize t)
+normalize t@(Var _) = t
+normalize (Pi _A _B) = Pi (normalize _A) (normalize _B)
+normalize (Lam _A t) = case normalize t of
+    App _ _ f -> f
+    t' -> Lam (normalize _A) t'
+normalize (App _A _B f) = case normalize f of
+    Lam _ t -> t
+    f' -> App (normalize _A) (normalize _B) f'
+normalize (Sigma _A _B) = Sigma (normalize _A) (normalize _B)
 
 data TcState = TcState
     -- Global definitions, and their values.

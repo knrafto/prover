@@ -1,9 +1,12 @@
 module Main where
 
+import           Control.Monad
 import           System.Environment
 import           System.Exit
 import           System.IO
 
+import qualified Data.Map.Strict               as Map
+import qualified Data.Text                     as Text
 import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec
 
@@ -26,5 +29,8 @@ main = do
         stmts <- case parse statements path input of
             Left e -> panic (errorBundlePretty e)
             Right x -> return x
-        _ <- typeCheck stmts
-        return ()
+        tcState <- typeCheck stmts
+        forM_ (Map.toList (tcAssumptions tcState)) $ \(name, _A) ->
+            putStrLn $ ":assume " ++ Text.unpack name ++ " : " ++ show _A
+        forM_ (Map.toList (tcDefinitions tcState)) $ \(name, body) ->
+            putStrLn $ Text.unpack name ++ " := " ++ show body
