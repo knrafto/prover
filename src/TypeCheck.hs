@@ -53,7 +53,7 @@ substDomain (SubstExtend σ _A) = Extend (Apply σ _A)
 substCodomain :: Subst -> Context
 substCodomain (SubstWeaken _A) = context _A
 substCodomain (SubstTerm t) = Extend (termType t)
-substCodomain (SubstExtend σ _A) = Extend _A
+substCodomain (SubstExtend _ _A) = Extend _A
 
 data Term
     -- U : Tm Γ U
@@ -78,7 +78,7 @@ instance Show Term where
     showsPrec _ (Universe _) = showString "U"
     showsPrec _ (Assume _ n) = showString (Text.unpack n)
     showsPrec _ (Apply σ t) = shows t . showString "[" . shows σ . showString "]"
-    showsPrec _ (Var _) = showsString "V"
+    showsPrec _ (Var _) = showString "V"
     showsPrec _ (Pi _A _B) = showString "Π(" . shows _A . showString ", " . shows _B . showString ")"
     showsPrec _ (Lam _ b) = showString "λ(" . shows b . showString ")"
     showsPrec _ (App _ _ f) = showString "app(" . shows f . showString ")"
@@ -125,7 +125,7 @@ subst' σ (Sigma _A _B) = Sigma (subst' σ _A) (subst' (SubstExtend σ _A) _B)
 -- * β-conversion
 -- * η-conversion
 normalize :: Term -> Term
-normalize = _
+normalize = id  -- TODO
 
 data TcState = TcState
     -- Global definitions, and their values.
@@ -151,17 +151,25 @@ typeCheckStatement (Syntax.Assume name ty) = do
     modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
 typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
 
+var :: Context -> Int -> Term
+var Empty _ = error "var: empty context"
+var (Extend _A) 0 = Var _A
+var (Extend _A) n = Apply (SubstWeaken _A) (var (context _A) (n - 1))
+
+weakenGlobal :: Context -> Term -> Term
+weakenGlobal Empty t = t
+weakenGlobal (Extend _A) t = Apply (SubstWeaken _A) (weakenGlobal (context _A) t) 
+
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
 typeCheckExpr _Γ names (Syntax.Var name) = do
     definitions <- gets tcDefinitions
     assumptions <- gets tcAssumptions
     case () of
-        _ | Just i <- elemIndex name names ->
-                return _
+        _ | Just i <- elemIndex name names -> return (var _Γ i)
           | Just body <- Map.lookup name definitions ->
-                return _
-          | Just ty <- Map.lookup name assumptions ->
-                return _
+                return (weakenGlobal _Γ body)
+          | Just _A <- Map.lookup name assumptions ->
+                return (weakenGlobal _Γ (Assume _A name))
           | otherwise ->
                 fail $ "unbound name: " ++ Text.unpack name
 typeCheckExpr _Γ _ Syntax.Universe = return (Universe _Γ)
@@ -194,22 +202,16 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     return (Sigma _A' _B')
 
 checkIsType :: Term -> TcM ()
-checkIsType = _
-{-
 checkIsType t = case normalize (termType t) of
     Universe _ -> return ()
-    _ -> fail "not a type"
--}
+    -- TODO: show context
+    _A -> fail $ "type of " ++ show t ++ " (namely " ++ show _A ++ ") is not a universe"
 
 typeCheckApp :: Term -> [Term] -> TcM Term
-typeCheckApp = _
-{-
 typeCheckApp f [] = return f
 typeCheckApp f (arg : args) = do
-    a <- case normalize (termType f) of
-        Pi a _ -> return a
-        _ -> fail $ "not a Π-type"
-    unless (judgmentallyEqual a (termType arg)) $
-        fail "argument type of function does not match type of argument"
-    typeCheckApp (App f arg) args
--}
+    (_A, _B) <- case normalize (termType f) of
+        Pi _A _B -> return (_A, _B)
+        -- TODO: show context
+        t -> fail $ "type of " ++ show f ++ " (namely " ++ show t ++ ") is not a Π-type"
+    typeCheckApp (Apply (SubstTerm arg) (App _A _B f)) args
