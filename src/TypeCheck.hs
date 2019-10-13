@@ -31,6 +31,7 @@ instance Show Context where
         go (Extend _A) = go (context _A) . showString ", " . shows _A
 
 -- A substitution between contexts.
+-- TODO: represent "categorically".
 data Subst
     -- Given A : Tm Γ U, we get a substitution (Γ , A) → Γ
     = SubstWeaken Term
@@ -55,11 +56,15 @@ substCodomain (SubstWeaken _A) = context _A
 substCodomain (SubstTerm t) = Extend (termType t)
 substCodomain (SubstExtend _ _A) = Extend _A
 
+type VarId = Int
+
 data Term
     -- U : Tm Γ U
     = Universe Context
     -- A named assumption in Tm ∙ A.
     | Assume Term Text
+    -- A metavar with a context and type.
+    | Metavar VarId Context Term
     -- If σ : Subst Δ Γ and t : Tm Γ A, then t[σ] : Tm Δ A[σ].
     | Apply Subst Term
     -- If A : Tm Γ U, then v : Tm (Γ, A) A[wk].
@@ -77,8 +82,9 @@ data Term
 instance Show Term where
     showsPrec _ (Universe _) = showString "U"
     showsPrec _ (Assume _ n) = showString (Text.unpack n)
+    showsPrec _ (Metavar i _ _) = showString "α" . shows i
     showsPrec _ (Apply σ t) = shows t . showString "[" . shows σ . showString "]"
-    showsPrec _ (Var _) = showString "V"
+    showsPrec _ (Var _) = showString "v"
     showsPrec _ (Pi _A _B) = showString "Π(" . shows _A . showString ", " . shows _B . showString ")"
     showsPrec _ (Lam _ b) = showString "λ(" . shows b . showString ")"
     showsPrec _ (App _ _ f) = showString "app(" . shows f . showString ")"
@@ -88,6 +94,7 @@ instance Show Term where
 context :: Term -> Context
 context (Universe _Γ) = _Γ
 context (Assume _ _) = Empty
+context (Metavar _ _Γ _) = _Γ
 context (Apply σ _) = substDomain σ
 context (Var _A) = Extend _A
 context (Pi _A _B) = context _A
@@ -99,6 +106,7 @@ context (Sigma _A _B) = context _A
 termType :: Term -> Term
 termType (Universe _Γ) = Universe _Γ
 termType (Assume _A _) = _A
+termType (Metavar _ _ _A) = _A
 termType (Apply σ t) = Apply σ (termType t)
 termType (Var _A) = Apply (SubstWeaken _A) _A
 termType (Pi _A _B) = Universe (context _A)
@@ -121,10 +129,7 @@ subst σ t = Apply σ t
 -- * β-conversion
 -- * η-conversion
 normalize :: Term -> Term
-normalize t@(Universe _) = t
-normalize t@(Assume _ _) = t
 normalize (Apply σ t) = subst σ (normalize t)
-normalize t@(Var _) = t
 normalize (Pi _A _B) = Pi (normalize _A) (normalize _B)
 normalize (Lam _A t) = case normalize t of
     App _ _ f -> f
@@ -133,6 +138,7 @@ normalize (App _A _B f) = case normalize f of
     Lam _ t -> t
     f' -> App (normalize _A) (normalize _B) f'
 normalize (Sigma _A _B) = Sigma (normalize _A) (normalize _B)
+normalize t = t
 
 data TcState = TcState
     -- Global definitions, and their values.
