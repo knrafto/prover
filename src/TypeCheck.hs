@@ -114,33 +114,6 @@ termType (Lam _A b) = Pi _A (termType b)
 termType (App _ _B _) = _B
 termType (Sigma _A _B) = Universe (context _A)
 
--- TODO: this is probably incomplete.
-subst :: Subst -> Term -> Term
-subst σ (Universe _) = Universe (substDomain σ)
-subst (SubstTerm t) (Var _) = t
-subst (SubstExtend σ _) (Var _A) = Var (subst σ _A)
-subst σ (Pi _A _B) = Pi (subst σ _A) (subst (SubstExtend σ _A) _B)
-subst σ (Lam _A b) = Lam (subst σ _A) (subst (SubstExtend σ _A) b)
-subst σ (Sigma _A _B) = Sigma (subst σ _A) (subst (SubstExtend σ _A) _B)
-subst σ t = Apply σ t
-
--- Rules for definitional equality:
--- * Weakening commutes with Pi, Lam, App, and Sigma
--- * β-conversion
--- * η-conversion
--- TODO: also substitute for metavars.
-normalize :: Term -> Term
-normalize (Apply σ t) = subst σ (normalize t)
-normalize (Pi _A _B) = Pi (normalize _A) (normalize _B)
-normalize (Lam _A t) = case normalize t of
-    App _ _ f -> f
-    t' -> Lam (normalize _A) t'
-normalize (App _A _B f) = case normalize f of
-    Lam _ t -> t
-    f' -> App (normalize _A) (normalize _B) f'
-normalize (Sigma _A _B) = Sigma (normalize _A) (normalize _B)
-normalize t = t
-
 data TcState = TcState
     -- Global definitions, and their values.
     { tcDefinitions :: Map Text Term
@@ -170,12 +143,13 @@ unify t1 t2 = liftIO $ do
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
 
+-- TODO: also substitute for metavars before printing.
 typeCheckStatement :: Syntax.Statement -> TcM ()
 typeCheckStatement (Syntax.Define name body) = do
-    body' <- normalize <$> typeCheckExpr Empty [] body
+    body' <- typeCheckExpr Empty [] body
     modify $ \s -> s { tcDefinitions = Map.insert name body' (tcDefinitions s) }
 typeCheckStatement (Syntax.Assume name ty) = do
-    ty' <- normalize <$> typeCheckExpr Empty [] ty
+    ty' <- typeCheckExpr Empty [] ty
     modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
 typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
 
