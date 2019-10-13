@@ -128,6 +128,7 @@ subst σ t = Apply σ t
 -- * Weakening commutes with Pi, Lam, App, and Sigma
 -- * β-conversion
 -- * η-conversion
+-- TODO: also substitute for metavars.
 normalize :: Term -> Term
 normalize (Apply σ t) = subst σ (normalize t)
 normalize (Pi _A _B) = Pi (normalize _A) (normalize _B)
@@ -159,6 +160,9 @@ freshVarId = do
     i <- gets nextId
     modify $ \s -> s { nextId = i + 1 }
     return (VarId i)
+
+unify :: Term -> Term -> TcM ()
+unify = _
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
@@ -230,17 +234,14 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     return (Sigma _A' _B')
 
 checkIsType :: Term -> TcM ()
-checkIsType t = case normalize (termType t) of
-    Universe _ -> return ()
-    -- TODO: show context
-    _A -> fail $ "type of " ++ show t ++ " (namely " ++ show _A ++ ") is not a universe"
+checkIsType t = unify t (Universe (context t))
 
 typeCheckApp :: Term -> [Term] -> TcM Term
 typeCheckApp f [] = return f
 typeCheckApp f (arg : args) = do
-    (_A, _B) <- case normalize (termType f) of
-        Pi _A _B -> return (_A, _B)
-        -- TODO: show context
-        t -> fail $ "type of " ++ show f ++ " (namely " ++ show t ++ ") is not a Π-type"
-    -- TODO: unify _A and termType arg
+    varId <- freshVarId
+    let _Γ = context f
+    let _A = (termType arg)
+    let _B = Metavar varId _Γ (Universe _Γ)
+    unify (termType f) (Pi _A _B)
     typeCheckApp (Apply (SubstTerm arg) (App _A _B f)) args
