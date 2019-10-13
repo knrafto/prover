@@ -211,7 +211,7 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     return (Sigma _A' _B')
 
 checkIsType :: Term -> TcM ()
-checkIsType t = unify t (Universe (context t))
+checkIsType t = unify (termType t) (Universe (context t))
 
 typeCheckApp :: Term -> [Term] -> TcM Term
 typeCheckApp f [] = return f
