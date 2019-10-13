@@ -162,7 +162,10 @@ freshVarId = do
     return (VarId i)
 
 unify :: Term -> Term -> TcM ()
-unify = _
+unify t1 t2 = liftIO $ do
+    putStrLn $ "Unifying in context: " ++ show (context t1)
+    putStrLn $ "  " ++ show t1
+    putStrLn $ "  " ++ show t2
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
