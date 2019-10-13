@@ -11,6 +11,7 @@ non-punctuation Unicode characters is a "word". The following words are
 reserved, and are treated specially in the syntax:
 
 ```
+_
 :
 :=
 →
@@ -39,6 +40,7 @@ directive =
     :prove expr
 definition = name := expr
 expr =
+    _
     name
     literal
     ( expr )
@@ -54,3 +56,5 @@ Here "→" is right-associative.
 # Type theory
 
 Dependent type theory. Type : Type for now.
+
+`_` is a "hole" that will be filled in by the compiler.

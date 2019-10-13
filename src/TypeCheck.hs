@@ -56,7 +56,7 @@ substCodomain (SubstWeaken _A) = context _A
 substCodomain (SubstTerm t) = Extend (termType t)
 substCodomain (SubstExtend _ _A) = Extend _A
 
-type VarId = Int
+newtype VarId = VarId Int
 
 data Term
     -- U : Tm Γ U
@@ -82,7 +82,7 @@ data Term
 instance Show Term where
     showsPrec _ (Universe _) = showString "U"
     showsPrec _ (Assume _ n) = showString (Text.unpack n)
-    showsPrec _ (Metavar i _ _) = showString "α" . shows i
+    showsPrec _ (Metavar (VarId i) _ _) = showString "α" . shows i
     showsPrec _ (Apply σ t) = shows t . showString "[" . shows σ . showString "]"
     showsPrec _ (Var _) = showString "v"
     showsPrec _ (Pi _A _B) = showString "Π(" . shows _A . showString ", " . shows _B . showString ")"
@@ -145,12 +145,20 @@ data TcState = TcState
     { tcDefinitions :: Map Text Term
     -- Global assumptions, and their types.
     , tcAssumptions :: Map Text Term
+    -- Next var id.
+    , nextId :: !Int
     }
 
 initialState :: TcState
-initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty }
+initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, nextId = 0 }
 
 type TcM a = StateT TcState IO a
+
+freshVarId :: TcM VarId
+freshVarId = do
+    i <- gets nextId
+    modify $ \s -> s { nextId = i + 1 }
+    return (VarId i)
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
@@ -174,6 +182,13 @@ weakenGlobal Empty t = t
 weakenGlobal (Extend _A) t = Apply (SubstWeaken _A) (weakenGlobal (context _A) t) 
 
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
+typeCheckExpr _Γ _ Syntax.Hole = do
+    -- We generate variables for both the hole itself, and its type. Luckily
+    -- for now we don't have to do this forever, since the type of any type is
+    -- the universe.
+    termVarId <- freshVarId
+    typeVarId <- freshVarId
+    return (Metavar termVarId _Γ (Metavar typeVarId _Γ (Universe _Γ)))
 typeCheckExpr _Γ names (Syntax.Var name) = do
     definitions <- gets tcDefinitions
     assumptions <- gets tcAssumptions
@@ -227,4 +242,5 @@ typeCheckApp f (arg : args) = do
         Pi _A _B -> return (_A, _B)
         -- TODO: show context
         t -> fail $ "type of " ++ show f ++ " (namely " ++ show t ++ ") is not a Π-type"
+    -- TODO: unify _A and termType arg
     typeCheckApp (Apply (SubstTerm arg) (App _A _B f)) args

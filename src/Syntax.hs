@@ -9,7 +9,8 @@ data Statement
     deriving (Show)
 
 data Expr
-    = Var Text
+    = Hole
+    | Var Text
     | Universe
     | Pi Text Expr Expr
     | Arrow Expr Expr
