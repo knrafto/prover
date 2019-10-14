@@ -57,6 +57,7 @@ substCodomain (SubstTerm t) = Extend (termType t)
 substCodomain (SubstExtend _ _A) = Extend _A
 
 newtype VarId = VarId Int
+    deriving (Eq, Ord, Show)
 
 data Term
     -- U : Tm Γ U
@@ -119,12 +120,14 @@ data TcState = TcState
     { tcDefinitions :: Map Text Term
     -- Global assumptions, and their types.
     , tcAssumptions :: Map Text Term
-    -- Next var id.
+    -- Next metavar id.
     , nextId :: !Int
+    -- Metavar substitution.
+    , subst :: Map VarId Term
     }
 
 initialState :: TcState
-initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, nextId = 0 }
+initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, nextId = 0, subst = Map.empty }
 
 type TcM a = StateT TcState IO a
 
@@ -135,10 +138,26 @@ freshVarId = do
     return (VarId i)
 
 unify :: Term -> Term -> TcM ()
+unify (Metavar i _ _) t = unifyVar i t
+unify t (Metavar i _ _) = unifyVar i t
+unify (Universe _) (Universe _) = return ()
+-- TODO: something more general for pushing down substitutions?
+unify (Apply σ t) (Universe _) = unify t (Universe (substDomain σ))
+unify (Universe _) (Apply σ t) = unify (Universe (substDomain σ)) t
+unify (Pi _A1 _B1) (Pi _A2 _B2) = do
+    unify _A1 _A2
+    unify _B1 _B2
 unify t1 t2 = liftIO $ do
-    putStrLn $ "Unifying in context: " ++ show (context t1)
+    putStrLn $ "Failed to unify in context: " ++ show (context t1)
     putStrLn $ "  " ++ show t1
     putStrLn $ "  " ++ show t2
+
+unifyVar :: VarId -> Term -> TcM()
+unifyVar i t = do
+    currentSubst <- gets subst
+    case Map.lookup i currentSubst of
+        Nothing -> modify $ \s -> s { subst = Map.insert i t currentSubst }
+        Just t' -> unify t t'
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
