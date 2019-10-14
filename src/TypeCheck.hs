@@ -62,8 +62,8 @@ newtype VarId = VarId Int
 data Term
     -- U : Tm Γ U
     = Universe Context
-    -- A named assumption in Tm ∙ A.
-    | Assume Term Text
+    -- A named assumption in Tm Γ A.
+    | Assume Text Context Term
     -- A metavar with a context and type.
     | Metavar VarId Context Term
     -- If σ : Subst Δ Γ and t : Tm Γ A, then t[σ] : Tm Δ A[σ].
@@ -82,7 +82,7 @@ data Term
 
 instance Show Term where
     showsPrec _ (Universe _) = showString "U"
-    showsPrec _ (Assume _ n) = showString (Text.unpack n)
+    showsPrec _ (Assume n _ _) = showString (Text.unpack n)
     showsPrec _ (Metavar (VarId i) _ _) = showString "α" . shows i
     showsPrec _ (Apply σ t) = shows t . showString "[" . shows σ . showString "]"
     showsPrec _ (Var _) = showString "v"
@@ -94,7 +94,7 @@ instance Show Term where
 -- Extracts the context from a term.
 context :: Term -> Context
 context (Universe _Γ) = _Γ
-context (Assume _ _) = Empty
+context (Assume _ _Γ _) = _Γ
 context (Metavar _ _Γ _) = _Γ
 context (Apply σ _) = substDomain σ
 context (Var _A) = Extend _A
@@ -106,7 +106,7 @@ context (Sigma _A _B) = context _A
 -- Extracts the type of a term.
 termType :: Term -> Term
 termType (Universe _Γ) = Universe _Γ
-termType (Assume _A _) = _A
+termType (Assume _ _ _A) = _A
 termType (Metavar _ _ _A) = _A
 termType (Apply σ t) = Apply σ (termType t)
 termType (Var _A) = Apply (SubstWeaken _A) _A
@@ -145,6 +145,7 @@ recordUnificationFailure t1 t2 = liftIO $ do
 
 unify :: Term -> Term -> TcM ()
 unify (Universe _) (Universe _) = return ()
+unify (Assume n1 _ _) (Assume n2 _ _) | n1 == n2 = return ()
 unify (Metavar i _ _) t = do
     currentSubst <- gets subst
     case Map.lookup i currentSubst of
@@ -166,6 +167,7 @@ unify t1 t2 = recordUnificationFailure t1 t2
 -- TODO: metavars?
 applySubst :: Subst -> Term -> TcM Term
 applySubst σ (Universe _) = return $ Universe (substDomain σ)
+applySubst σ (Assume name _ _A) = return $ Assume name (substDomain σ) (Apply σ _A)
 applySubst σ t@(Metavar i _ _) = do
     currentSubst <- gets subst
     case Map.lookup i currentSubst of
@@ -221,7 +223,7 @@ typeCheckExpr _Γ names (Syntax.Var name) = do
           | Just body <- Map.lookup name definitions ->
                 return (weakenGlobal _Γ body)
           | Just _A <- Map.lookup name assumptions ->
-                return (weakenGlobal _Γ (Assume _A name))
+                return (Assume name _Γ _A)
           | otherwise ->
                 fail $ "unbound name: " ++ Text.unpack name
 typeCheckExpr _Γ _ Syntax.Universe = return (Universe _Γ)
