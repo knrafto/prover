@@ -137,27 +137,51 @@ freshVarId = do
     modify $ \s -> s { nextId = i + 1 }
     return (VarId i)
 
-unify :: Term -> Term -> TcM ()
-unify (Metavar i _ _) t = unifyVar i t
-unify t (Metavar i _ _) = unifyVar i t
-unify (Universe _) (Universe _) = return ()
--- TODO: something more general for pushing down substitutions?
-unify (Apply σ t) (Universe _) = unify t (Universe (substDomain σ))
-unify (Universe _) (Apply σ t) = unify (Universe (substDomain σ)) t
-unify (Pi _A1 _B1) (Pi _A2 _B2) = do
-    unify _A1 _A2
-    unify _B1 _B2
-unify t1 t2 = liftIO $ do
+recordUnificationFailure :: Term -> Term -> TcM ()
+recordUnificationFailure t1 t2 = liftIO $ do
     putStrLn $ "Failed to unify in context: " ++ show (context t1)
     putStrLn $ "  " ++ show t1
     putStrLn $ "  " ++ show t2
 
-unifyVar :: VarId -> Term -> TcM()
-unifyVar i t = do
+unify :: Term -> Term -> TcM ()
+unify (Universe _) (Universe _) = return ()
+unify (Metavar i _ _) t = do
     currentSubst <- gets subst
     case Map.lookup i currentSubst of
         Nothing -> modify $ \s -> s { subst = Map.insert i t currentSubst }
         Just t' -> unify t t'
+unify t1 t2@(Metavar _ _ _) = unify t2 t1
+unify (Apply σ t) t2 = do
+    t1' <- applySubst σ t
+    case t1' of
+        Apply _ _ -> recordUnificationFailure t1' t2
+        _ -> unify t1' t2
+unify t1 t2@(Apply _ _) = unify t2 t1
+unify (Pi _A1 _B1) (Pi _A2 _B2) = do
+    unify _A1 _A2
+    unify _B1 _B2
+unify t1 t2 = recordUnificationFailure t1 t2
+
+-- Attempts to simplify a term by applying a substitution.
+-- TODO: metavars?
+applySubst :: Subst -> Term -> TcM Term
+applySubst σ (Universe _) = return $ Universe (substDomain σ)
+applySubst σ t@(Metavar i _ _) = do
+    currentSubst <- gets subst
+    case Map.lookup i currentSubst of
+        Nothing -> return (Apply σ t)
+        Just t' -> applySubst σ t'
+applySubst σ (Apply τ t) = do
+    t' <- applySubst τ t
+    case t' of 
+        Apply _ _ -> return $ Apply σ t'
+        _ -> applySubst σ t'
+applySubst (SubstTerm t) (Var _) = return t
+applySubst (SubstExtend σ _) (Var _A) = return $ Var (Apply σ _A)
+applySubst σ (Pi _A _B) = return $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
+applySubst σ (Lam _A b) = return $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
+applySubst σ (Sigma _A _B) = return $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
+applySubst σ t = return $ Apply σ t
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
