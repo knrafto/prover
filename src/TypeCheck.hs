@@ -59,6 +59,39 @@ substCodomain (SubstExtend _ _A) = Extend _A
 newtype VarId = VarId Int
     deriving (Eq, Ord, Show)
 
+subscript :: Int -> String
+subscript i = map toSubscript (show i)
+  where
+    toSubscript '0' = '₀'
+    toSubscript '1' = '₁'
+    toSubscript '2' = '₂'
+    toSubscript '3' = '₃'
+    toSubscript '4' = '₄'
+    toSubscript '5' = '₅'
+    toSubscript '6' = '₆'
+    toSubscript '7' = '₇'
+    toSubscript '8' = '₈'
+    toSubscript '9' = '₉'
+    toSubscript _ = error "toSubscript: not a digit"
+
+data Var
+    -- If A : Tm Γ U, then v₀ : Var (Γ, A) A[wk].
+    = VZ Term
+    -- If B : Tm Γ U and v : Var Γ B, then vs(v) : Var (Γ, A) B[wk]
+    | VS Term Var
+
+instance Show Var where
+    showsPrec _ v = showString "v" . showString (subscript (deBruijn v))
+
+deBruijn :: Var -> Int
+deBruijn (VZ _) = 0
+deBruijn (VS _ v) = 1 + deBruijn v
+
+fromDeBruijn :: Context -> Int -> Var
+fromDeBruijn Empty _ = error "fromDeBruijn: empty context"
+fromDeBruijn (Extend _A) 0 = VZ _A
+fromDeBruijn (Extend _A) i = VS _A (fromDeBruijn (context _A) (i - 1))
+
 data Term
     -- U : Tm Γ U
     = Universe Context
@@ -68,8 +101,8 @@ data Term
     | Metavar VarId Context Term
     -- If σ : Subst Δ Γ and t : Tm Γ A, then t[σ] : Tm Δ A[σ].
     | Apply Subst Term
-    -- If A : Tm Γ U, then v : Tm (Γ, A) A[wk].
-    | Var Term
+    -- If v : Var Γ A, then var(v) : Tm Γ A
+    | Var Var
     -- If A : Tm Γ U and B : Tm (Γ, A) U, then Π(A, B) : Tm Γ U
     | Pi Term Term
     -- If A : Tm Γ U and b : Tm (Γ, A) B, then λ(b) : Tm Π(A, B)
@@ -83,9 +116,9 @@ data Term
 instance Show Term where
     showsPrec _ (Universe _) = showString "U"
     showsPrec _ (Assume n _ _) = showString (Text.unpack n)
-    showsPrec _ (Metavar (VarId i) _ _) = showString "α" . shows i
+    showsPrec _ (Metavar (VarId i) _ _) = showString "α" . showString (subscript i)
     showsPrec _ (Apply σ t) = shows t . showString "[" . shows σ . showString "]"
-    showsPrec _ (Var _) = showString "v"
+    showsPrec _ (Var v) = shows v
     showsPrec _ (Pi _A _B) = showString "Π(" . shows _A . showString ", " . shows _B . showString ")"
     showsPrec _ (Lam _ b) = showString "λ(" . shows b . showString ")"
     showsPrec _ (App _ _ f) = showString "app(" . shows f . showString ")"
@@ -97,7 +130,10 @@ context (Universe _Γ) = _Γ
 context (Assume _ _Γ _) = _Γ
 context (Metavar _ _Γ _) = _Γ
 context (Apply σ _) = substDomain σ
-context (Var _A) = Extend _A
+context (Var v) = go v
+  where
+    go (VZ _A) = Extend _A
+    go (VS _A _) = Extend _A
 context (Pi _A _B) = context _A
 context (Lam _A _) = context _A
 context (App _A _ _) = Extend _A
@@ -109,7 +145,10 @@ termType (Universe _Γ) = Universe _Γ
 termType (Assume _ _ _A) = _A
 termType (Metavar _ _ _A) = _A
 termType (Apply σ t) = Apply σ (termType t)
-termType (Var _A) = Apply (SubstWeaken _A) _A
+termType (Var v) = go v
+  where
+    go (VZ _A) = Apply (SubstWeaken _A) _A
+    go (VS _A v') = Apply (SubstWeaken _A) (go v')
 termType (Pi _A _B) = Universe (context _A)
 termType (Lam _A b) = Pi _A (termType b)
 termType (App _ _B _) = _B
@@ -158,6 +197,8 @@ unify (Apply σ t) t2 = do
         Apply _ _ -> recordUnificationFailure t1' t2
         _ -> unify t1' t2
 unify t1 t2@(Apply _ _) = unify t2 t1
+unify (Var (VZ _)) (Var (VZ _)) = return ()
+unify (Var (VS _ v1)) (Var (VS _ v2)) = unify (Var v1) (Var v2)
 unify (Pi _A1 _B1) (Pi _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
@@ -178,8 +219,13 @@ applySubst σ (Apply τ t) = do
     case t' of 
         Apply _ _ -> return $ Apply σ t'
         _ -> applySubst σ t'
-applySubst (SubstTerm t) (Var _) = return t
-applySubst (SubstExtend σ _) (Var _A) = return $ Var (Apply σ _A)
+applySubst (SubstWeaken _A) (Var v) = return $ Var (VS _A v)
+applySubst (SubstTerm t) (Var (VZ _)) = return t
+applySubst (SubstTerm _) (Var (VS _ v)) = return $ Var v
+applySubst (SubstExtend σ _) (Var (VZ _A)) = return $ Var (VZ (Apply σ _A))
+applySubst (SubstExtend σ _A) (Var (VS _ v)) = do
+    t <- applySubst σ (Var v)
+    applySubst (SubstWeaken (Apply σ _A)) t
 applySubst σ (Pi _A _B) = return $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
 applySubst σ (Lam _A b) = return $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
 applySubst σ (Sigma _A _B) = return $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
@@ -198,11 +244,6 @@ typeCheckStatement (Syntax.Assume name ty) = do
     modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
 typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
 
-var :: Context -> Int -> Term
-var Empty _ = error "var: empty context"
-var (Extend _A) 0 = Var _A
-var (Extend _A) n = Apply (SubstWeaken _A) (var (context _A) (n - 1))
-
 weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t
 weakenGlobal (Extend _A) t = Apply (SubstWeaken _A) (weakenGlobal (context _A) t) 
@@ -219,7 +260,7 @@ typeCheckExpr _Γ names (Syntax.Var name) = do
     definitions <- gets tcDefinitions
     assumptions <- gets tcAssumptions
     case () of
-        _ | Just i <- elemIndex name names -> return (var _Γ i)
+        _ | Just i <- elemIndex name names -> return (Var (fromDeBruijn _Γ i))
           | Just body <- Map.lookup name definitions ->
                 return (weakenGlobal _Γ body)
           | Just _A <- Map.lookup name assumptions ->
