@@ -105,9 +105,9 @@ data Term
     | Var Var
     -- If A : Tm Γ U and B : Tm (Γ, A) U, then Π(A, B) : Tm Γ U
     | Pi Term Term
-    -- If A : Tm Γ U and b : Tm (Γ, A) B, then λ(b) : Tm Π(A, B)
+    -- If A : Tm Γ U and b : Tm (Γ, A) B, then λ(b) : Tm Γ Π(A, B)
     | Lam Term Term
-    -- If A : Tm Γ U and B : Tm (Γ, A) U and and f : Tm Π(A, B),
+    -- If A : Tm Γ U and B : Tm (Γ, A) U and f : Tm Γ Π(A, B),
     -- then app(f) : Tm (Γ, A) B
     | App Term Term Term 
     -- If A : Tm Γ U and B : Tm (Γ, A) U, then Σ(A, B) : Tm Γ U
