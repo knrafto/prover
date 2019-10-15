@@ -107,9 +107,9 @@ data Term
     | Pi Term Term
     -- If A : Tm Γ U and b : Tm (Γ, A) B, then λ(b) : Tm Γ Π(A, B)
     | Lam Term Term
-    -- If A : Tm Γ U and B : Tm (Γ, A) U and f : Tm Γ Π(A, B),
-    -- then app(f) : Tm (Γ, A) B
-    | App Term Term Term 
+    -- If A : Tm Γ U and B : Tm (Γ, A) U and f : Tm Γ Π(A, B) and a : Tm Γ A
+    -- then app(f, a) : Tm Γ B[⟨a⟩]
+    | App Term Term Term Term
     -- If A : Tm Γ U and B : Tm (Γ, A) U, then Σ(A, B) : Tm Γ U
     | Sigma Term Term
 
@@ -121,7 +121,7 @@ instance Show Term where
     showsPrec _ (Var v) = shows v
     showsPrec _ (Pi _A _B) = showString "Π(" . shows _A . showString ", " . shows _B . showString ")"
     showsPrec _ (Lam _ b) = showString "λ(" . shows b . showString ")"
-    showsPrec _ (App _ _ f) = showString "app(" . shows f . showString ")"
+    showsPrec _ (App _ _ f a) = showString "app(" . shows f . showString ", " . shows a . showString ")"
     showsPrec _ (Sigma _A _B) = showString "Σ(" . shows _A . showString ", " . shows _B . showString ")"
 
 -- Extracts the context from a term.
@@ -136,7 +136,7 @@ context (Var v) = go v
     go (VS _A _) = Extend _A
 context (Pi _A _B) = context _A
 context (Lam _A _) = context _A
-context (App _A _ _) = Extend _A
+context (App _A _ _ _) = context _A
 context (Sigma _A _B) = context _A
 
 -- Extracts the type of a term.
@@ -151,7 +151,7 @@ termType (Var v) = go v
     go (VS _A v') = Apply (SubstWeaken _A) (go v')
 termType (Pi _A _B) = Universe (context _A)
 termType (Lam _A b) = Pi _A (termType b)
-termType (App _ _B _) = _B
+termType (App _ _B _ a) = Apply (SubstTerm a) _B
 termType (Sigma _A _B) = Universe (context _A)
 
 data TcState = TcState
@@ -202,6 +202,10 @@ unify (Var (VS _ v1)) (Var (VS _ v2)) = unify (Var v1) (Var v2)
 unify (Pi _A1 _B1) (Pi _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
+-- TODO: this is probably overzealous
+unify (App _ _ f1 a1) (App _ _ f2 a2) = do
+    unify f1 f2
+    unify a1 a2
 unify t1 t2 = recordUnificationFailure t1 t2
 
 -- Attempts to simplify a term by applying a substitution.
@@ -228,8 +232,8 @@ applySubst (SubstExtend σ _A) (Var (VS _ v)) = do
     applySubst (SubstWeaken (Apply σ _A)) t
 applySubst σ (Pi _A _B) = return $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
 applySubst σ (Lam _A b) = return $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
+applySubst σ (App _A _B f a) = return $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
 applySubst σ (Sigma _A _B) = return $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
-applySubst σ t = return $ Apply σ t
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
@@ -304,7 +308,7 @@ typeCheckApp f [] = return f
 typeCheckApp f (arg : args) = do
     varId <- freshVarId
     let _Γ = context f
-    let _A = (termType arg)
+    let _A = termType arg
     let _B = Metavar varId _Γ (Universe _Γ)
     unify (termType f) (Pi _A _B)
-    typeCheckApp (Apply (SubstTerm arg) (App _A _B f)) args
+    typeCheckApp (App _A _B f arg) args
