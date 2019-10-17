@@ -1,20 +1,20 @@
 :assume Id : Π (A : Type). A → A → Type
 
-IsContr := λ (A : Type). Σ (a : A). Π (b : A). Id(A, a, b)
+IsContr := λ (A : Type). Σ (a : A). Π (b : A). Id(_, a, b)
 
-IsProp := λ (A : Type). Π (a : A). Π (b : A). Id(A, a, b)
+IsProp := λ (A : Type). Π (a : A). Π (b : A). Id(_, a, b)
 
 IsSet := λ (A : Type). Π (a : A). Π (b : A).
-    Π (p : Id(A, a, b)). Π (q : Id(A, a, b)). Id(Id(A, a, b), p, q)
+    Π (p : Id(_, a, b)). Π (q : Id(_, a, b)). Id(_, p, q)
 
 Fiber := λ (A : Type). λ (B : Type). λ (f : A → B). λ (b : B).
-    Σ (a : A). Id(B, f(a), b)
+    Σ (a : A). Id(_, f(a), b)
 
 IsEquiv := λ (A : Type). λ (B : Type). λ (f : A → B).
-    Π (b : B). IsContr(Fiber(A, B, f, b))
+    Π (b : B). IsContr(Fiber(_, _, f, b))
 
 IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
-    Π (b : B). IsProp(Fiber(A, B, f, b))
+    Π (b : B). IsProp(Fiber(_, _, f, b))
 
 :assume 1 : Type
 :assume ⋆ : 1
