@@ -239,7 +239,9 @@ unify' (Sigma _A _B) (Apply σ t) = do
     unify _B _B'
 unify' t1 t2 = unificationFailure t1 t2
 
--- Attempts to simplify a term.
+-- Attempts to simplify a term. If there are no metavars, the result will be
+-- a normal form.
+-- TODO: reduce Pi and Sigma?
 reduce :: Term -> TcM Term
 reduce t@(Metavar i _ _) = do
     currentSubst <- gets subst
@@ -259,17 +261,20 @@ reduce (Apply σ t) = do
             (SubstExtend σ' _, VZ _A) -> Var (VZ (Apply σ' _A))
             (SubstExtend σ' _A, VS _ v') ->
                 Apply (SubstWeaken (Apply σ' _A)) (Apply σ' (Var v'))
-        Pi _A _B -> return $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
+        Pi _A _B -> reduce $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
         Lam _A b -> reduce $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
         App _A _B f a -> reduce $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
-        Sigma _A _B -> return $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
+        Sigma _A _B -> reduce $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
         _ -> return $ Apply σ t'
+reduce (Pi _A _B) = Pi <$> reduce _A <*> reduce _B
+reduce (Lam _A b) = Lam _A <$> reduce b
 reduce (App _A _B f a) = do
     f' <- reduce f
     a' <- reduce a
     case f' of
         Lam _ b -> reduce $ Apply (SubstTerm a') b
         _ -> return $ App _A _B f' a'
+reduce (Sigma _A _B) = Sigma <$> reduce _A <*> reduce _B
 reduce t = return t
 
 -- Checks there are no redexes in an expression.
