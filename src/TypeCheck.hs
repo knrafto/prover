@@ -182,6 +182,10 @@ freshVarId = do
     modify $ \s -> s { nextId = i + 1 }
     return (VarId i)
 
+-- TODO: occurs check
+assign :: VarId -> Term -> TcM ()
+assign i t = modify $ \s -> s { subst = Map.insert i t (subst s) }
+
 unificationFailure :: Term -> Term -> TcM a
 unificationFailure t1 t2 = throwError $
     "Failed to unify in context: " ++ show (context t1) ++ "\n" ++
@@ -189,57 +193,96 @@ unificationFailure t1 t2 = throwError $
     "  " ++ show t2 ++ "\n"
 
 unify :: Term -> Term -> TcM ()
-unify (Universe _) (Universe _) = return ()
-unify (Assume n1 _ _) (Assume n2 _ _) | n1 == n2 = return ()
-unify (Metavar i _ _) t = do
-    currentSubst <- gets subst
-    case Map.lookup i currentSubst of
-        Nothing -> modify $ \s -> s { subst = Map.insert i t currentSubst }
-        Just t' -> unify t t'
-unify t1 t2@(Metavar _ _ _) = unify t2 t1
-unify (Apply σ t) t2 = do
-    t1' <- applySubst σ t
-    case t1' of
-        Apply _ _ -> unificationFailure t1' t2
-        _ -> unify t1' t2
-unify t1 t2@(Apply _ _) = unify t2 t1
-unify (Var (VZ _)) (Var (VZ _)) = return ()
-unify (Var (VS _ v1)) (Var (VS _ v2)) = unify (Var v1) (Var v2)
-unify (Pi _A1 _B1) (Pi _A2 _B2) = do
+unify t1 t2 = do
+    t1' <- reduce t1
+    t2' <- reduce t2
+    unify' t1' t2'
+
+-- TODO: rewrite to be one-sided and try both sides in unify?
+unify' :: Term -> Term -> TcM ()
+unify' (Universe _) (Universe _) = return ()
+unify' (Universe _) (Apply σ t) = unify (Universe (substCodomain σ)) t
+unify' (Apply σ t) (Universe _) = unify t (Universe (substCodomain σ))
+unify' (Assume n1 _ _) (Assume n2 _ _) | n1 == n2 = return ()
+unify' (Metavar i _ _) t = assign i t
+unify' t (Metavar i _ _) = assign i t
+unify' (Var (VZ _)) (Var (VZ _)) = return ()
+unify' (Var (VS _ v1)) (Var (VS _ v2)) = unify (Var v1) (Var v2)
+unify' (Apply (SubstWeaken _) t) (Var (VS _ v)) = unify t (Var v)
+unify' (Var (VS _ v)) (Apply (SubstWeaken _) t) = unify t (Var v)
+unify' (Apply (SubstTerm _) (Apply (SubstWeaken _) t1)) t2 = unify t1 t2
+unify' t1 (Apply (SubstTerm _) (Apply (SubstWeaken _) t2)) = unify t1 t2
+unify' (Pi _A1 _B1) (Pi _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
--- TODO: this is probably overzealous
-unify (App _ _ f1 a1) (App _ _ f2 a2) = do
+unify' (Pi _A _B) (Apply σ t) = do
+    α <- freshVarId
+    β <- freshVarId
+    let _Γ = substCodomain σ
+    let _A' = Metavar α _Γ (Universe _Γ)
+    let _B' = Metavar β (Extend _A') (Universe (Extend _A'))
+    unify t (Pi _A' _B')
+    unify _A _A'
+    unify _B _B'
+unify' t1@(Apply _ _) t2@(Pi _ _) = unify t2 t1
+unify' (Lam _ b1) (Lam _ b2) = unify b1 b2
+unify' (App _ _ f1 a1) (App _ _ f2 a2) | isHeadNeutral f1 && isHeadNeutral f2 = do
     unify f1 f2
     unify a1 a2
-unify t1 t2 = unificationFailure t1 t2
+unify' (Sigma _A1 _B1) (Sigma _A2 _B2) = do
+    unify _A1 _A2
+    unify _B1 _B2
+unify' (Sigma _A _B) (Apply σ t) = do
+    α <- freshVarId
+    β <- freshVarId
+    let _Γ = substCodomain σ
+    let _A' = Metavar α _Γ (Universe _Γ)
+    let _B' = Metavar β (Extend _A') (Universe (Extend _A'))
+    unify t (Sigma _A' _B')
+    unify _A _A'
+    unify _B _B'
+unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
+unify' t1 t2 = unificationFailure t1 t2
 
--- Attempts to simplify a term by applying a substitution.
--- TODO: metavars?
-applySubst :: Subst -> Term -> TcM Term
-applySubst σ (Universe _) = return $ Universe (substDomain σ)
-applySubst σ (Assume name _ _A) = return $ Assume name (substDomain σ) (Apply σ _A)
-applySubst σ t@(Metavar i _ _) = do
+-- Attempts to simplify a term.
+reduce :: Term -> TcM Term
+reduce t@(Metavar i _ _) = do
     currentSubst <- gets subst
+    -- TODO: path compression
     case Map.lookup i currentSubst of
-        Nothing -> return (Apply σ t)
-        Just t' -> applySubst σ t'
-applySubst σ (Apply τ t) = do
-    t' <- applySubst τ t
-    case t' of 
-        Apply _ _ -> return $ Apply σ t'
-        _ -> applySubst σ t'
-applySubst (SubstWeaken _A) (Var v) = return $ Var (VS _A v)
-applySubst (SubstTerm t) (Var (VZ _)) = return t
-applySubst (SubstTerm _) (Var (VS _ v)) = return $ Var v
-applySubst (SubstExtend σ _) (Var (VZ _A)) = return $ Var (VZ (Apply σ _A))
-applySubst (SubstExtend σ _A) (Var (VS _ v)) = do
-    t <- applySubst σ (Var v)
-    applySubst (SubstWeaken (Apply σ _A)) t
-applySubst σ (Pi _A _B) = return $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
-applySubst σ (Lam _A b) = return $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
-applySubst σ (App _A _B f a) = return $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
-applySubst σ (Sigma _A _B) = return $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
+        Nothing -> return t
+        Just t' -> reduce t'
+reduce (Apply σ t) = do
+    t' <- reduce t
+    case t' of
+        Universe _ -> return $ Universe (substDomain σ)
+        Assume name _ _A -> return $ Assume name (substDomain σ) (Apply σ _A)
+        Var v -> reduce $ case (σ, v) of
+            (SubstWeaken _A, _) -> Var (VS _A v)
+            (SubstTerm a, VZ _) -> a
+            (SubstTerm _, VS _ v') -> Var v'
+            (SubstExtend σ' _, VZ _A) -> Var (VZ (Apply σ' _A))
+            (SubstExtend σ' _A, VS _ v') ->
+                Apply (SubstWeaken (Apply σ' _A)) (Apply σ' (Var v'))
+        Pi _A _B -> return $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
+        Lam _A b -> reduce $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
+        App _A _B f a -> reduce $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
+        Sigma _A _B -> return $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
+        _ -> return $ Apply σ t'
+reduce (App _A _B f a) = do
+    f' <- reduce f
+    a' <- reduce a
+    case f' of
+        Lam _ b -> reduce $ Apply (SubstTerm a') b
+        _ -> return $ App _A _B f' a'
+reduce t = return t
+
+-- Checks there are no redexes in an expression.
+isHeadNeutral :: Term -> Bool
+isHeadNeutral (Assume _ _ _) = True
+isHeadNeutral (Var _) = True
+isHeadNeutral (App _ _ f _) = isHeadNeutral f
+isHeadNeutral _ = False
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
