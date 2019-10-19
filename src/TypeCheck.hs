@@ -4,6 +4,7 @@ import           Control.Applicative
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.List
+import           Data.Monoid
 import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict as Map
 import           Data.Text                      ( Text )
@@ -172,10 +173,15 @@ initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, n
 
 -- Note that StateT is layered over ExceptT, so that alternatives are explored
 -- "in parallel" by duplicating state.
-type TcM a = StateT TcState (ExceptT String IO) a
+type TcM a = StateT TcState (ExceptT (Last String) IO) a
+
+throwString :: String -> TcM a
+throwString = throwError . Last . Just
 
 reportError :: TcM () -> TcM ()
-reportError h = catchError h $ \e -> liftIO (putStrLn e)
+reportError h = catchError h $ \(Last m) -> case m of
+    Nothing -> liftIO (putStrLn "<unknown error>")
+    Just e -> liftIO (putStrLn e)
 
 freshVarId :: TcM VarId
 freshVarId = do
@@ -188,10 +194,10 @@ assign :: VarId -> Term -> TcM ()
 assign i t = modify $ \s -> s { subst = Map.insert i t (subst s) }
 
 unificationFailure :: Term -> Term -> TcM a
-unificationFailure t1 t2 = throwError $
+unificationFailure t1 t2 = throwString $
     "Failed to unify in context: " ++ show (context t1) ++ "\n" ++
     "  " ++ show t1 ++ "\n" ++
-    "  " ++ show t2 ++ "\n"
+    "  " ++ show t2
 
 unify :: Term -> Term -> TcM ()
 unify t1 t2 = do
@@ -289,13 +295,14 @@ isHeadNeutral _ = False
 
 -- Searches for a term that has a given type.
 prove :: Term -> TcM Term
-prove _A = throwError $ "Could not prove " ++ show _A
+prove _A = throwString $ "Could not prove " ++ show _A
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
     result <- runExceptT (execStateT (mapM_ typeCheckStatement statements) initialState)
     case result of
-        Left e -> fail e
+        Left (Last Nothing) -> fail "<unknown error>"
+        Left (Last (Just e)) -> fail e
         Right s -> return s
 
 -- TODO: also substitute for metavars before printing.
