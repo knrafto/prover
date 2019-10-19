@@ -173,17 +173,20 @@ initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, n
 -- "in parallel" by duplicating state.
 type TcM a = StateT TcState (ExceptT String IO) a
 
+reportError :: TcM () -> TcM ()
+reportError h = catchError h $ \e -> liftIO (putStr e)
+
 freshVarId :: TcM VarId
 freshVarId = do
     i <- gets nextId
     modify $ \s -> s { nextId = i + 1 }
     return (VarId i)
 
-recordUnificationFailure :: Term -> Term -> TcM ()
-recordUnificationFailure t1 t2 = liftIO $ do
-    putStrLn $ "Failed to unify in context: " ++ show (context t1)
-    putStrLn $ "  " ++ show t1
-    putStrLn $ "  " ++ show t2
+unificationFailure :: Term -> Term -> TcM a
+unificationFailure t1 t2 = throwError $
+    "Failed to unify in context: " ++ show (context t1) ++ "\n" ++
+    "  " ++ show t1 ++ "\n" ++
+    "  " ++ show t2 ++ "\n"
 
 unify :: Term -> Term -> TcM ()
 unify (Universe _) (Universe _) = return ()
@@ -197,7 +200,7 @@ unify t1 t2@(Metavar _ _ _) = unify t2 t1
 unify (Apply σ t) t2 = do
     t1' <- applySubst σ t
     case t1' of
-        Apply _ _ -> recordUnificationFailure t1' t2
+        Apply _ _ -> unificationFailure t1' t2
         _ -> unify t1' t2
 unify t1 t2@(Apply _ _) = unify t2 t1
 unify (Var (VZ _)) (Var (VZ _)) = return ()
@@ -209,7 +212,7 @@ unify (Pi _A1 _B1) (Pi _A2 _B2) = do
 unify (App _ _ f1 a1) (App _ _ f2 a2) = do
     unify f1 f2
     unify a1 a2
-unify t1 t2 = recordUnificationFailure t1 t2
+unify t1 t2 = unificationFailure t1 t2
 
 -- Attempts to simplify a term by applying a substitution.
 -- TODO: metavars?
@@ -308,7 +311,7 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     return (Sigma _A' _B')
 
 checkIsType :: Term -> TcM ()
-checkIsType t = unify (termType t) (Universe (context t))
+checkIsType t = reportError $ unify (termType t) (Universe (context t))
 
 typeCheckApp :: Term -> [Term] -> TcM Term
 typeCheckApp f [] = return f
@@ -317,5 +320,5 @@ typeCheckApp f (arg : args) = do
     let _Γ = context f
     let _A = termType arg
     let _B = Metavar varId _Γ (Universe _Γ)
-    unify (termType f) (Pi _A _B)
+    reportError $ unify (termType f) (Pi _A _B)
     typeCheckApp (App _A _B f arg) args
