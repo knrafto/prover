@@ -225,6 +225,9 @@ unify' (Lam _ b1) (Lam _ b2) = unify b1 b2
 unify' (App _ _ f1 a1) (App _ _ f2 a2) | isHeadNeutral f1 && isHeadNeutral f2 = do
     unify f1 f2
     unify a1 a2
+-- Eta rule says that lam(app(f[wk], v₀))) = f for any f. Thus, if we have
+-- app(f[wk], v₀)) = e, then we know f = lam(e).
+unify' (App _A _ (Apply (SubstWeaken _) t1) (Var (VZ _))) t2 = unify t1 (Lam _A t2)
 unify' (Sigma _A1 _B1) (Sigma _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
