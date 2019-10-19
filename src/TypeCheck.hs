@@ -175,7 +175,7 @@ initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, n
 type TcM a = StateT TcState (ExceptT String IO) a
 
 reportError :: TcM () -> TcM ()
-reportError h = catchError h $ \e -> liftIO (putStr e)
+reportError h = catchError h $ \e -> liftIO (putStrLn e)
 
 freshVarId :: TcM VarId
 freshVarId = do
@@ -287,6 +287,10 @@ isHeadNeutral (Var _) = True
 isHeadNeutral (App _ _ f _) = isHeadNeutral f
 isHeadNeutral _ = False
 
+-- Searches for a term that has a given type.
+prove :: Term -> TcM Term
+prove _A = throwError $ "Could not prove " ++ show _A
+
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
     result <- runExceptT (execStateT (mapM_ typeCheckStatement statements) initialState)
@@ -304,7 +308,10 @@ typeCheckStatement (Syntax.Assume name ty) = do
     tyTerm <- typeCheckExpr Empty [] ty
     tyTerm' <- reduce tyTerm
     modify $ \s -> s { tcAssumptions = Map.insert name tyTerm' (tcAssumptions s) }
-typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
+typeCheckStatement (Syntax.Prove ty) = do
+    tyTerm <- typeCheckExpr Empty [] ty
+    tyTerm' <- reduce tyTerm
+    reportError . void $ prove tyTerm'
 
 weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t
