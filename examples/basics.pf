@@ -1,4 +1,5 @@
 :assume Id : Π (A : Type). A → A → Type
+:assume refl : Π (A : Type). Π (a : A). Id(A, a, a)
 
 IsContr := λ (A : Type). Σ (a : A). Π (b : A). Id(_, a, b)
 
@@ -20,4 +21,4 @@ IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
 :assume ⋆ : 1
 :assume ind1 : Π (C : 1 → Type). C(⋆) → Π (a : 1). C(a)
 
-:prove IsProp(1)
+p1 := ind1(_, ind1(_, refl(1, ⋆)))
