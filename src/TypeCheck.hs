@@ -294,11 +294,13 @@ typeCheck statements = do
 -- TODO: also substitute for metavars before printing.
 typeCheckStatement :: Syntax.Statement -> TcM ()
 typeCheckStatement (Syntax.Define name body) = do
-    body' <- typeCheckExpr Empty [] body
-    modify $ \s -> s { tcDefinitions = Map.insert name body' (tcDefinitions s) }
+    bodyTerm <- typeCheckExpr Empty [] body
+    bodyTerm' <- reduce bodyTerm
+    modify $ \s -> s { tcDefinitions = Map.insert name bodyTerm' (tcDefinitions s) }
 typeCheckStatement (Syntax.Assume name ty) = do
-    ty' <- typeCheckExpr Empty [] ty
-    modify $ \s -> s { tcAssumptions = Map.insert name ty' (tcAssumptions s) }
+    tyTerm <- typeCheckExpr Empty [] ty
+    tyTerm' <- reduce tyTerm
+    modify $ \s -> s { tcAssumptions = Map.insert name tyTerm' (tcAssumptions s) }
 typeCheckStatement (Syntax.Prove _) = fail ":prove not implemented"
 
 weakenGlobal :: Context -> Term -> Term
