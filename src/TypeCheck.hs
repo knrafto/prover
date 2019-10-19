@@ -307,8 +307,13 @@ typeCheck statements = do
 
 -- TODO: also substitute for metavars before printing.
 typeCheckStatement :: Syntax.Statement -> TcM ()
-typeCheckStatement (Syntax.Define name body) = do
+typeCheckStatement (Syntax.Define name ty body) = do
     bodyTerm <- typeCheckExpr Empty [] body
+    case ty of
+        Nothing -> return ()
+        Just ty' -> do
+            tyTerm <- typeCheckExpr Empty [] ty'
+            unify (termType bodyTerm) tyTerm
     bodyTerm' <- reduce bodyTerm
     modify $ \s -> s { tcDefinitions = Map.insert name bodyTerm' (tcDefinitions s) }
 typeCheckStatement (Syntax.Assume name ty) = do

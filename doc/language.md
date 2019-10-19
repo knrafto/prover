@@ -38,7 +38,7 @@ statement = directive | definition
 directive =
     :assume name : expr
     :prove expr
-definition = name := expr
+definition = name [ : expr ] := expr
 expr =
     _
     name

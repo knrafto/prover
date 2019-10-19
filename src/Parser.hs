@@ -80,7 +80,7 @@ expr = do
         return (Arrow x y)
 
 define :: Parser Statement
-define = Define <$> identifier <* reservedWord ":=" <*> expr
+define = Define <$> identifier <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
 
 assume :: Parser Statement
 assume = Assume <$ reservedWord ":assume" <*> identifier <* reservedWord ":" <*> expr

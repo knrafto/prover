@@ -3,7 +3,7 @@ module Syntax where
 import Data.Text (Text)
 
 data Statement
-    = Define Text Expr
+    = Define Text (Maybe Expr) Expr
     | Assume Text Expr
     | Prove Expr
     deriving (Show)
