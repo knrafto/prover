@@ -1,5 +1,6 @@
 module TypeCheck where
 
+import           Control.Applicative
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.List
@@ -196,22 +197,18 @@ unify :: Term -> Term -> TcM ()
 unify t1 t2 = do
     t1' <- reduce t1
     t2' <- reduce t2
-    unify' t1' t2'
+    unify' t1' t2' <|> unify' t2' t1'
 
 -- TODO: rewrite to be one-sided and try both sides in unify?
 unify' :: Term -> Term -> TcM ()
 unify' (Universe _) (Universe _) = return ()
 unify' (Universe _) (Apply σ t) = unify (Universe (substCodomain σ)) t
-unify' (Apply σ t) (Universe _) = unify t (Universe (substCodomain σ))
 unify' (Assume n1 _ _) (Assume n2 _ _) | n1 == n2 = return ()
 unify' (Metavar i _ _) t = assign i t
-unify' t (Metavar i _ _) = assign i t
 unify' (Var (VZ _)) (Var (VZ _)) = return ()
 unify' (Var (VS _ v1)) (Var (VS _ v2)) = unify (Var v1) (Var v2)
 unify' (Apply (SubstWeaken _) t) (Var (VS _ v)) = unify t (Var v)
-unify' (Var (VS _ v)) (Apply (SubstWeaken _) t) = unify t (Var v)
 unify' (Apply (SubstTerm _) (Apply (SubstWeaken _) t1)) t2 = unify t1 t2
-unify' t1 (Apply (SubstTerm _) (Apply (SubstWeaken _) t2)) = unify t1 t2
 unify' (Pi _A1 _B1) (Pi _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
@@ -224,7 +221,6 @@ unify' (Pi _A _B) (Apply σ t) = do
     unify t (Pi _A' _B')
     unify _A _A'
     unify _B _B'
-unify' t1@(Apply _ _) t2@(Pi _ _) = unify t2 t1
 unify' (Lam _ b1) (Lam _ b2) = unify b1 b2
 unify' (App _ _ f1 a1) (App _ _ f2 a2) | isHeadNeutral f1 && isHeadNeutral f2 = do
     unify f1 f2
@@ -241,7 +237,6 @@ unify' (Sigma _A _B) (Apply σ t) = do
     unify t (Sigma _A' _B')
     unify _A _A'
     unify _B _B'
-unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
 unify' t1 t2 = unificationFailure t1 t2
 
 -- Attempts to simplify a term.
