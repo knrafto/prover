@@ -1,5 +1,6 @@
 module TypeCheck where
 
+import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.List
 import           Data.Map.Strict                ( Map )
@@ -168,7 +169,9 @@ data TcState = TcState
 initialState :: TcState
 initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, nextId = 0, subst = Map.empty }
 
-type TcM a = StateT TcState IO a
+-- Note that StateT is layered over ExceptT, so that alternatives are explored
+-- "in parallel" by duplicating state.
+type TcM a = StateT TcState (ExceptT String IO) a
 
 freshVarId :: TcM VarId
 freshVarId = do
@@ -236,7 +239,11 @@ applySubst σ (App _A _B f a) = return $ App (Apply σ _A) (Apply (SubstExtend �
 applySubst σ (Sigma _A _B) = return $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
 
 typeCheck :: [Syntax.Statement] -> IO TcState
-typeCheck statements = execStateT (mapM_ typeCheckStatement statements) initialState
+typeCheck statements = do
+    result <- runExceptT (execStateT (mapM_ typeCheckStatement statements) initialState)
+    case result of
+        Left e -> fail e
+        Right s -> return s
 
 -- TODO: also substitute for metavars before printing.
 typeCheckStatement :: Syntax.Statement -> TcM ()
