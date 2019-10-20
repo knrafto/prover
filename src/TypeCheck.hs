@@ -190,11 +190,12 @@ reportError h = catchError h $ \(Last m) -> case m of
     Nothing -> liftIO (putStrLn "<unknown error>")
     Just e -> liftIO (putStrLn e)
 
-freshVarId :: TcM VarId
-freshVarId = do
+-- Generate a metavar for the given context and type.
+freshMetavar :: Context -> Term -> TcM Term
+freshMetavar _Γ _A = do
     i <- gets nextId
     modify $ \s -> s { nextId = i + 1 }
-    return (VarId i)
+    return $ Metavar (VarId i) _Γ _A
 
 saveEquation :: Term -> Term ->TcM ()
 saveEquation t1 t2 = modify $ \s -> s { unsolvedEquations = (t1, t2) : unsolvedEquations s }
@@ -241,11 +242,9 @@ unify' (Pi _A1 _B1) (Pi _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
 unify' (Pi _A _B) (Apply σ t) = do
-    α <- freshVarId
-    β <- freshVarId
     let _Γ = substCodomain σ
-    let _A' = Metavar α _Γ (Universe _Γ)
-    let _B' = Metavar β (Extend _A') (Universe (Extend _A'))
+    _A' <- freshMetavar _Γ (Universe _Γ)
+    _B' <- freshMetavar (Extend _A') (Universe (Extend _A'))
     unify t (Pi _A' _B')
     unify _A _A'
     unify _B _B'
@@ -262,11 +261,9 @@ unify' (Sigma _A1 _B1) (Sigma _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
 unify' (Sigma _A _B) (Apply σ t) = do
-    α <- freshVarId
-    β <- freshVarId
     let _Γ = substCodomain σ
-    let _A' = Metavar α _Γ (Universe _Γ)
-    let _B' = Metavar β (Extend _A') (Universe (Extend _A'))
+    _A' <- freshMetavar _Γ (Universe _Γ)
+    _B' <- freshMetavar (Extend _A') (Universe (Extend _A'))
     unify t (Sigma _A' _B')
     unify _A _A'
     unify _B _B'
@@ -375,9 +372,8 @@ typeCheckExpr _Γ _ Syntax.Hole = do
     -- We generate variables for both the hole itself, and its type. Luckily
     -- for now we don't have to do this forever, since the type of any type is
     -- the universe.
-    termVarId <- freshVarId
-    typeVarId <- freshVarId
-    return (Metavar termVarId _Γ (Metavar typeVarId _Γ (Universe _Γ)))
+    _A <- freshMetavar _Γ (Universe _Γ)
+    freshMetavar _Γ _A
 typeCheckExpr _Γ names (Syntax.Var name) = do
     definitions <- gets tcDefinitions
     assumptions <- gets tcAssumptions
@@ -424,9 +420,8 @@ checkIsType t = unify (termType t) (Universe (context t))
 typeCheckApp :: Term -> [Term] -> TcM Term
 typeCheckApp f [] = return f
 typeCheckApp f (arg : args) = do
-    varId <- freshVarId
     let _Γ = context f
     let _A = termType arg
-    let _B = Metavar varId _Γ (Universe _Γ)
+    _B <- freshMetavar _Γ (Universe _Γ)
     unify (termType f) (Pi _A _B)
     typeCheckApp (App _A _B f arg) args
