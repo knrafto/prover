@@ -215,8 +215,6 @@ unify' (Var (VZ _)) (Var (VZ _)) = return ()
 unify' (Var (VS _ v1)) (Var (VS _ v2)) = unify (Var v1) (Var v2)
 unify' (Apply (SubstWeaken _) t) (Var (VS _ v)) = unify t (Var v)
 unify' (Var (VS _ v)) (Apply (SubstWeaken _) t) = unify t (Var v)
-unify' (Apply (SubstTerm _) (Apply (SubstWeaken _) t1)) t2 = unify t1 t2
-unify' t1 (Apply (SubstTerm _) (Apply (SubstWeaken _) t2)) = unify t1 t2
 unify' (Pi _A1 _B1) (Pi _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2
@@ -268,6 +266,10 @@ reduce (Apply σ t) = do
     case t' of
         Universe _ -> return $ Universe (substDomain σ)
         Assume name _ _A -> return $ Assume name (substDomain σ) (Apply σ _A)
+        Apply τ t'' -> case (σ, τ) of
+            (SubstTerm _, SubstWeaken _) -> return t''
+            (SubstExtend σ' _, SubstWeaken _A) -> reduce $ Apply (SubstWeaken (Apply σ' _A)) (Apply σ' t'')
+            _ -> return $ Apply σ t'
         Var v -> reduce $ case (σ, v) of
             (SubstWeaken _A, _) -> Var (VS _A v)
             (SubstTerm a, VZ _) -> a
