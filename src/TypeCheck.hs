@@ -165,10 +165,18 @@ data TcState = TcState
     , nextId :: !Int
     -- Metavar substitution.
     , subst :: Map VarId Term
+    -- Unsolved unification equations.
+    , unsolvedEquations :: [(Term, Term)]
     }
 
 initialState :: TcState
-initialState = TcState { tcDefinitions = Map.empty, tcAssumptions = Map.empty, nextId = 0, subst = Map.empty }
+initialState = TcState
+    { tcDefinitions = Map.empty
+    , tcAssumptions = Map.empty
+    , nextId = 0
+    , subst = Map.empty
+    , unsolvedEquations = []
+    }
 
 -- Note that StateT is layered over ExceptT, so that alternatives are explored
 -- "in parallel" by duplicating state.
@@ -188,15 +196,29 @@ freshVarId = do
     modify $ \s -> s { nextId = i + 1 }
     return (VarId i)
 
+saveEquation :: Term -> Term ->TcM ()
+saveEquation t1 t2 = modify $ \s -> s { unsolvedEquations = (t1, t2) : unsolvedEquations s }
+
 -- TODO: occurs check
 assign :: VarId -> Term -> TcM ()
-assign i t = modify $ \s -> s { subst = Map.insert i t (subst s) }
+assign i t = do
+    eqs <- gets unsolvedEquations
+    modify $ \s -> s { subst = Map.insert i t (subst s), unsolvedEquations = [] }
+    forM_ eqs $ \(t1, t2) -> unify t1 t2
 
 unificationFailure :: Term -> Term -> TcM a
 unificationFailure t1 t2 = throwString $
     "Failed to unify in context: " ++ show (context t1) ++ "\n" ++
     "  " ++ show t1 ++ "\n" ++
     "  " ++ show t2
+
+checkSolved :: TcM ()
+checkSolved = do
+    eqs <- gets unsolvedEquations
+    modify $ \s -> s { unsolvedEquations = [] }
+    case eqs of
+        [] -> return ()
+        ((t1, t2):_) -> unificationFailure t1 t2
 
 unify :: Term -> Term -> TcM ()
 unify t1 t2 = do
@@ -249,6 +271,12 @@ unify' (Sigma _A _B) (Apply σ t) = do
     unify _A _A'
     unify _B _B'
 unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
+-- If either term is Apply, or App, we may solve this later.
+unify' t1@(Apply _ _) t2 = saveEquation t1 t2
+unify' t1@(App _ _ _ _) t2 = saveEquation t1 t2
+unify' t1 t2@(Apply _ _) = saveEquation t1 t2
+unify' t1 t2@(App _ _ _ _) = saveEquation t1 t2
+-- Otherwise, the terms are unequal.
 unify' t1 t2 = unificationFailure t1 t2
 
 -- Attempts to simplify a term. If there are no metavars, the result will be
@@ -308,8 +336,12 @@ typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
     result <- runExceptT (execStateT (mapM_ typeCheckStatement statements) initialState)
     case result of
-        Left (Last Nothing) -> fail "<unknown error>"
-        Left (Last (Just e)) -> fail e
+        Left (Last Nothing) -> do
+            putStrLn "<unknown error>"
+            fail ""
+        Left (Last (Just e)) -> do
+            putStrLn e
+            fail ""
         Right s -> return s
 
 -- TODO: also substitute for metavars before printing.
@@ -321,10 +353,12 @@ typeCheckStatement (Syntax.Define name ty body) = do
         Just ty' -> do
             tyTerm <- typeCheckExpr Empty [] ty'
             unify (termType bodyTerm) tyTerm
+    checkSolved
     bodyTerm' <- reduce bodyTerm
     modify $ \s -> s { tcDefinitions = Map.insert name bodyTerm' (tcDefinitions s) }
 typeCheckStatement (Syntax.Assume name ty) = do
     tyTerm <- typeCheckExpr Empty [] ty
+    checkSolved
     tyTerm' <- reduce tyTerm
     modify $ \s -> s { tcAssumptions = Map.insert name tyTerm' (tcAssumptions s) }
 typeCheckStatement (Syntax.Prove ty) = do
@@ -385,7 +419,7 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     return (Sigma _A' _B')
 
 checkIsType :: Term -> TcM ()
-checkIsType t = reportError $ unify (termType t) (Universe (context t))
+checkIsType t = unify (termType t) (Universe (context t))
 
 typeCheckApp :: Term -> [Term] -> TcM Term
 typeCheckApp f [] = return f
@@ -394,5 +428,5 @@ typeCheckApp f (arg : args) = do
     let _Γ = context f
     let _A = termType arg
     let _B = Metavar varId _Γ (Universe _Γ)
-    reportError $ unify (termType f) (Pi _A _B)
+    unify (termType f) (Pi _A _B)
     typeCheckApp (App _A _B f arg) args
