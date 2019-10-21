@@ -156,6 +156,10 @@ termType (Lam _A b) = Pi _A (termType b)
 termType (App _ _B _ a) = Apply (SubstTerm a) _B
 termType (Sigma _A _B) = Universe (context _A)
 
+weakenGlobal :: Context -> Term -> Term
+weakenGlobal Empty t = t
+weakenGlobal (Extend _A) t = Apply (SubstWeaken _A) (weakenGlobal (context _A) t)
+
 data TcState = TcState
     -- Global definitions, and their values.
     { tcDefinitions :: Map Text Term
@@ -325,9 +329,19 @@ isHeadNeutral (Var _) = True
 isHeadNeutral (App _ _ f _) = isHeadNeutral f
 isHeadNeutral _ = False
 
--- Searches for a term that has a given type.
-prove :: Term -> TcM Term
-prove _A = throwString $ "Could not prove " ++ show _A
+-- Tries to unify something with the given term (which is most likely a metavar).
+search :: Term -> TcM ()
+search t = tryStar
+  where
+    _Γ = context t
+
+    tryStar = do
+        assumptions <- gets tcAssumptions
+        let name = Text.pack "⋆"
+        let Just ty = Map.lookup name assumptions
+        let star = weakenGlobal _Γ (Assume name Empty ty)
+        unify (termType t) (termType star)
+        unify t star
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
@@ -361,14 +375,11 @@ typeCheckStatement (Syntax.Assume name ty) = do
 typeCheckStatement (Syntax.Prove name ty) = do
     tyTerm <- typeCheckExpr Empty [] ty
     tyTerm' <- reduce tyTerm
-    bodyTerm <- prove tyTerm'
+    α <- freshMetavar (context tyTerm') tyTerm'
+    search α
     checkSolved
-    bodyTerm' <- reduce bodyTerm
+    bodyTerm' <- reduce α
     modify $ \s -> s { tcDefinitions = Map.insert name bodyTerm' (tcDefinitions s) }
-
-weakenGlobal :: Context -> Term -> Term
-weakenGlobal Empty t = t
-weakenGlobal (Extend _A) t = Apply (SubstWeaken _A) (weakenGlobal (context _A) t) 
 
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
 typeCheckExpr _Γ _ Syntax.Hole = do
@@ -385,7 +396,7 @@ typeCheckExpr _Γ names (Syntax.Var name) = do
           | Just body <- Map.lookup name definitions ->
                 return (weakenGlobal _Γ body)
           | Just _A <- Map.lookup name assumptions ->
-                return (Assume name _Γ _A)
+                return (weakenGlobal _Γ (Assume name Empty _A))
           | otherwise ->
                 fail $ "unbound name: " ++ Text.unpack name
 typeCheckExpr _Γ _ Syntax.Universe = return (Universe _Γ)
