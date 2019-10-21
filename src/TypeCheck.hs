@@ -1,5 +1,6 @@
 module TypeCheck where
 
+import           Control.Applicative
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.List
@@ -272,6 +273,8 @@ unify' (Sigma _A _B) (Apply σ t) = do
     unify _A _A'
     unify _B _B'
 unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
+-- If two head-neutral terms don't unify, the terms are unequal.
+unify' t1 t2 | isHeadNeutral t1 && isHeadNeutral t2 = unificationFailure t1 t2
 -- If either term is Apply, or App, we may solve this later.
 unify' t1@(Apply _ _) t2 = saveEquation t1 t2
 unify' t1@(App _ _ _ _) t2 = saveEquation t1 t2
@@ -324,24 +327,61 @@ reduce t = return t
 
 -- Checks there are no redexes in an expression.
 isHeadNeutral :: Term -> Bool
+isHeadNeutral (Universe _) = True
 isHeadNeutral (Assume _ _ _) = True
 isHeadNeutral (Var _) = True
+isHeadNeutral (Pi _ _) = True
 isHeadNeutral (App _ _ f _) = isHeadNeutral f
+isHeadNeutral (Sigma _ _) = True
 isHeadNeutral _ = False
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
-search t = tryStar
-  where
-    _Γ = context t
+search t = searchStar t <|> searchRefl t <|> searchInd1 t
 
-    tryStar = do
-        assumptions <- gets tcAssumptions
-        let name = Text.pack "⋆"
-        let Just ty = Map.lookup name assumptions
-        let star = weakenGlobal _Γ (Assume name Empty ty)
-        unify (termType t) (termType star)
-        unify t star
+searchStar :: Term -> TcM ()
+searchStar t = do
+    let _Γ = context t
+    assumptions <- gets tcAssumptions
+    let name = Text.pack "⋆"
+    let Just ty = Map.lookup name assumptions
+    let star = weakenGlobal _Γ (Assume name Empty ty)
+    unify (termType t) (termType star)
+    unify t star
+
+searchRefl :: Term -> TcM ()
+searchRefl t = do
+    let _Γ = context t
+    assumptions <- gets tcAssumptions
+    let name = Text.pack "refl"
+    let Just ty = Map.lookup name assumptions
+    let refl = weakenGlobal _Γ (Assume name Empty ty)
+    Pi _A (Pi _B _C) <- reduce (termType refl)
+    α <- freshMetavar _Γ _A
+    let _B' = Apply (SubstTerm α) _B
+    let _C' = Apply (SubstExtend (SubstTerm α) _B') _C
+    β <- freshMetavar _Γ _B'
+    let p = App _B' _C' (App _A (Pi _B _C) refl α) β
+    unify (termType t) (termType p)
+    unify t p
+    search β
+
+searchInd1 :: Term -> TcM ()
+searchInd1 t = do
+    let _Γ = context t
+    assumptions <- gets tcAssumptions
+    let name = Text.pack "ind1"
+    let Just ty = Map.lookup name assumptions
+    let ind1 = weakenGlobal _Γ (Assume name Empty ty)
+    Pi _A (Pi _B _C) <- reduce (termType ind1)
+    α <- freshMetavar _Γ _A
+    let _B' = Apply (SubstTerm α) _B
+    let _C' = Apply (SubstExtend (SubstTerm α) _B') _C
+    β <- freshMetavar _Γ _B'
+    let p = App _B' _C' (App _A (Pi _B _C) ind1 α) β
+    unify (termType t) (termType p)
+    unify t p
+    search β
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
