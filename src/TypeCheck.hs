@@ -185,13 +185,13 @@ initialState = TcState
 
 -- Note that StateT is layered over ExceptT, so that alternatives are explored
 -- "in parallel" by duplicating state.
-type TcM a = StateT TcState (ExceptT (Last String) IO) a
+type TcM a = StateT TcState (ExceptT (First String) IO) a
 
 throwString :: String -> TcM a
-throwString = throwError . Last . Just
+throwString = throwError . First . Just
 
 reportError :: TcM () -> TcM ()
-reportError h = catchError h $ \(Last m) -> case m of
+reportError h = catchError h $ \(First m) -> case m of
     Nothing -> liftIO (putStrLn "<unknown error>")
     Just e -> liftIO (putStrLn e)
 
@@ -398,10 +398,10 @@ typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
     result <- runExceptT (execStateT (mapM_ typeCheckStatement statements) initialState)
     case result of
-        Left (Last Nothing) -> do
+        Left (First Nothing) -> do
             putStrLn "<unknown error>"
             fail ""
-        Left (Last (Just e)) -> do
+        Left (First (Just e)) -> do
             putStrLn e
             fail ""
         Right s -> return s
