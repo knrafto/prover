@@ -358,10 +358,13 @@ typeCheckStatement (Syntax.Assume name ty) = do
     checkSolved
     tyTerm' <- reduce tyTerm
     modify $ \s -> s { tcAssumptions = Map.insert name tyTerm' (tcAssumptions s) }
-typeCheckStatement (Syntax.Prove ty) = do
+typeCheckStatement (Syntax.Prove name ty) = do
     tyTerm <- typeCheckExpr Empty [] ty
     tyTerm' <- reduce tyTerm
-    reportError . void $ prove tyTerm'
+    bodyTerm <- prove tyTerm'
+    checkSolved
+    bodyTerm' <- reduce bodyTerm
+    modify $ \s -> s { tcDefinitions = Map.insert name bodyTerm' (tcDefinitions s) }
 
 weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t

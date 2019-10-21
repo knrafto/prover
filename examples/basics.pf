@@ -22,3 +22,4 @@ IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
 :assume ind1 : Π (C : 1 → Type). C(⋆) → Π (a : 1). C(a)
 
 p1 : IsProp(1) := ind1(_, ind1(_, refl(_, _)))
+# :prove p2 : IsProp(1)

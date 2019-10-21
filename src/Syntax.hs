@@ -5,7 +5,7 @@ import Data.Text (Text)
 data Statement
     = Define Text (Maybe Expr) Expr
     | Assume Text Expr
-    | Prove Expr
+    | Prove Text Expr
     deriving (Show)
 
 data Expr
