@@ -337,7 +337,13 @@ isHeadNeutral _ = False
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
-search t = searchStar t <|> searchRefl t <|> searchInd1 t
+search t = do
+    t' <- reduce t
+    case t' of
+        Metavar _ _ _ -> searchStar t' <|> searchRefl t' <|> searchInd1 t'
+        -- Assume term is solved.
+        -- TODO: check more carefully.
+        _ -> return ()
 
 searchStar :: Term -> TcM ()
 searchStar t = do
