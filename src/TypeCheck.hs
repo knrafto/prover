@@ -340,20 +340,25 @@ search :: Term -> TcM ()
 search t = do
     t' <- reduce t
     case t' of
-        Metavar _ _ _ -> searchStar t' <|> searchRefl t' <|> searchInd1 t'
+        Metavar _ _ _ -> searchAssumptions t' <|> searchRefl t' <|> searchInd1 t'
         -- Assume term is solved.
         -- TODO: check more carefully.
         _ -> return ()
 
-searchStar :: Term -> TcM ()
-searchStar t = do
-    let _Γ = context t
+choice :: (Alternative f) => [f a] -> f a
+choice = foldr (<|>) empty
+
+searchAssumptions :: Term -> TcM ()
+searchAssumptions t = do
     assumptions <- gets tcAssumptions
-    let name = Text.pack "⋆"
-    let Just ty = Map.lookup name assumptions
-    let star = weakenGlobal _Γ (Assume name Empty ty)
-    unify (termType t) (termType star)
-    unify t star
+    choice $ map (\(name, ty) -> go name ty) (Map.toList assumptions)
+  where
+    _Γ = context t
+
+    go name ty = do
+        let p = weakenGlobal _Γ (Assume name Empty ty)
+        unify (termType t) (termType p)
+        unify t p
 
 searchRefl :: Term -> TcM ()
 searchRefl t = do
