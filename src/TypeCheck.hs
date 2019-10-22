@@ -340,7 +340,7 @@ search :: Term -> TcM ()
 search t = do
     t' <- reduce t
     case t' of
-        Metavar _ _ _ -> searchAssumptions t' <|> searchRefl t' <|> searchInd1 t'
+        Metavar _ _ _ -> searchAssumptions t'
         -- Assume term is solved.
         -- TODO: check more carefully.
         _ -> return ()
@@ -351,48 +351,26 @@ choice = foldr (<|>) empty
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
     assumptions <- gets tcAssumptions
-    choice $ map (\(name, ty) -> go name ty) (Map.toList assumptions)
+    choice $ map (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty))) (Map.toList assumptions)
   where
     _Γ = context t
 
-    go name ty = do
-        let p = weakenGlobal _Γ (Assume name Empty ty)
+    try p = do
+        liftIO . putStrLn $ "Trying " ++ show p ++ " for " ++ show t ++ " : " ++ show (termType t)
+        accept p <|> tryApp p
+
+    accept p = do
         unify (termType t) (termType p)
         unify t p
 
-searchRefl :: Term -> TcM ()
-searchRefl t = do
-    let _Γ = context t
-    assumptions <- gets tcAssumptions
-    let name = Text.pack "refl"
-    let Just ty = Map.lookup name assumptions
-    let refl = weakenGlobal _Γ (Assume name Empty ty)
-    Pi _A (Pi _B _C) <- reduce (termType refl)
-    α <- freshMetavar _Γ _A
-    let _B' = Apply (SubstTerm α) _B
-    let _C' = Apply (SubstExtend (SubstTerm α) _B') _C
-    β <- freshMetavar _Γ _B'
-    let p = App _B' _C' (App _A (Pi _B _C) refl α) β
-    unify (termType t) (termType p)
-    unify t p
-    search β
-
-searchInd1 :: Term -> TcM ()
-searchInd1 t = do
-    let _Γ = context t
-    assumptions <- gets tcAssumptions
-    let name = Text.pack "ind1"
-    let Just ty = Map.lookup name assumptions
-    let ind1 = weakenGlobal _Γ (Assume name Empty ty)
-    Pi _A (Pi _B _C) <- reduce (termType ind1)
-    α <- freshMetavar _Γ _A
-    let _B' = Apply (SubstTerm α) _B
-    let _C' = Apply (SubstExtend (SubstTerm α) _B') _C
-    β <- freshMetavar _Γ _B'
-    let p = App _B' _C' (App _A (Pi _B _C) ind1 α) β
-    unify (termType t) (termType p)
-    unify t p
-    search β
+    tryApp p = do
+        ty <- reduce (termType p)
+        case ty of
+            Pi _A _B -> do
+                α <- freshMetavar _Γ _A
+                try (App _A _B p α)
+                search α
+            _ -> empty
 
 typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck statements = do
