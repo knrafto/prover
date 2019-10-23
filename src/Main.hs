@@ -29,8 +29,8 @@ main = do
         stmts <- case parse statements path input of
             Left e -> panic (errorBundlePretty e)
             Right x -> return x
-        tcState <- typeCheck stmts
-        forM_ (Map.toList (tcAssumptions tcState)) $ \(name, _A) ->
+        env <- typeCheck stmts
+        forM_ (Map.toList (envAssumptions env)) $ \(name, _A) ->
             putStrLn $ ":assume " ++ Text.unpack name ++ " : " ++ show _A
-        forM_ (Map.toList (tcDefinitions tcState)) $ \(name, body) ->
+        forM_ (Map.toList (envDefinitions env)) $ \(name, body) ->
             putStrLn $ Text.unpack name ++ " := " ++ show body

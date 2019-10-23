@@ -5,12 +5,14 @@ import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Foldable
 import           Data.List
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict as Map
 import           Data.Text                      ( Text )
 import qualified Data.Text as Text
 
+import           Search
 import qualified Syntax
 
 -- This description of type theory is based on:
@@ -162,11 +164,22 @@ weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t
 weakenGlobal (Extend _A) t = Apply (SubstWeaken _A) (weakenGlobal (context _A) t)
 
-data TcState = TcState
+data Env = Env
     -- Global definitions, and their values.
-    { tcDefinitions :: Map Text Term
+    { envDefinitions :: Map Text Term
     -- Global assumptions, and their types.
-    , tcAssumptions :: Map Text Term
+    , envAssumptions :: Map Text Term
+    }
+
+emptyEnv :: Env
+emptyEnv = Env
+    { envDefinitions = Map.empty
+    , envAssumptions = Map.empty
+    }
+
+data TcState = TcState
+    -- Current environment.
+    { currentEnv :: Env
     -- Next metavar id.
     , nextId :: !Int
     -- Metavar substitution.
@@ -175,26 +188,30 @@ data TcState = TcState
     , unsolvedEquations :: [(Term, Term)]
     }
 
-initialState :: TcState
-initialState = TcState
-    { tcDefinitions = Map.empty
-    , tcAssumptions = Map.empty
+initialState :: Env -> TcState
+initialState env = TcState
+    { currentEnv = env
     , nextId = 0
     , subst = Map.empty
     , unsolvedEquations = []
     }
 
--- Note that StateT is layered over ExceptT, so that alternatives are explored
--- "in parallel" by duplicating state.
-type TcM a = StateT TcState (ExceptT (First String) IO) a
+type TcM a = SearchM TcState (First String) a
+
+-- Runs a search, reporting any failure
+runTcM :: Env -> TcM a -> IO (Maybe a)
+runTcM env m = case runSearch 100 m (initialState env) of
+    Ok [] -> error "runTcM: Ok []"
+    Ok (a:_) -> return (Just a)
+    Fail (First e) -> do
+        putStrLn (fromMaybe "<no error message>" e)
+        return Nothing
+    Unknown -> do
+        putStrLn "<depth limit exceeded>"
+        return Nothing
 
 throwString :: String -> TcM a
-throwString = throwError . First . Just
-
-reportError :: TcM () -> TcM ()
-reportError h = catchError h $ \(First m) -> case m of
-    Nothing -> liftIO (putStrLn "<unknown error>")
-    Just e -> liftIO (putStrLn e)
+throwString = throw . First . Just
 
 -- Generate a metavar for the given context and type.
 freshMetavar :: Context -> Term -> TcM Term
@@ -203,7 +220,7 @@ freshMetavar _Γ _A = do
     modify $ \s -> s { nextId = i + 1 }
     return $ Metavar (VarId i) _Γ _A
 
-saveEquation :: Term -> Term ->TcM ()
+saveEquation :: Term -> Term -> TcM ()
 saveEquation t1 t2 = modify $ \s -> s { unsolvedEquations = (t1, t2) : unsolvedEquations s }
 
 -- TODO: occurs check
@@ -338,7 +355,7 @@ isHeadNeutral _ = False
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
-search t = do
+search t = deepen $ do
     t' <- reduce t
     case t' of
         Metavar _ _ _ -> searchAssumptions t'
@@ -348,14 +365,12 @@ search t = do
 
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
-    assumptions <- gets tcAssumptions
+    assumptions <- gets (envAssumptions . currentEnv)
     asum $ map (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty))) (Map.toList assumptions)
   where
     _Γ = context t
 
-    try p = do
-        liftIO . putStrLn $ "Trying " ++ show p ++ " for " ++ show t ++ " : " ++ show (termType t)
-        accept p <|> tryApp p
+    try p = accept p <|> tryApp p
 
     accept p = do
         unify (termType t) (termType p)
@@ -370,43 +385,48 @@ searchAssumptions t = do
                 search α
             _ -> empty
 
-typeCheck :: [Syntax.Statement] -> IO TcState
-typeCheck statements = do
-    result <- runExceptT (execStateT (mapM_ typeCheckStatement statements) initialState)
-    case result of
-        Left (First Nothing) -> do
-            putStrLn "<unknown error>"
-            fail ""
-        Left (First (Just e)) -> do
-            putStrLn e
-            fail ""
-        Right s -> return s
+typeCheck :: [Syntax.Statement] -> IO Env
+typeCheck = go emptyEnv
+  where
+    go env [] = return env
+    go env (stmt:rest) = do
+        env' <- typeCheckStatement env stmt
+        go env' rest
 
 -- TODO: also substitute for metavars before printing.
-typeCheckStatement :: Syntax.Statement -> TcM ()
-typeCheckStatement (Syntax.Define name ty body) = do
-    bodyTerm <- typeCheckExpr Empty [] body
-    case ty of
-        Nothing -> return ()
-        Just ty' -> do
-            tyTerm <- typeCheckExpr Empty [] ty'
-            unify (termType bodyTerm) tyTerm
-    checkSolved
-    bodyTerm' <- reduce bodyTerm
-    modify $ \s -> s { tcDefinitions = Map.insert name bodyTerm' (tcDefinitions s) }
-typeCheckStatement (Syntax.Assume name ty) = do
-    tyTerm <- typeCheckExpr Empty [] ty
-    checkSolved
-    tyTerm' <- reduce tyTerm
-    modify $ \s -> s { tcAssumptions = Map.insert name tyTerm' (tcAssumptions s) }
-typeCheckStatement (Syntax.Prove name ty) = do
-    tyTerm <- typeCheckExpr Empty [] ty
-    tyTerm' <- reduce tyTerm
-    α <- freshMetavar (context tyTerm') tyTerm'
-    search α
-    checkSolved
-    bodyTerm' <- reduce α
-    modify $ \s -> s { tcDefinitions = Map.insert name bodyTerm' (tcDefinitions s) }
+typeCheckStatement :: Env -> Syntax.Statement -> IO Env
+typeCheckStatement env (Syntax.Define name ty body) = do
+    bodyTerm <- runTcM env $ do
+        bodyTerm <- typeCheckExpr Empty [] body
+        case ty of
+            Nothing -> return ()
+            Just ty' -> do
+                tyTerm <- typeCheckExpr Empty [] ty'
+                unify (termType bodyTerm) tyTerm
+        checkSolved
+        reduce bodyTerm
+    return $ case bodyTerm of
+        Nothing -> env
+        Just t -> env { envDefinitions = Map.insert name t (envDefinitions env) }
+typeCheckStatement env (Syntax.Assume name ty) = do
+    tyTerm <- runTcM env $ do
+        tyTerm <- typeCheckExpr Empty [] ty
+        checkSolved
+        reduce tyTerm
+    return $ case tyTerm of
+        Nothing -> env
+        Just t -> env { envAssumptions = Map.insert name t (envAssumptions env) }
+typeCheckStatement env (Syntax.Prove name ty) = do
+    bodyTerm <- runTcM env $ do
+        tyTerm <- typeCheckExpr Empty [] ty
+        tyTerm' <- reduce tyTerm
+        α <- freshMetavar (context tyTerm') tyTerm'
+        search α
+        checkSolved
+        reduce α
+    return $ case bodyTerm of
+        Nothing -> env
+        Just t -> env { envDefinitions = Map.insert name t (envDefinitions env) }
 
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
 typeCheckExpr _Γ _ Syntax.Hole = do
@@ -416,8 +436,8 @@ typeCheckExpr _Γ _ Syntax.Hole = do
     _A <- freshMetavar _Γ (Universe _Γ)
     freshMetavar _Γ _A
 typeCheckExpr _Γ names (Syntax.Var name) = do
-    definitions <- gets tcDefinitions
-    assumptions <- gets tcAssumptions
+    definitions <- gets (envDefinitions . currentEnv)
+    assumptions <- gets (envAssumptions . currentEnv)
     case () of
         _ | Just i <- elemIndex name names -> return (Var (fromDeBruijn _Γ i))
           | Just body <- Map.lookup name definitions ->
