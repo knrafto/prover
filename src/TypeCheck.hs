@@ -505,4 +505,10 @@ typeCheckApp f (arg : args) = do
 typeCheckTuple :: [Term] -> TcM Term
 typeCheckTuple [] = error "typeCheckTuple: empty tuple"
 typeCheckTuple [t] = return t
-typeCheckTuple (_:_) = throwString $ "typeCheckTuple: unimplemented"
+typeCheckTuple (a:ts) = do
+    let _A = termType a
+    let _Γ' = Extend _A
+    _B <- freshMetavar _Γ' (Universe _Γ')
+    b <- typeCheckTuple ts
+    unify (Apply (SubstTerm a) _B) (termType b)
+    return $ Pair _A _B a b

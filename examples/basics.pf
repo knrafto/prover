@@ -26,3 +26,5 @@ IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
 
 :prove p1 : IsProp(0)
 :prove p2 : IsProp(1)
+
+p3 : IsContr(1) := (⋆, ind1(λ (b : 1). Id(1, ⋆, b), refl(1, ⋆)))
