@@ -336,7 +336,7 @@ reduce (Apply σ t) = do
         Lam _A b -> reduce $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
         App _A _B f a -> reduce $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
         Sigma _A _B -> reduce $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
-        Pair _ _ _ _ -> error "reduce: Pair"
+        Pair _A _B a b -> reduce $ Pair (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ a) (Apply σ b)
 reduce t@(Var _) = return t
 reduce (Pi _A _B) = Pi <$> reduce _A <*> reduce _B
 reduce (Lam _A b) = Lam _A <$> reduce b
