@@ -49,7 +49,6 @@ symbol c = lexeme (void $ char c)
 atom :: Parser Expr
 atom = Hole <$ reservedWord "_"
    <|> Var <$> identifier
-   <|> symbol '(' *> expr <* symbol ')'
    <|> Universe <$ reservedWord "Type"
    <|> Sigma <$ reservedWord "Σ"
         <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
@@ -60,6 +59,7 @@ atom = Hole <$ reservedWord "_"
    <|> Lam <$ reservedWord "λ"
         <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
         <* symbol '.' <*> expr
+    <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
 
 expr :: Parser Expr
 expr = do

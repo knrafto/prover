@@ -17,4 +17,5 @@ data Expr
     | Lam Text Expr Expr
     | App Expr [Expr]
     | Sigma Text Expr Expr
+    | Tuple [Expr]
     deriving (Show)

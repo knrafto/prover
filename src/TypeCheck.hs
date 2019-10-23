@@ -118,6 +118,9 @@ data Term
     | App Term Term Term Term
     -- If A : Tm Γ U and B : Tm (Γ, A) U, then Σ(A, B) : Tm Γ U
     | Sigma Term Term
+    -- If A : Tm Γ U and B : Tm (Γ, A) U and a : Tm Γ A and b : Tm Γ B[⟨a⟩]
+    -- then pair(a, b) : Tm Γ Σ(A, B)
+    | Pair Term Term Term Term
 
 instance Show Term where
     showsPrec _ (Universe _) = showString "U"
@@ -129,6 +132,7 @@ instance Show Term where
     showsPrec _ (Lam _ b) = showString "λ(" . shows b . showString ")"
     showsPrec _ (App _ _ f a) = showString "app(" . shows f . showString ", " . shows a . showString ")"
     showsPrec _ (Sigma _A _B) = showString "Σ(" . shows _A . showString ", " . shows _B . showString ")"
+    showsPrec _ (Pair _ _ a b) = showString "pair(" . shows a . showString ", " . shows b . showString ")"
 
 -- Extracts the context from a term.
 context :: Term -> Context
@@ -144,6 +148,7 @@ context (Pi _A _B) = context _A
 context (Lam _A _) = context _A
 context (App _A _ _ _) = context _A
 context (Sigma _A _B) = context _A
+context (Pair _A _ _ _) = context _A
 
 -- Extracts the type of a term.
 termType :: Term -> Term
@@ -159,6 +164,7 @@ termType (Pi _A _B) = Universe (context _A)
 termType (Lam _A b) = Pi _A (termType b)
 termType (App _ _B _ a) = Apply (SubstTerm a) _B
 termType (Sigma _A _B) = Universe (context _A)
+termType (Pair _A _B _ _) = Sigma _A _B
 
 weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t
@@ -291,20 +297,18 @@ unify' (Sigma _A _B) (Apply σ t) = do
     unify _A _A'
     unify _B _B'
 unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
--- If two head-neutral terms don't unify, the terms are unequal.
-unify' t1 t2 | isHeadNeutral t1 && isHeadNeutral t2 = unificationFailure t1 t2
--- If either term is Apply, or App, we may solve this later.
-unify' t1@(Apply _ _) t2 = saveEquation t1 t2
-unify' t1@(App _ _ _ _) t2 = saveEquation t1 t2
-unify' t1 t2@(Apply _ _) = saveEquation t1 t2
-unify' t1 t2@(App _ _ _ _) = saveEquation t1 t2
--- Otherwise, the terms are unequal.
-unify' t1 t2 = unificationFailure t1 t2
+-- If two head-neutral terms don't unify, the terms are unequal; otherwise,
+-- save it for later.
+unify' t1 t2
+    | isHeadNeutral t1 && isHeadNeutral t2 = unificationFailure t1 t2
+    | otherwise = saveEquation t1 t2
 
 -- Attempts to simplify a term. If there are no metavars, the result will be
 -- a normal form.
--- TODO: reduce Pi and Sigma?
+-- TODO: reduce contexts, types too?
 reduce :: Term -> TcM Term
+reduce t@(Universe _) = return t
+reduce t@(Assume _ _ _) = return t
 reduce t@(Metavar i _ _) = do
     currentSubst <- gets subst
     -- TODO: path compression
@@ -316,6 +320,7 @@ reduce (Apply σ t) = do
     case t' of
         Universe _ -> return $ Universe (substDomain σ)
         Assume name _ _A -> return $ Assume name (substDomain σ) (Apply σ _A)
+        Metavar _ _ _ -> return $ Apply σ t'
         Apply τ t'' -> case (σ, τ) of
             (SubstTerm _, SubstWeaken _) -> return t''
             (SubstExtend σ' _, SubstWeaken _A) -> reduce $ Apply (SubstWeaken (Apply σ' _A)) (Apply σ' t'')
@@ -331,7 +336,8 @@ reduce (Apply σ t) = do
         Lam _A b -> reduce $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
         App _A _B f a -> reduce $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
         Sigma _A _B -> reduce $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
-        _ -> return $ Apply σ t'
+        Pair _ _ _ _ -> error "reduce: Pair"
+reduce t@(Var _) = return t
 reduce (Pi _A _B) = Pi <$> reduce _A <*> reduce _B
 reduce (Lam _A b) = Lam _A <$> reduce b
 reduce (App _A _B f a) = do
@@ -341,17 +347,20 @@ reduce (App _A _B f a) = do
         Lam _ b -> reduce $ Apply (SubstTerm a') b
         _ -> return $ App _A _B f' a'
 reduce (Sigma _A _B) = Sigma <$> reduce _A <*> reduce _B
-reduce t = return t
+reduce (Pair _A _B a b) = Pair _A _B <$> reduce a <*> reduce b
 
 -- Checks there are no redexes in an expression.
 isHeadNeutral :: Term -> Bool
 isHeadNeutral (Universe _) = True
 isHeadNeutral (Assume _ _ _) = True
+isHeadNeutral (Metavar _ _ _) = False
+isHeadNeutral (Apply _ _) = False
 isHeadNeutral (Var _) = True
 isHeadNeutral (Pi _ _) = True
+isHeadNeutral (Lam _ _) = True
 isHeadNeutral (App _ _ f _) = isHeadNeutral f
 isHeadNeutral (Sigma _ _) = True
-isHeadNeutral _ = False
+isHeadNeutral (Pair _ _ _ _) = True
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
@@ -474,6 +483,9 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     _B' <- typeCheckExpr (Extend _A') (name : names) _B
     checkIsType _B'
     return (Sigma _A' _B')
+typeCheckExpr _Γ names (Syntax.Tuple args) = do
+    args' <- mapM (typeCheckExpr _Γ names) args
+    typeCheckTuple args'
 
 checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))
@@ -486,3 +498,8 @@ typeCheckApp f (arg : args) = do
     _B <- freshMetavar _Γ (Universe _Γ)
     unify (termType f) (Pi _A _B)
     typeCheckApp (App _A _B f arg) args
+
+typeCheckTuple :: [Term] -> TcM Term
+typeCheckTuple [] = error "typeCheckTuple: empty tuple"
+typeCheckTuple [t] = return t
+typeCheckTuple (_:_) = throwString $ "typeCheckTuple: unimplemented"
