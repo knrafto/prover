@@ -370,7 +370,7 @@ search :: Term -> TcM ()
 search t = deepen $ do
     t' <- reduce t
     case t' of
-        Metavar _ _ _ -> searchAssumptions t'
+        Metavar _ _ _ -> searchAssumptions t' <|> searchPair t'
         -- Assume term is solved.
         -- TODO: check more carefully.
         _ -> return ()
@@ -396,6 +396,20 @@ searchAssumptions t = do
                 try (App _A _B p α)
                 search α
             _ -> empty
+
+searchPair :: Term -> TcM ()
+searchPair t = do
+    let _Γ = context t
+    _A <- freshMetavar _Γ (Universe _Γ)
+    let _Γ' = Extend _A
+    _B <- freshMetavar _Γ' (Universe _Γ')
+    α <- freshMetavar _Γ _A
+    β <- freshMetavar _Γ (Apply (SubstTerm α) _B)
+    let p = Pair _A _B α β
+    unify (termType t) (termType p)
+    unify t p
+    search α
+    search β
 
 typeCheck :: [Syntax.Statement] -> IO Env
 typeCheck = go emptyEnv
