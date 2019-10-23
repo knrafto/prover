@@ -144,7 +144,7 @@ context (Var v) = go v
   where
     go (VZ _A) = Extend _A
     go (VS _A _) = Extend _A
-context (Pi _A _B) = context _A
+context (Pi _A _) = context _A
 context (Lam _A _) = context _A
 context (App _A _ _ _) = context _A
 context (Sigma _A _B) = context _A
@@ -275,8 +275,8 @@ unify' (Pi _A _B) (Apply σ t) = do
     _A' <- freshMetavar _Γ (Universe _Γ)
     _B' <- freshMetavar (Extend _A') (Universe (Extend _A'))
     unify t (Pi _A' _B')
-    unify _A _A'
-    unify _B _B'
+    unify _A (Apply σ _A')
+    unify _B (Apply (SubstExtend σ _A') _B')
 unify' t1@(Apply _ _) t2@(Pi _ _) = unify t2 t1
 unify' (Lam _ b1) (Lam _ b2) = unify b1 b2
 unify' (App _ _ f1 a1) (App _ _ f2 a2) | isHeadNeutral f1 && isHeadNeutral f2 = do
@@ -294,8 +294,8 @@ unify' (Sigma _A _B) (Apply σ t) = do
     _A' <- freshMetavar _Γ (Universe _Γ)
     _B' <- freshMetavar (Extend _A') (Universe (Extend _A'))
     unify t (Sigma _A' _B')
-    unify _A _A'
-    unify _B _B'
+    unify _A (Apply σ _A')
+    unify _B (Apply (SubstExtend σ _A') _B')
 unify' (Pair _ _ a1 b1) (Pair _ _ a2 b2) = do
     unify a1 a2
     unify b1 b2
