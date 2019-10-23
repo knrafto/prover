@@ -296,6 +296,9 @@ unify' (Sigma _A _B) (Apply σ t) = do
     unify t (Sigma _A' _B')
     unify _A _A'
     unify _B _B'
+unify' (Pair _ _ a1 b1) (Pair _ _ a2 b2) = do
+    unify a1 a2
+    unify b1 b2
 unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
 -- If two head-neutral terms don't unify, the terms are unequal; otherwise,
 -- save it for later.
