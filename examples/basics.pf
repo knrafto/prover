@@ -17,9 +17,12 @@ IsEquiv := λ (A : Type). λ (B : Type). λ (f : A → B).
 IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
     Π (b : B). IsProp(Fiber(_, _, f, b))
 
+:assume 0 : Type
+:assume ind0 : Π (C : 0 → Type). Π (a : 0). C(a)
+
 :assume 1 : Type
 :assume ⋆ : 1
 :assume ind1 : Π (C : 1 → Type). C(⋆) → Π (a : 1). C(a)
 
-p1 : IsProp(1) := ind1(_, ind1(_, refl(_, _)))
+:prove p1 : IsProp(0)
 :prove p2 : IsProp(1)
