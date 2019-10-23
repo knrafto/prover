@@ -3,6 +3,7 @@ module TypeCheck where
 import           Control.Applicative
 import           Control.Monad.Except
 import           Control.Monad.State
+import           Data.Foldable
 import           Data.List
 import           Data.Monoid
 import           Data.Map.Strict                ( Map )
@@ -345,13 +346,10 @@ search t = do
         -- TODO: check more carefully.
         _ -> return ()
 
-choice :: (Alternative f) => [f a] -> f a
-choice = foldr (<|>) empty
-
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
     assumptions <- gets tcAssumptions
-    choice $ map (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty))) (Map.toList assumptions)
+    asum $ map (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty))) (Map.toList assumptions)
   where
     _Γ = context t
 
