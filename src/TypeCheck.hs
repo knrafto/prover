@@ -206,7 +206,7 @@ type TcM a = SearchM TcState (First String) a
 
 -- Runs a search, reporting any failure
 runTcM :: Env -> TcM a -> IO (Maybe a)
-runTcM env m = case runSearch 100 m (initialState env) of
+runTcM env m = case runSearch 10 m (initialState env) of
     Ok [] -> error "runTcM: Ok []"
     Ok (a:_) -> return (Just a)
     Fail (First e) -> do
@@ -419,7 +419,6 @@ typeCheck = go emptyEnv
         env' <- typeCheckStatement env stmt
         go env' rest
 
--- TODO: also substitute for metavars before printing.
 typeCheckStatement :: Env -> Syntax.Statement -> IO Env
 typeCheckStatement env (Syntax.Define name ty body) = do
     bodyTerm <- runTcM env $ do
@@ -431,6 +430,7 @@ typeCheckStatement env (Syntax.Define name ty body) = do
                 unify (termType bodyTerm) tyTerm
         checkSolved
         reduce bodyTerm
+    putStrLn $ Text.unpack name ++ " := " ++ show bodyTerm
     return $ case bodyTerm of
         Nothing -> env
         Just t -> env { envDefinitions = Map.insert name t (envDefinitions env) }
@@ -439,6 +439,7 @@ typeCheckStatement env (Syntax.Assume name ty) = do
         tyTerm <- typeCheckExpr Empty [] ty
         checkSolved
         reduce tyTerm
+    putStrLn $ ":assume " ++ Text.unpack name ++ " : " ++ show tyTerm
     return $ case tyTerm of
         Nothing -> env
         Just t -> env { envAssumptions = Map.insert name t (envAssumptions env) }
@@ -450,6 +451,7 @@ typeCheckStatement env (Syntax.Prove name ty) = do
         search α
         checkSolved
         reduce α
+    putStrLn $ Text.unpack name ++ " := " ++ show bodyTerm
     return $ case bodyTerm of
         Nothing -> env
         Just t -> env { envDefinitions = Map.insert name t (envDefinitions env) }
