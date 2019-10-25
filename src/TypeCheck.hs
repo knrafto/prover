@@ -11,6 +11,7 @@ import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict as Map
 import           Data.Text                      ( Text )
 import qualified Data.Text as Text
+import           Debug.Trace
 
 import           Search
 import qualified Syntax
@@ -275,7 +276,7 @@ unify' (Pi _A _B) (Apply σ t) = do
     unify _B (Apply (SubstExtend σ _A') _B')
 unify' t1@(Apply _ _) t2@(Pi _ _) = unify t2 t1
 unify' (Lam _ b1) (Lam _ b2) = unify b1 b2
-unify' (App _ _ f1 a1) (App _ _ f2 a2) | isHeadNeutral f1 && isHeadNeutral f2 = do
+unify' (App _ _ f1 a1) (App _ _ f2 a2) | isWeakNormal f1 && isWeakNormal f2 = do
     unify f1 f2
     unify a1 a2
 -- Eta rule says that lam(app(f[wk], v₀))) = f for any f. Thus, if we have
@@ -299,7 +300,7 @@ unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
 -- If two head-neutral terms don't unify, the terms are unequal; otherwise,
 -- save it for later.
 unify' t1 t2
-    | isHeadNeutral t1 && isHeadNeutral t2 = unificationFailure t1 t2
+    | isWeakNormal t1 && isWeakNormal t2 = unificationFailure t1 t2
     | otherwise = saveEquation t1 t2
 
 -- Attempts to simplify a term. If there are no metavars, the result will be
@@ -348,18 +349,21 @@ reduce (App _A _B f a) = do
 reduce (Sigma _A _B) = Sigma <$> reduce _A <*> reduce _B
 reduce (Pair _A _B a b) = Pair _A _B <$> reduce a <*> reduce b
 
--- Checks there are no redexes in an expression.
-isHeadNeutral :: Term -> Bool
-isHeadNeutral (Universe _) = True
-isHeadNeutral (Assume _ _ _) = True
-isHeadNeutral (Metavar _ _ _) = False
-isHeadNeutral (Apply _ _) = False
-isHeadNeutral (Var _) = True
-isHeadNeutral (Pi _ _) = True
-isHeadNeutral (Lam _ _) = True
-isHeadNeutral (App _ _ f _) = isHeadNeutral f
-isHeadNeutral (Sigma _ _) = True
-isHeadNeutral (Pair _ _ _ _) = True
+-- Checks there are no redexes in the App "spine" of a term.
+isWeakNormal :: Term -> Bool
+isWeakNormal (Lam _ _) = True
+isWeakNormal t = isWeakNeutral t
+  where
+    isWeakNeutral (Universe _) = True
+    isWeakNeutral (Assume _ _ _) = True
+    isWeakNeutral (Metavar _ _ _) = False
+    isWeakNeutral (Apply _ _) = False
+    isWeakNeutral (Var _) = True
+    isWeakNeutral (Pi _ _) = True
+    isWeakNeutral (Lam _ _) = False
+    isWeakNeutral (App _ _ f _) = isWeakNeutral f
+    isWeakNeutral (Sigma _ _) = True
+    isWeakNeutral (Pair _ _ _ _) = True
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
@@ -371,6 +375,14 @@ search t = deepen $ do
         -- TODO: check more carefully.
         _ -> return ()
 
+-- Try to unify an unknown term with a guess.
+accept :: Term -> Term -> TcM ()
+accept t p = do
+    _A <- reduce (termType t)
+    traceM $ "Trying " ++ show p ++ " for " ++ show _A
+    unify (termType t) (termType p)
+    unify t p
+
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
     assumptions <- gets (envAssumptions . currentEnv)
@@ -378,11 +390,7 @@ searchAssumptions t = do
   where
     _Γ = context t
 
-    try p = accept p <|> tryApp p
-
-    accept p = do
-        unify (termType t) (termType p)
-        unify t p
+    try p = accept t p <|> tryApp p
 
     tryApp p = do
         ty <- reduce (termType p)
@@ -401,9 +409,7 @@ searchPair t = do
     _B <- freshMetavar _Γ' (Universe _Γ')
     α <- freshMetavar _Γ _A
     β <- freshMetavar _Γ (Apply (SubstTerm α) _B)
-    let p = Pair _A _B α β
-    unify (termType t) (termType p)
-    unify t p
+    accept t (Pair _A _B α β)
     search α
     search β
 
