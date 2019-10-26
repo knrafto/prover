@@ -14,6 +14,7 @@ reserved, and are treated specially in the syntax:
 _
 :
 :=
+=
 →
 Σ
 Π
@@ -45,6 +46,7 @@ expr =
     literal
     ( expr )
     expr ( expr [, expr]* )
+    expr = expr
     expr → expr
     Σ ( name : expr ) . expr
     (expr , expr [, expr]*)

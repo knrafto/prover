@@ -41,7 +41,7 @@ identifier = lexeme . try $ do
     return w
   where
     reservedWords :: [Text]
-    reservedWords = ["_", ":", ":=", "Σ", "Π", "λ", "→", "Type", ":assume", ":prove"]
+    reservedWords = ["_", ":", ":=", "=", "Σ", "Π", "λ", "→", "Type", ":assume", ":prove"]
 
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
@@ -61,23 +61,43 @@ atom = Hole <$ reservedWord "_"
         <* symbol '.' <*> expr
     <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
 
-expr :: Parser Expr
-expr = do
+apps :: Parser Expr
+apps = do
     x <- atom
-    rest x
+    rest x    
   where
-    rest x = apply x <|> arrow x <|> return x
+    rest x = app x <|> return x
 
-    apply x = do
+    app x = do
         symbol '('
         args <- expr `sepBy1` symbol ','
         symbol ')'
         rest (App x args)
 
+equals :: Parser Expr
+equals = do
+    x <- apps
+    equal x <|> return x
+  where
+    equal x = do
+        reservedWord "="
+        y <- apps
+        return (App (Var "Id") [Hole, x, y])
+
+arrows :: Parser Expr
+arrows = do
+    x <- equals
+    rest x
+  where
+    rest x = arrow x <|> return x
+
     arrow x = do
         reservedWord "→"
-        y <- expr
+        y <- arrows
         return (Arrow x y)
+
+expr :: Parser Expr
+expr = arrows
 
 define :: Parser Statement
 define = Define <$> identifier <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr

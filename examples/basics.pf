@@ -1,20 +1,20 @@
 :assume Id : Π (A : Type). A → A → Type
-:assume refl : Π (A : Type). Π (a : A). Id(A, a, a)
+:assume refl : Π (A : Type). Π (a : A). a = a
 # Based path induction.
 :assume ind-Id : Π (A : Type). Π (a : A).
-    Π (C : Π (b : A). Id(A, a, b) → Type).
+    Π (C : Π (b : A). a = b → Type).
     C(a, refl(A, a)) →
-    Π (b : A). Π (p : Id(A, a, b)). C(b, p)
+    Π (b : A). Π (p : a = b). C(b, p)
 
-IsContr := λ (A : Type). Σ (a : A). Π (b : A). Id(_, a, b)
+IsContr := λ (A : Type). Σ (a : A). Π (b : A). a = b
 
-IsProp := λ (A : Type). Π (a : A). Π (b : A). Id(_, a, b)
+IsProp := λ (A : Type). Π (a : A). Π (b : A). a = b
 
 IsSet := λ (A : Type). Π (a : A). Π (b : A).
-    Π (p : Id(_, a, b)). Π (q : Id(_, a, b)). Id(_, p, q)
+    Π (p : a = b). Π (q : a = b). p = q
 
 Fiber := λ (A : Type). λ (B : Type). λ (f : A → B). λ (b : B).
-    Σ (a : A). Id(_, f(a), b)
+    Σ (a : A). f(a) = b
 
 IsEquiv := λ (A : Type). λ (B : Type). λ (f : A → B).
     Π (b : B). IsContr(Fiber(_, _, f, b))
@@ -34,7 +34,7 @@ IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
 :prove 1-IsContr : IsContr(1)
 :prove 1-IsProp : IsProp(1)
 
-# sym : Π (A : Type). Π (a : A). Π (b : A). Id(A, a, b) → Id(A, b, a)
-#     := λ (A : Type). λ (a : A). ind-Id(A, a, λ (b : A). λ (p : Id(A, a, b)). Id(A, b, a), refl(A, a))
+# sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
+#     := λ (A : Type). λ (a : A). ind-Id(A, a, λ (b : A). λ (p : a = b). b = a, refl(A, a))
 
-# :prove p4 : Π (A : Type). Π (a : A). IsContr(Σ (b : A). Id(A, a, b))
+# :prove p4 : Π (A : Type). Π (a : A). IsContr(Σ (b : A). a = b)
