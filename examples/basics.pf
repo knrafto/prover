@@ -1,5 +1,10 @@
 :assume Id : Π (A : Type). A → A → Type
 :assume refl : Π (A : Type). Π (a : A). Id(A, a, a)
+# Based path induction.
+:assume ind-Id : Π (A : Type). Π (a : A).
+    Π (C : Π (b : A). Id(A, a, b) → Type).
+    C(a, refl(A, a)) →
+    Π (b : A). Π (p : Id(A, a, b)). C(b, p)
 
 IsContr := λ (A : Type). Σ (a : A). Π (b : A). Id(_, a, b)
 
@@ -21,9 +26,15 @@ IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
 :assume ind0 : Π (C : 0 → Type). Π (a : 0). C(a)
 
 :assume 1 : Type
-:assume ⋆ : 1
-:assume ind1 : Π (C : 1 → Type). C(⋆) → Π (a : 1). C(a)
+:assume tt : 1
+:assume ind-1 : Π (C : 1 → Type). C(tt) → Π (a : 1). C(a)
 
-:prove p1 : IsProp(0)
-:prove p2 : IsProp(1)
-:prove p3 : IsContr(1)
+:prove 0-IsProp : IsProp(0)
+
+:prove 1-IsContr : IsContr(1)
+:prove 1-IsProp : IsProp(1)
+
+# sym : Π (A : Type). Π (a : A). Π (b : A). Id(A, a, b) → Id(A, b, a)
+#     := λ (A : Type). λ (a : A). ind-Id(A, a, λ (b : A). λ (p : Id(A, a, b)). Id(A, b, a), refl(A, a))
+
+# :prove p4 : Π (A : Type). Π (a : A). IsContr(Σ (b : A). Id(A, a, b))

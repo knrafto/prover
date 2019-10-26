@@ -251,6 +251,7 @@ unify :: Term -> Term -> TcM ()
 unify t1 t2 = do
     t1' <- reduce t1
     t2' <- reduce t2
+    traceM $ "Unifying\n  " ++ show t1' ++ "\n  " ++ show t2'
     unify' t1' t2'
 
 unify' :: Term -> Term -> TcM ()
@@ -377,11 +378,14 @@ search t = deepen $ do
 
 -- Try to unify an unknown term with a guess.
 accept :: Term -> Term -> TcM ()
-accept t p = do
+accept t guess = do
+    guessType <- reduce (termType guess)
+    -- Prune branches where the guess is too general (e.g. metavar applied to args).
+    guard (isWeakNormal guessType)
     _A <- reduce (termType t)
-    traceM $ "Trying " ++ show p ++ " for " ++ show _A
-    unify (termType t) (termType p)
-    unify t p
+    -- traceM $ "Trying " ++ show guess ++ " for " ++ show _A
+    unify (termType t) (termType guess)
+    unify t guess
 
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
