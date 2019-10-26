@@ -11,7 +11,6 @@ import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict as Map
 import           Data.Text                      ( Text )
 import qualified Data.Text as Text
-import           Debug.Trace
 
 import           Search
 import qualified Syntax
@@ -203,7 +202,7 @@ initialState env = TcState
     , unsolvedEquations = []
     }
 
-type TcM a = SearchM TcState (First String) a
+type TcM a = SearchM TcState a
 
 -- Runs a search, reporting any failure
 runTcM :: Env -> TcM a -> Either String a
@@ -212,9 +211,6 @@ runTcM env m = case runSearch 10 m (initialState env) of
     Ok (a:_) -> Right a
     Fail (First e) -> Left (fromMaybe "<no error message>" e)
     Unknown -> Left "<depth limit exceeded>"
-
-throwString :: String -> TcM a
-throwString = throw . First . Just
 
 -- Generate a metavar for the given context and type.
 freshMetavar :: Context -> Term -> TcM Term
@@ -234,7 +230,7 @@ assign i t = do
     forM_ eqs $ \(t1, t2) -> unify t1 t2
 
 unificationFailure :: Term -> Term -> TcM a
-unificationFailure t1 t2 = throwString $
+unificationFailure t1 t2 = throw $
     "Failed to unify in context: " ++ show (context t1) ++ "\n" ++
     "  " ++ show t1 ++ "\n" ++
     "  " ++ show t2
@@ -251,8 +247,8 @@ unify :: Term -> Term -> TcM ()
 unify t1 t2 = do
     t1' <- reduce t1
     t2' <- reduce t2
-    traceM $ "Unifying\n  " ++ show t1' ++ "\n  " ++ show t2'
-    unify' t1' t2'
+    trace ("Unifying\n  " ++ show t1' ++ "\n  " ++ show t2') $
+        unify' t1' t2'
 
 unify' :: Term -> Term -> TcM ()
 unify' (Universe _) (Universe _) = return ()
@@ -368,13 +364,14 @@ isWeakNormal t = isWeakNeutral t
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
-search t = deepen $ do
+search t = do
     t' <- reduce t
-    case t' of
-        Metavar _ _ _ -> searchAssumptions t' <|> searchPair t'
-        -- Assume term is solved.
-        -- TODO: check more carefully.
-        _ -> return ()
+    deepen ("Searching " ++ show t ++ " : " ++ show (termType t')) $
+        case t' of
+            Metavar _ _ _ -> searchAssumptions t' <|> searchPair t'
+            -- Assume term is solved.
+            -- TODO: check more carefully.
+            _ -> return ()
 
 -- Try to unify an unknown term with a guess.
 accept :: Term -> Term -> TcM ()
@@ -383,9 +380,9 @@ accept t guess = do
     -- Prune branches where the guess is too general (e.g. metavar applied to args).
     guard (isWeakNormal guessType)
     _A <- reduce (termType t)
-    -- traceM $ "Trying " ++ show guess ++ " for " ++ show _A
-    unify (termType t) (termType guess)
-    unify t guess
+    trace ("Trying " ++ show guess ++ " for " ++ show _A) $ do
+        unify (termType t) (termType guess)
+        unify t guess
 
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
