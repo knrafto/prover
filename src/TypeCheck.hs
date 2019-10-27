@@ -406,6 +406,7 @@ reduce (Proj2 _A _B p) = do
         _ -> return (Proj2 _A _B p')
 
 -- Checks there are no redexes in the App "spine" of a term.
+-- TODO: put this on firm foundation (especially Pair/Proj with eta rules).
 isWeakNormal :: Term -> Bool
 isWeakNormal (Lam _ _) = True
 isWeakNormal t = isWeakNeutral t
@@ -420,7 +421,6 @@ isWeakNormal t = isWeakNeutral t
     isWeakNeutral (App _ _ f _) = isWeakNeutral f
     isWeakNeutral (Sigma _ _) = True
     isWeakNeutral (Pair _ _ _ _) = True
-    -- TODO: are these weak neutral?
     isWeakNeutral (Proj1 _ _ _) = False
     isWeakNeutral (Proj2 _ _ _) = False
 
