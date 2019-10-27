@@ -41,7 +41,7 @@ identifier = lexeme . try $ do
     return w
   where
     reservedWords :: [Text]
-    reservedWords = ["_", ":", ":=", "=", "Σ", "Π", "λ", "→", "Type", ":assume", ":prove"]
+    reservedWords = ["_", ":", ":=", "=", "Σ", "Π", "λ", "→", "Type", "π₁", "π₂", ":assume", ":prove"]
 
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
