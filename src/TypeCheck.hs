@@ -121,6 +121,10 @@ data Term
     -- If A : Tm Γ U and B : Tm (Γ, A) U and a : Tm Γ A and b : Tm Γ B[⟨a⟩]
     -- then pair(a, b) : Tm Γ Σ(A, B)
     | Pair Term Term Term Term
+    -- If A : Tm Γ U and B : Tm (Γ, A) U and p : Tm Γ Σ(A, B), then π₁(p) : Tm Γ A
+    | Proj1 Term Term Term
+    -- If A : Tm Γ U and B : Tm (Γ, A) U and p : Tm Γ Σ(A, B), then π₂(p) : Tm Γ B[⟨π₁(p)⟩]
+    | Proj2 Term Term Term
 
 instance Show Term where
     showsPrec _ (Universe _) = showString "U"
@@ -133,6 +137,8 @@ instance Show Term where
     showsPrec _ (App _ _ f a) = showString "app(" . shows f . showString ", " . shows a . showString ")"
     showsPrec _ (Sigma _A _B) = showString "Σ(" . shows _A . showString ", " . shows _B . showString ")"
     showsPrec _ (Pair _ _ a b) = showString "pair(" . shows a . showString ", " . shows b . showString ")"
+    showsPrec _ (Proj1 _ _ p) = showString "π₁(" . shows p . showString ")"
+    showsPrec _ (Proj2 _ _ p) = showString "π₂(" . shows p . showString ")"
 
 -- Extracts the context from a term.
 context :: Term -> Context
@@ -149,6 +155,8 @@ context (Lam _A _) = context _A
 context (App _A _ _ _) = context _A
 context (Sigma _A _B) = context _A
 context (Pair _A _ _ _) = context _A
+context (Proj1 _ _ p) = context p
+context (Proj2 _ _ p) = context p
 
 -- Extracts the type of a term.
 termType :: Term -> Term
@@ -165,6 +173,8 @@ termType (Lam _A b) = Pi _A (termType b)
 termType (App _ _B _ a) = Apply (SubstTerm a) _B
 termType (Sigma _A _B) = Universe (context _A)
 termType (Pair _A _B _ _) = Sigma _A _B
+termType (Proj1 _A _ _) = _A
+termType (Proj2 _A _B p) = Apply (SubstTerm (Proj1 _A _B p)) _B
 
 weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t
@@ -337,6 +347,8 @@ reduce (Apply σ t) = do
         App _A _B f a -> reduce $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
         Sigma _A _B -> reduce $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
         Pair _A _B a b -> reduce $ Pair (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ a) (Apply σ b)
+        Proj1 _A _B p -> reduce $ Proj1 (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ p)
+        Proj2 _A _B p -> reduce $ Proj2 (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ p)
 reduce t@(Var _) = return t
 reduce (Pi _A _B) = Pi <$> reduce _A <*> reduce _B
 reduce (Lam _A b) = Lam _A <$> reduce b
@@ -347,7 +359,10 @@ reduce (App _A _B f a) = do
         Lam _ b -> reduce $ Apply (SubstTerm a') b
         _ -> return $ App _A _B f' a'
 reduce (Sigma _A _B) = Sigma <$> reduce _A <*> reduce _B
+-- TODO: βη reduction for pairs
 reduce (Pair _A _B a b) = Pair _A _B <$> reduce a <*> reduce b
+reduce (Proj1 _A _B p) = Proj1 _A _B <$> reduce p
+reduce (Proj2 _A _B p) = Proj2 _A _B <$> reduce p
 
 -- Checks there are no redexes in the App "spine" of a term.
 isWeakNormal :: Term -> Bool
@@ -364,6 +379,9 @@ isWeakNormal t = isWeakNeutral t
     isWeakNeutral (App _ _ f _) = isWeakNeutral f
     isWeakNeutral (Sigma _ _) = True
     isWeakNeutral (Pair _ _ _ _) = True
+    -- TODO: are these weak neutral?
+    isWeakNeutral (Proj1 _ _ _) = False
+    isWeakNeutral (Proj2 _ _ _) = False
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
@@ -520,6 +538,9 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
 typeCheckExpr _Γ names (Syntax.Tuple args) = do
     args' <- mapM (typeCheckExpr _Γ names) args
     typeCheckTuple args'
+typeCheckExpr _ _ (Syntax.Proj1 _) = error "typeCheckExpr: Proj1"
+typeCheckExpr _ _ (Syntax.Proj2 _) = error "typeCheckExpr: Proj2"
+
 
 checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))

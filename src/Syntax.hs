@@ -18,4 +18,6 @@ data Expr
     | App Expr [Expr]
     | Sigma Text Expr Expr
     | Tuple [Expr]
+    | Proj1 Expr
+    | Proj2 Expr
     deriving (Show)

@@ -59,7 +59,9 @@ atom = Hole <$ reservedWord "_"
    <|> Lam <$ reservedWord "λ"
         <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
         <* symbol '.' <*> expr
-    <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
+   <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
+   <|> Proj1 <$ reservedWord "π₁" <* symbol '(' <*> expr <* symbol ')' 
+   <|> Proj2 <$ reservedWord "π₂" <* symbol '(' <*> expr <* symbol ')' 
 
 apps :: Parser Expr
 apps = do
