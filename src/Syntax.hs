@@ -17,6 +17,7 @@ data Expr
     | Lam Text Expr Expr
     | App Expr [Expr]
     | Sigma Text Expr Expr
+    | Times Expr Expr
     | Tuple [Expr]
     | Proj1 Expr
     | Proj2 Expr

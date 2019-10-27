@@ -1,6 +1,6 @@
+# Identity types, with based path induction.
 :assume Id : Π (A : Type). A → A → Type
 :assume refl : Π (A : Type). Π (a : A). a = a
-# Based path induction.
 :assume ind-Id : Π (A : Type). Π (a : A).
     Π (C : Π (b : A). a = b → Type).
     C(a, refl(A, a)) →
@@ -33,6 +33,8 @@ IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
 
 :prove 1-IsContr : IsContr(1)
 :prove 1-IsProp : IsProp(1)
+
+# 
 
 sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
     := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))

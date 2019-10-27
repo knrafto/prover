@@ -3,7 +3,8 @@ module Parser (statements) where
 
 import Control.Monad
 
-import Data.Text (Text)
+import           Control.Monad.Combinators.Expr
+import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Data.Void
 import           Text.Megaparsec
@@ -41,7 +42,10 @@ identifier = lexeme . try $ do
     return w
   where
     reservedWords :: [Text]
-    reservedWords = ["_", ":", ":=", "=", "Σ", "Π", "λ", "→", "Type", "π₁", "π₂", ":assume", ":prove"]
+    reservedWords =
+        [ "_", ":", ":=", "=", "Σ", "Π", "λ", "→", "×", "π₁", "π₂"
+        , "Type", ":assume", ":prove"
+        ]
 
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
@@ -76,30 +80,14 @@ apps = do
         symbol ')'
         rest (App x args)
 
-equals :: Parser Expr
-equals = do
-    x <- apps
-    equal x <|> return x
-  where
-    equal x = do
-        reservedWord "="
-        y <- apps
-        return (App (Var "Id") [Hole, x, y])
-
-arrows :: Parser Expr
-arrows = do
-    x <- equals
-    rest x
-  where
-    rest x = arrow x <|> return x
-
-    arrow x = do
-        reservedWord "→"
-        y <- arrows
-        return (Arrow x y)
-
 expr :: Parser Expr
-expr = arrows
+expr = makeExprParser apps
+    [ [InfixR (Times <$ reservedWord "×")]
+    , [InfixN (equal <$ reservedWord "=")]
+    , [InfixR (Arrow <$ reservedWord "→")]
+    ]
+  where
+    equal x y = App (Var "Id") [Hole, x, y]
 
 define :: Parser Statement
 define = Define <$> identifier <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr

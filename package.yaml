@@ -20,6 +20,7 @@ dependencies:
 - containers >= 0.6.0.1 && < 1
 - megaparsec >= 7.0.5 && < 8
 - mtl >= 2.2.2 && < 3
+- parser-combinators >= 1.1.0 && < 2
 - text >= 1.2.3.1 && < 2
 
 executables:

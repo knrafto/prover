@@ -16,6 +16,7 @@ _
 :=
 =
 →
+×
 Σ
 Π
 λ
@@ -52,6 +53,7 @@ expr =
     expr ( expr [, expr]* )
     expr = expr
     expr → expr
+    expr × expr
     Σ ( name : expr ) . expr
     (expr , expr [, expr]*)
     Π ( name : expr ) . expr

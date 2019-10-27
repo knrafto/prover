@@ -576,6 +576,12 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     _B' <- typeCheckExpr (Extend _A') (name : names) _B
     checkIsType _B'
     return (Sigma _A' _B')
+typeCheckExpr _Γ names (Syntax.Times _A _B) = do
+    _A' <- typeCheckExpr _Γ names _A
+    checkIsType _A'
+    _B' <- typeCheckExpr _Γ names _B
+    checkIsType _B'
+    return (Sigma _A' (Apply (SubstWeaken _A') _B'))
 typeCheckExpr _Γ names (Syntax.Tuple args) = do
     args' <- mapM (typeCheckExpr _Γ names) args
     typeCheckTuple args'
