@@ -538,9 +538,20 @@ typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
 typeCheckExpr _Γ names (Syntax.Tuple args) = do
     args' <- mapM (typeCheckExpr _Γ names) args
     typeCheckTuple args'
-typeCheckExpr _ _ (Syntax.Proj1 _) = error "typeCheckExpr: Proj1"
-typeCheckExpr _ _ (Syntax.Proj2 _) = error "typeCheckExpr: Proj2"
-
+typeCheckExpr _Γ names (Syntax.Proj1 e) = do
+    p <- typeCheckExpr _Γ names e
+    _A <- freshMetavar _Γ (Universe _Γ)
+    let _Γ' = Extend _A
+    _B <- freshMetavar _Γ' (Universe _Γ')
+    unify (termType p) (Sigma _A _B)
+    return (Proj1 _A _B p)
+typeCheckExpr _Γ names (Syntax.Proj2 e) = do
+    p <- typeCheckExpr _Γ names e
+    _A <- freshMetavar _Γ (Universe _Γ)
+    let _Γ' = Extend _A
+    _B <- freshMetavar _Γ' (Universe _Γ')
+    unify (termType p) (Sigma _A _B)
+    return (Proj2 _A _B p)
 
 checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))
