@@ -359,10 +359,17 @@ reduce (App _A _B f a) = do
         Lam _ b -> reduce $ Apply (SubstTerm a') b
         _ -> return $ App _A _B f' a'
 reduce (Sigma _A _B) = Sigma <$> reduce _A <*> reduce _B
--- TODO: βη reduction for pairs
 reduce (Pair _A _B a b) = Pair _A _B <$> reduce a <*> reduce b
-reduce (Proj1 _A _B p) = Proj1 _A _B <$> reduce p
-reduce (Proj2 _A _B p) = Proj2 _A _B <$> reduce p
+reduce (Proj1 _A _B p) = do
+    p' <- reduce p
+    case p' of
+        Pair _ _ a _ -> return a
+        _ -> return Proj1 _A _B p'
+reduce (Proj2 _A _B p) = do
+    p' <- reduce p
+    case p' of
+        Pair _ _ _ b -> return b
+        _ -> return Proj1 _A _B p'
 
 -- Checks there are no redexes in the App "spine" of a term.
 isWeakNormal :: Term -> Bool
