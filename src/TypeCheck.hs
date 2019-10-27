@@ -47,6 +47,12 @@ data Subst
     -- σ ↑ A : (Δ, A[σ]) → (Γ, A).
     | SubstExtend Subst Term
 
+instance Eq Subst where
+    (SubstWeaken _) == (SubstWeaken _) = True
+    (SubstTerm t1) == (SubstTerm t2) = t1 == t2
+    (SubstExtend σ1 _) == (SubstExtend σ2 _) = σ1 == σ2
+    _ == _ = False
+
 instance Show Subst where
     showsPrec _ (SubstWeaken _A) = showString "wk"
     showsPrec _ (SubstTerm t) = showString "⟨" . shows t . showString "⟩"
@@ -86,6 +92,11 @@ data Var
     -- If B : Tm Γ U and v : Var Γ B, then vs(v) : Var (Γ, A) B[wk]
     | VS Term Var
 
+instance Eq Var where
+    (VZ _) == (VZ _) = True
+    (VS _ v1) == (VS _ v2) = v1 == v2
+    _ == _ = False
+
 instance Show Var where
     showsPrec _ v = showString "v" . showString (subscript (deBruijn v))
 
@@ -98,6 +109,10 @@ fromDeBruijn Empty _ = error "fromDeBruijn: empty context"
 fromDeBruijn (Extend _A) 0 = VZ _A
 fromDeBruijn (Extend _A) i = VS _A (fromDeBruijn (context _A) (i - 1))
 
+-- Represents a term in a type and a context. Most functions operating on terms
+-- assume that terms' contexts and types are compatible and do not check.
+-- The Eq instance checks for syntactic equality, and assumes that both terms
+-- have the same context and type.
 data Term
     -- U : Tm Γ U
     = Universe Context
@@ -125,6 +140,21 @@ data Term
     | Proj1 Term Term Term
     -- If A : Tm Γ U and B : Tm (Γ, A) U and p : Tm Γ Σ(A, B), then π₂(p) : Tm Γ B[⟨π₁(p)⟩]
     | Proj2 Term Term Term
+
+instance Eq Term where
+    (Universe _) == (Universe _) = True
+    (Assume n1 _ _) == (Assume n2 _ _) = n1 == n2
+    (Metavar i1 _ _) == (Metavar i2 _ _) = i1 == i2
+    (Apply σ1 t1) == (Apply σ2 t2) = σ1 == σ2 && t1 == t2
+    (Var v1) == (Var v2) = v1 == v2
+    (Pi _A1 _B1) == (Pi _A2 _B2) = _A1 == _A2 && _B1 == _B2
+    (Lam _ b1) == (Lam _ b2) = b1 == b2
+    (App _ _ f1 a1) == (App _ _ f2 a2) = f1 == f2 && a1 == a2
+    (Sigma _A1 _B1) == (Sigma _A2 _B2) = _A1 == _A2 && _B1 == _B2
+    (Pair _ _ a1 b1) == (Pair _ _ a2 b2) = a1 == a2 && b1 == b2
+    (Proj1 _ _ p1) == (Proj1 _ _ p2) = p1 == p2
+    (Proj2 _ _ p1) == (Proj2 _ _ p2) = p1 == p2
+    _ == _ = False
 
 instance Show Term where
     showsPrec _ (Universe _) = showString "U"
@@ -260,6 +290,7 @@ unify t1 t2 = do
         unify' t1' t2'
 
 unify' :: Term -> Term -> TcM ()
+unify' t1 t2 | t1 == t2 = return ()
 unify' (Universe _) (Universe _) = return ()
 unify' (Universe _) (Apply σ t) = unify (Universe (substCodomain σ)) t
 unify' (Apply σ t) (Universe _) = unify (Universe (substCodomain σ)) t
@@ -306,6 +337,9 @@ unify' (Sigma _A _B) (Apply σ t) = do
 unify' (Pair _ _ a1 b1) (Pair _ _ a2 b2) = do
     unify a1 a2
     unify b1 b2
+-- Eta rule for pairs.
+unify' (Pair _ _ (Proj1 _ _ p1) (Proj2 _ _ p2)) t | p1 == p2 = unify p1 t
+unify' t (Pair _ _ (Proj1 _ _ p1) (Proj2 _ _ p2)) | p1 == p2 = unify p1 t
 unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
 -- If two head-neutral terms don't unify, the terms are unequal; otherwise,
 -- save it for later.
@@ -364,12 +398,12 @@ reduce (Proj1 _A _B p) = do
     p' <- reduce p
     case p' of
         Pair _ _ a _ -> return a
-        _ -> return Proj1 _A _B p'
+        _ -> return (Proj1 _A _B p')
 reduce (Proj2 _A _B p) = do
     p' <- reduce p
     case p' of
         Pair _ _ _ b -> return b
-        _ -> return Proj1 _A _B p'
+        _ -> return (Proj2 _A _B p')
 
 -- Checks there are no redexes in the App "spine" of a term.
 isWeakNormal :: Term -> Bool

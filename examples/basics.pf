@@ -38,3 +38,8 @@ sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
     := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
 
 # :prove p4 : Π (A : Type). Π (a : A). IsContr(Σ (b : A). a = b)
+
+ind-Σ : Π (A : Type). Π (B : A → Type). Π (C : (Σ (a : A). B(a)) → Type).
+        (Π (a : A). Π (b : B(a)). C((a, b))) → Π (p : Σ (a : A). B(a)). C(p)
+    := λ (A : Type). λ (B : A → Type). λ (C : (Σ (a : A). B(a)) → Type).
+        λ (g : Π (a : A). Π (b : B(a)). C((a, b))). λ (p : Σ (a : A). B(a)). g(π₁(p), π₂(p))
