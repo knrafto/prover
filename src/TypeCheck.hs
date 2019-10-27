@@ -279,6 +279,10 @@ unify' (App _ _ f1 a1) (App _ _ f2 a2) | isWeakNormal f1 && isWeakNormal f2 = do
 -- app(f[wk], v₀)) = e, then we know f = lam(e).
 unify' (App _A _ (Apply (SubstWeaken _) t1) (Var (VZ _))) t2 = unify t1 (Lam _A t2)
 unify' t2 (App _A _ (Apply (SubstWeaken _) t1) (Var (VZ _))) = unify t1 (Lam _A t2)
+-- Two-level eta rule.
+-- TODO: infer this from principles instead of hacking it in.
+unify' (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _))) t2 = unify t1 (Lam _A (Lam _B t2))
+unify' t2 (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _))) = unify t1 (Lam _A (Lam _B t2))
 unify' (Sigma _A1 _B1) (Sigma _A2 _B2) = do
     unify _A1 _A2
     unify _B1 _B2

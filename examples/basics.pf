@@ -34,7 +34,7 @@ IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
 :prove 1-IsContr : IsContr(1)
 :prove 1-IsProp : IsProp(1)
 
-# sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
-#     := λ (A : Type). λ (a : A). ind-Id(A, a, λ (b : A). λ (p : a = b). b = a, refl(A, a))
+sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
+    := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
 
 # :prove p4 : Π (A : Type). Π (a : A). IsContr(Σ (b : A). a = b)
