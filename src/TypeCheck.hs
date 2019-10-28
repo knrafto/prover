@@ -266,7 +266,8 @@ assign :: VarId -> Term -> TcM ()
 assign i t = do
     eqs <- gets unsolvedEquations
     modify $ \s -> s { subst = Map.insert i t (subst s), unsolvedEquations = [] }
-    forM_ eqs $ \(t1, t2) -> unify t1 t2
+    trace "Retrying unsolved equations" $
+        forM_ eqs $ \(t1, t2) -> unify t1 t2
 
 unificationFailure :: Term -> Term -> TcM a
 unificationFailure t1 t2 = throw $
