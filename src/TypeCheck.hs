@@ -286,7 +286,7 @@ unify :: Term -> Term -> TcM ()
 unify t1 t2 = do
     t1' <- reduce t1
     t2' <- reduce t2
-    trace ("Unifying\n  " ++ show t1' ++ "\n  " ++ show t2') $
+    trace ("Unifying in context: " ++ show (context t1) ++ "\n  " ++ show t1' ++ "\n  " ++ show t2') $
         unify' t1' t2'
 
 unify' :: Term -> Term -> TcM ()
@@ -486,6 +486,7 @@ typeCheck = go emptyEnv
 
 typeCheckStatement :: Env -> Syntax.Statement -> IO Env
 typeCheckStatement env (Syntax.Define name ty body) = do
+    putStrLn $ "Checking " ++ Text.unpack name
     result <- runTcM env $ do
             bodyTerm <- typeCheckExpr Empty [] body
             case ty of
@@ -503,6 +504,7 @@ typeCheckStatement env (Syntax.Define name ty body) = do
             putStrLn $ Text.unpack name ++ " := " ++ show bodyTerm
             return $ env { envDefinitions = Map.insert name bodyTerm (envDefinitions env) }
 typeCheckStatement env (Syntax.Assume name ty) = do
+    putStrLn $ "Checking " ++ Text.unpack name
     result <- runTcM env $ do
             tyTerm <- typeCheckExpr Empty [] ty
             checkSolved
@@ -515,6 +517,7 @@ typeCheckStatement env (Syntax.Assume name ty) = do
             putStrLn $ ":assume " ++ Text.unpack name ++ " : " ++ show tyTerm
             return $ env { envAssumptions = Map.insert name tyTerm (envAssumptions env) }
 typeCheckStatement env (Syntax.Prove name ty) = do
+    putStrLn $ "Checking " ++ Text.unpack name
     result <- runTcM env $ do
             tyTerm <- typeCheckExpr Empty [] ty
             tyTerm' <- reduce tyTerm
