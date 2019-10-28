@@ -488,14 +488,14 @@ typeCheckStatement :: Env -> Syntax.Statement -> IO Env
 typeCheckStatement env (Syntax.Define name ty body) = do
     putStrLn $ "Checking " ++ Text.unpack name
     result <- runTcM env $ do
-            bodyTerm <- typeCheckExpr Empty [] body
-            case ty of
-                Nothing -> return ()
-                Just ty' -> do
-                    tyTerm <- typeCheckExpr Empty [] ty'
-                    unify (termType bodyTerm) tyTerm
-            checkSolved
-            reduce bodyTerm
+        bodyTerm <- typeCheckExpr Empty [] body
+        case ty of
+            Nothing -> return ()
+            Just ty' -> do
+                tyTerm <- typeCheckExpr Empty [] ty'
+                unify (termType bodyTerm) tyTerm
+        checkSolved
+        reduce bodyTerm
     case result of
         Nothing -> do
             putStrLn $ "Error in " ++ Text.unpack name
@@ -506,9 +506,9 @@ typeCheckStatement env (Syntax.Define name ty body) = do
 typeCheckStatement env (Syntax.Assume name ty) = do
     putStrLn $ "Checking " ++ Text.unpack name
     result <- runTcM env $ do
-            tyTerm <- typeCheckExpr Empty [] ty
-            checkSolved
-            reduce tyTerm
+        tyTerm <- typeCheckExpr Empty [] ty
+        checkSolved
+        reduce tyTerm
     case result of
         Nothing -> do
             putStrLn $ "Error in " ++ Text.unpack name
@@ -519,12 +519,12 @@ typeCheckStatement env (Syntax.Assume name ty) = do
 typeCheckStatement env (Syntax.Prove name ty) = do
     putStrLn $ "Checking " ++ Text.unpack name
     result <- runTcM env $ do
-            tyTerm <- typeCheckExpr Empty [] ty
-            tyTerm' <- reduce tyTerm
-            α <- freshMetavar (context tyTerm') tyTerm'
-            search α
-            checkSolved
-            reduce α
+        tyTerm <- typeCheckExpr Empty [] ty
+        tyTerm' <- reduce tyTerm
+        α <- freshMetavar (context tyTerm') tyTerm'
+        search α
+        checkSolved
+        reduce α
     case result of
         Nothing -> do
             putStrLn $ "Error in " ++ Text.unpack name
