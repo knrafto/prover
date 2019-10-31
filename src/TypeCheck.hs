@@ -421,7 +421,7 @@ search t = do
     t' <- reduce t
     trace ("Searching " ++ show t ++ " : " ++ show (termType t')) $
         case t' of
-            Metavar _ _ _ -> searchAssumptions t' <|> searchPair t'
+            Metavar _ _ _ -> searchAssumptions t' <|> searchLam t' <|> searchPair t'
             -- Assume term is solved.
             -- TODO: check more carefully.
             _ -> return ()
@@ -454,6 +454,16 @@ searchAssumptions t = do
                 try (App _A _B p α)
                 search α
             _ -> empty
+
+searchLam :: Term -> TcM ()
+searchLam t = do
+    let _Γ = context t
+    _A <- freshMetavar _Γ (Universe _Γ)
+    let _Γ' = Extend _A
+    _B <- freshMetavar _Γ' (Universe _Γ')
+    β <- freshMetavar _Γ' _B
+    accept t (Lam _A β)
+    search β
 
 searchPair :: Term -> TcM ()
 searchPair t = do
