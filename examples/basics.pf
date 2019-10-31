@@ -11,10 +11,10 @@
     ind-Id(A, a, C, c, a, refl(A, a)) = c
 
 # Groupoid structure of identity types.
-# sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
-#     := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
+sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
+    := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
 
-# sym-refl-type := Π (A : Type). Π (a : A). sym(A, a, a, refl(A, a)) = refl(A, a)
+:prove sym-refl : Π (A : Type). Π (a : A). sym(A, a, a, refl(A, a)) = refl(A, a)
 
 # trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a = c
 #     := λ (A : Type). λ (a : A). λ (b : A). λ (c : A). λ (p : a = b). λ (q : b = c).
