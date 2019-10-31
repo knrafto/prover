@@ -41,5 +41,5 @@ trace :: String -> SearchM s a -> SearchM s a
 trace e m = SearchM (StateT (\s ->
     let Result as bs = runStateT (runSearchM m) s in Result as [Node e bs]))
 
-runSearch :: SearchM s a -> s -> Result a
-runSearch m s = evalStateT (runSearchM m) s
+runSearch :: SearchM s a -> s -> Result (a, s)
+runSearch m s = runStateT (runSearchM m) s

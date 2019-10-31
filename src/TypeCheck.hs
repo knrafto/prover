@@ -210,22 +210,11 @@ weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t
 weakenGlobal (Extend _A) t = Apply (SubstWeaken _A) (weakenGlobal (context _A) t)
 
-data Env = Env
+data TcState = TcState
     -- Global definitions, and their values.
     { envDefinitions :: Map Text Term
     -- Global assumptions, and their types.
     , envAssumptions :: Map Text Term
-    }
-
-emptyEnv :: Env
-emptyEnv = Env
-    { envDefinitions = Map.empty
-    , envAssumptions = Map.empty
-    }
-
-data TcState = TcState
-    -- Current environment.
-    { currentEnv :: Env
     -- Next metavar id.
     , nextId :: !Int
     -- Metavar substitution.
@@ -234,9 +223,10 @@ data TcState = TcState
     , unsolvedEquations :: [(Term, Term)]
     }
 
-initialState :: Env -> TcState
-initialState env = TcState
-    { currentEnv = env
+initialState :: TcState
+initialState = TcState
+    { envDefinitions = Map.empty
+    , envAssumptions = Map.empty
     , nextId = 0
     , subst = Map.empty
     , unsolvedEquations = []
@@ -245,9 +235,9 @@ initialState env = TcState
 type TcM a = SearchM TcState a
 
 -- Runs a search, reporting any failure
-runTcM :: Env -> TcM a -> IO (Maybe a)
-runTcM env m = do
-    let Result as bs = runSearch m (initialState env)
+runTcM :: TcState -> TcM a -> IO (Maybe (a, TcState))
+runTcM s m = do
+    let Result as bs = runSearch m s
     putStr (drawForest bs)
     return (listToMaybe as)
 
@@ -449,7 +439,7 @@ accept t guess = do
 
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
-    assumptions <- gets (envAssumptions . currentEnv)
+    assumptions <- gets envAssumptions
     asum $ map (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty))) (Map.toList assumptions)
   where
     _Γ = context t
@@ -477,18 +467,18 @@ searchPair t = do
     search α
     search β
 
-typeCheck :: [Syntax.Statement] -> IO Env
-typeCheck = go emptyEnv
+typeCheck :: [Syntax.Statement] -> IO TcState
+typeCheck = go initialState
   where
-    go env [] = return env
-    go env (stmt:rest) = do
-        env' <- typeCheckStatement env stmt
-        go env' rest
+    go s [] = return s
+    go s (stmt:rest) = do
+        s' <- typeCheckStatement s stmt
+        go s' rest
 
-typeCheckStatement :: Env -> Syntax.Statement -> IO Env
-typeCheckStatement env (Syntax.Define name ty body) = do
+typeCheckStatement :: TcState -> Syntax.Statement -> IO TcState
+typeCheckStatement s (Syntax.Define name ty body) = do
     putStrLn $ "Checking " ++ Text.unpack name
-    result <- runTcM env $ do
+    result <- runTcM s $ do
         bodyTerm <- typeCheckExpr Empty [] body
         case ty of
             Nothing -> return ()
@@ -500,26 +490,26 @@ typeCheckStatement env (Syntax.Define name ty body) = do
     case result of
         Nothing -> do
             putStrLn $ "Error in " ++ Text.unpack name
-            return env
-        Just bodyTerm -> do
+            return s
+        Just (bodyTerm, s') -> do
             putStrLn $ Text.unpack name ++ " := " ++ show bodyTerm
-            return $ env { envDefinitions = Map.insert name bodyTerm (envDefinitions env) }
-typeCheckStatement env (Syntax.Assume name ty) = do
+            return $ s' { envDefinitions = Map.insert name bodyTerm (envDefinitions s') }
+typeCheckStatement s (Syntax.Assume name ty) = do
     putStrLn $ "Checking " ++ Text.unpack name
-    result <- runTcM env $ do
+    result <- runTcM s $ do
         tyTerm <- typeCheckExpr Empty [] ty
         checkSolved
         reduce tyTerm
     case result of
         Nothing -> do
             putStrLn $ "Error in " ++ Text.unpack name
-            return env
-        Just tyTerm -> do
+            return s
+        Just (tyTerm, s') -> do
             putStrLn $ ":assume " ++ Text.unpack name ++ " : " ++ show tyTerm
-            return $ env { envAssumptions = Map.insert name tyTerm (envAssumptions env) }
-typeCheckStatement env (Syntax.Prove name ty) = do
+            return $ s' { envAssumptions = Map.insert name tyTerm (envAssumptions s') }
+typeCheckStatement s (Syntax.Prove name ty) = do
     putStrLn $ "Checking " ++ Text.unpack name
-    result <- runTcM env $ do
+    result <- runTcM s $ do
         tyTerm <- typeCheckExpr Empty [] ty
         tyTerm' <- reduce tyTerm
         α <- freshMetavar (context tyTerm') tyTerm'
@@ -529,10 +519,10 @@ typeCheckStatement env (Syntax.Prove name ty) = do
     case result of
         Nothing -> do
             putStrLn $ "Error in " ++ Text.unpack name
-            return env
-        Just bodyTerm -> do
+            return s
+        Just (bodyTerm, s') -> do
             putStrLn $ Text.unpack name ++ " := " ++ show bodyTerm
-            return $ env { envDefinitions = Map.insert name bodyTerm (envDefinitions env) }
+            return $ s' { envDefinitions = Map.insert name bodyTerm (envDefinitions s') }
 
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
 typeCheckExpr _Γ _ Syntax.Hole = do
@@ -542,8 +532,8 @@ typeCheckExpr _Γ _ Syntax.Hole = do
     _A <- freshMetavar _Γ (Universe _Γ)
     freshMetavar _Γ _A
 typeCheckExpr _Γ names (Syntax.Var name) = do
-    definitions <- gets (envDefinitions . currentEnv)
-    assumptions <- gets (envAssumptions . currentEnv)
+    definitions <- gets envDefinitions
+    assumptions <- gets envAssumptions
     case () of
         _ | Just i <- elemIndex name names -> return (Var (fromDeBruijn _Γ i))
           | Just body <- Map.lookup name definitions ->
