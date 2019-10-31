@@ -260,8 +260,9 @@ assign :: VarId -> Term -> TcM ()
 assign i t = do
     eqs <- gets unsolvedEquations
     modify $ \s -> s { subst = Map.insert i t (subst s), unsolvedEquations = [] }
-    trace "Retrying unsolved equations" $
-        forM_ eqs $ \(t1, t2) -> unify t1 t2
+    unless (null eqs) $
+        trace "Retrying unsolved equations" $
+            forM_ eqs $ \(t1, t2) -> unify t1 t2
 
 unificationFailure :: Term -> Term -> TcM a
 unificationFailure t1 t2 = throw $
@@ -423,12 +424,13 @@ isWeakNormal t = isWeakNeutral t
 search :: Term -> TcM ()
 search t = do
     t' <- reduce t
-    trace ("Searching " ++ show t ++ " : " ++ show (termType t')) $
-        case t' of
-            Metavar _ _ _ -> searchAssumptions t' <|> searchLam t' <|> searchPair t'
-            -- Assume term is solved.
-            -- TODO: check more carefully.
-            _ -> return ()
+    case t' of
+        Metavar _ _ _ ->
+            trace ("Searching " ++ show t' ++ " : " ++ show (termType t')) $
+                searchAssumptions t' <|> searchLam t' <|> searchPair t'
+        -- Assume term is solved.
+        -- TODO: check more carefully.
+        _ -> return ()
 
 -- Try to unify an unknown term with a guess.
 accept :: Term -> Term -> TcM ()
