@@ -18,6 +18,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - containers >= 0.6.0.1 && < 1
+- hflags >= 0.4.3 && < 1
 - megaparsec >= 7.0.5 && < 8
 - mtl >= 2.2.2 && < 3
 - parser-combinators >= 1.1.0 && < 2

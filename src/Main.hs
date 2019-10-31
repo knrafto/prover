@@ -1,11 +1,12 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import           Control.Monad
-import           System.Environment
 import           System.Exit
 import           System.IO
 
 import qualified Data.Text.IO                  as Text
+import           HFlags
 import           Text.Megaparsec
 
 import TypeCheck
@@ -18,7 +19,7 @@ panic message = do
 
 main :: IO ()
 main = do
-    args <- getArgs
+    args <- $initHFlags "A theorem prover."
     path <- case args of
         [path] -> return path
         _ -> panic "usage: prover FILE"
