@@ -16,9 +16,12 @@ sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
 
 :prove sym-refl : Π (A : Type). Π (a : A). sym(A, a, a, refl(A, a)) = refl(A, a)
 
-# trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a = c
-#     := λ (A : Type). λ (a : A). λ (b : A). λ (c : A). λ (p : a = b). λ (q : b = c).
-#         ind-Id(A, a, λ (b : A). λ (p : a = b). Π (c : A). b = c → a = c, ind-Id(A, a, _, refl(A, a)), b, p)(c, q)
+trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a = c
+    := λ (A : Type). λ (a : A). λ (b : A). λ (c : A). λ (p : a = b). λ (q : b = c).
+        ind-Id(A, a, λ (b : A). λ (p : a = b). Π (c : A). b = c → a = c, ind-Id(A, a, _, refl(A, a)), b, p)(c, q)
+
+:prove trans-refl-l : Π (A : Type). Π (a : A). Π (b : A). Π (p : a = b). trans(A, a, a, b, refl(A, a), p) = p
+:prove trans-refl-r : Π (A : Type). Π (a : A). Π (b : A). Π (p : a = b). trans(A, a, b, b, p, refl(A, b)) = p
 
 # Empty type.
 :assume 0 : Type
