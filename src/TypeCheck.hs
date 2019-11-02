@@ -512,12 +512,7 @@ typeCheckStatement s (Syntax.Prove name ty) = do
             return $ s' { envDefinitions = Map.insert name bodyTerm (envDefinitions s') }
 
 typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
-typeCheckExpr _Γ _ Syntax.Hole = do
-    -- We generate variables for both the hole itself, and its type. Luckily
-    -- for now we don't have to do this forever, since the type of any type is
-    -- the universe.
-    _A <- freshMetavar _Γ (Universe _Γ)
-    freshMetavar _Γ _A
+typeCheckExpr _Γ _ Syntax.Hole = typeCheckHole _Γ
 typeCheckExpr _Γ names (Syntax.Var name) = do
     definitions <- gets envDefinitions
     assumptions <- gets envAssumptions
@@ -530,6 +525,12 @@ typeCheckExpr _Γ names (Syntax.Var name) = do
           | otherwise ->
                 fail $ "unbound name: " ++ Text.unpack name
 typeCheckExpr _Γ _ Syntax.Universe = return (Universe _Γ)
+typeCheckExpr _Γ names (Syntax.Equal a b) = do
+    f' <- typeCheckBuiltIn _Γ "Id"
+    _A <- typeCheckHole _Γ
+    a' <- typeCheckExpr _Γ names a
+    b' <- typeCheckExpr _Γ names b
+    typeCheckApp f' [_A, a', b']
 typeCheckExpr _Γ names (Syntax.Pi name _A _B) = do
     _A' <- typeCheckExpr _Γ names _A
     checkIsType _A'
@@ -566,6 +567,22 @@ typeCheckExpr _Γ names (Syntax.Times _A _B) = do
 typeCheckExpr _Γ names (Syntax.Tuple args) = do
     args' <- mapM (typeCheckExpr _Γ names) args
     typeCheckTuple args'
+
+typeCheckBuiltIn :: Context -> String -> TcM Term
+typeCheckBuiltIn _Γ name = do
+    let name' = Text.pack name
+    assumptions <- gets envAssumptions
+    case Map.lookup name' assumptions of
+        Just _A -> return (weakenGlobal _Γ (Assume name' Empty _A))
+        _ -> fail $ "can't find built-in: " ++ name
+
+typeCheckHole :: Context -> TcM Term
+typeCheckHole _Γ = do
+    -- We generate variables for both the hole itself, and its type. Luckily
+    -- for now we don't have to do this forever, since the type of any type is
+    -- the universe.
+    _A <- freshMetavar _Γ (Universe _Γ)
+    freshMetavar _Γ _A
 
 checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))

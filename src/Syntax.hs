@@ -12,6 +12,7 @@ data Expr
     = Hole
     | Var Text
     | Universe
+    | Equal Expr Expr
     | Pi Text Expr Expr
     | Arrow Expr Expr
     | Lam Text Expr Expr

@@ -81,11 +81,9 @@ apps = do
 expr :: Parser Expr
 expr = makeExprParser apps
     [ [InfixR (Times <$ reservedWord "×")]
-    , [InfixN (equal <$ reservedWord "=")]
+    , [InfixN (Equal <$ reservedWord "=")]
     , [InfixR (Arrow <$ reservedWord "→")]
     ]
-  where
-    equal x y = App (Var "Id") [Hole, x, y]
 
 define :: Parser Statement
 define = Define <$> identifier <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
