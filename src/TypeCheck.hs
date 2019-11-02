@@ -135,11 +135,6 @@ data Term
     -- If A : Tm Γ U and B : Tm (Γ, A) U and f : Tm Γ Π(A, B) and a : Tm Γ A
     -- then app(f, a) : Tm Γ B[⟨a⟩]
     | App Term Term Term Term
-    -- If A : Tm Γ U and B : Tm (Γ, A) U, then Σ(A, B) : Tm Γ U
-    | Sigma Term Term
-    -- If A : Tm Γ U and B : Tm (Γ, A) U and a : Tm Γ A and b : Tm Γ B[⟨a⟩]
-    -- then pair(a, b) : Tm Γ Σ(A, B)
-    | Pair Term Term Term Term
 
 instance Eq Term where
     (Universe _) == (Universe _) = True
@@ -150,8 +145,6 @@ instance Eq Term where
     (Pi _A1 _B1) == (Pi _A2 _B2) = _A1 == _A2 && _B1 == _B2
     (Lam _ b1) == (Lam _ b2) = b1 == b2
     (App _ _ f1 a1) == (App _ _ f2 a2) = f1 == f2 && a1 == a2
-    (Sigma _A1 _B1) == (Sigma _A2 _B2) = _A1 == _A2 && _B1 == _B2
-    (Pair _ _ a1 b1) == (Pair _ _ a2 b2) = a1 == a2 && b1 == b2
     _ == _ = False
 
 instance Show Term where
@@ -163,8 +156,6 @@ instance Show Term where
     showsPrec _ (Pi _A _B) = showString "Π(" . shows _A . showString ", " . shows _B . showString ")"
     showsPrec _ (Lam _ b) = showString "λ(" . shows b . showString ")"
     showsPrec _ (App _ _ f a) = showString "app(" . shows f . showString ", " . shows a . showString ")"
-    showsPrec _ (Sigma _A _B) = showString "Σ(" . shows _A . showString ", " . shows _B . showString ")"
-    showsPrec _ (Pair _ _ a b) = showString "pair(" . shows a . showString ", " . shows b . showString ")"
 
 -- Extracts the context from a term.
 context :: Term -> Context
@@ -179,8 +170,6 @@ context (Var v) = go v
 context (Pi _A _) = context _A
 context (Lam _A _) = context _A
 context (App _A _ _ _) = context _A
-context (Sigma _A _B) = context _A
-context (Pair _A _ _ _) = context _A
 
 -- Extracts the type of a term.
 termType :: Term -> Term
@@ -195,8 +184,6 @@ termType (Var v) = go v
 termType (Pi _A _B) = Universe (context _A)
 termType (Lam _A b) = Pi _A (termType b)
 termType (App _ _B _ a) = Apply (SubstTerm a) _B
-termType (Sigma _A _B) = Universe (context _A)
-termType (Pair _A _B _ _) = Sigma _A _B
 
 weakenGlobal :: Context -> Term -> Term
 weakenGlobal Empty t = t
@@ -308,20 +295,6 @@ unify' t2 (App _A _ (Apply (SubstWeaken _) t1) (Var (VZ _))) = unify t1 (Lam _A 
 -- TODO: infer this from principles instead of hacking it in.
 unify' (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _))) t2 = unify t1 (Lam _A (Lam _B t2))
 unify' t2 (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _))) = unify t1 (Lam _A (Lam _B t2))
-unify' (Sigma _A1 _B1) (Sigma _A2 _B2) = do
-    unify _A1 _A2
-    unify _B1 _B2
-unify' (Sigma _A _B) (Apply σ t) = do
-    let _Γ = substCodomain σ
-    _A' <- freshMetavar _Γ (Universe _Γ)
-    _B' <- freshMetavar (Extend _A') (Universe (Extend _A'))
-    unify t (Sigma _A' _B')
-    unify _A (Apply σ _A')
-    unify _B (Apply (SubstExtend σ _A') _B')
-unify' (Pair _ _ a1 b1) (Pair _ _ a2 b2) = do
-    unify a1 a2
-    unify b1 b2
-unify' t1@(Apply _ _) t2@(Sigma _ _) = unify t2 t1
 -- If two head-neutral terms don't unify, the terms are unequal; otherwise,
 -- save it for later.
 unify' t1 t2
@@ -360,8 +333,6 @@ reduce (Apply σ t) = do
         Pi _A _B -> reduce $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
         Lam _A b -> reduce $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
         App _A _B f a -> reduce $ App (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ f) (Apply σ a)
-        Sigma _A _B -> reduce $ Sigma (Apply σ _A) (Apply (SubstExtend σ _A) _B)
-        Pair _A _B a b -> reduce $ Pair (Apply σ _A) (Apply (SubstExtend σ _A) _B) (Apply σ a) (Apply σ b)
 reduce t@(Var _) = return t
 reduce (Pi _A _B) = Pi <$> reduce _A <*> reduce _B
 reduce (Lam _A b) = Lam _A <$> reduce b
@@ -371,8 +342,6 @@ reduce (App _A _B f a) = do
     case f' of
         Lam _ b -> reduce $ Apply (SubstTerm a') b
         _ -> return $ App _A _B f' a'
-reduce (Sigma _A _B) = Sigma <$> reduce _A <*> reduce _B
-reduce (Pair _A _B a b) = Pair _A _B <$> reduce a <*> reduce b
 
 -- Checks there are no redexes in the App "spine" of a term.
 -- TODO: put this on firm foundation.
@@ -388,8 +357,6 @@ isWeakNormal t = isWeakNeutral t
     isWeakNeutral (Pi _ _) = True
     isWeakNeutral (Lam _ _) = False
     isWeakNeutral (App _ _ f _) = isWeakNeutral f
-    isWeakNeutral (Sigma _ _) = True
-    isWeakNeutral (Pair _ _ _ _) = True
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
@@ -398,7 +365,7 @@ search t = do
     case t' of
         Metavar _ _ _ ->
             trace ("Searching " ++ show t' ++ " : " ++ show (termType t')) $
-                searchAssumptions t' <|> searchLam t' <|> searchPair t'
+                searchAssumptions t' <|> searchLam t'
         -- Assume term is solved.
         -- TODO: check more carefully.
         _ -> return ()
@@ -440,18 +407,6 @@ searchLam t = do
     _B <- freshMetavar _Γ' (Universe _Γ')
     β <- freshMetavar _Γ' _B
     accept t (Lam _A β)
-    search β
-
-searchPair :: Term -> TcM ()
-searchPair t = do
-    let _Γ = context t
-    _A <- freshMetavar _Γ (Universe _Γ)
-    let _Γ' = Extend _A
-    _B <- freshMetavar _Γ' (Universe _Γ')
-    α <- freshMetavar _Γ _A
-    β <- freshMetavar _Γ (Apply (SubstTerm α) _B)
-    accept t (Pair _A _B α β)
-    search α
     search β
 
 typeCheck :: [Syntax.Statement] -> IO TcState
@@ -554,16 +509,14 @@ typeCheckExpr _Γ names (Syntax.App f args) = do
     typeCheckApp f' args'
 typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
     _A' <- typeCheckExpr _Γ names _A
-    checkIsType _A'
     _B' <- typeCheckExpr (Extend _A') (name : names) _B
-    checkIsType _B'
-    return (Sigma _A' _B')
+    f <- typeCheckBuiltIn _Γ "Σ'"
+    typeCheckApp f [_A', Lam _A' _B']
 typeCheckExpr _Γ names (Syntax.Times _A _B) = do
     _A' <- typeCheckExpr _Γ names _A
-    checkIsType _A'
     _B' <- typeCheckExpr _Γ names _B
-    checkIsType _B'
-    return (Sigma _A' (Apply (SubstWeaken _A') _B'))
+    f <- typeCheckBuiltIn _Γ "Σ'"
+    typeCheckApp f [_A', Lam _A' (Apply (SubstWeaken _A') _B')]
 typeCheckExpr _Γ names (Syntax.Tuple args) = do
     args' <- mapM (typeCheckExpr _Γ names) args
     typeCheckTuple args'
@@ -600,9 +553,9 @@ typeCheckTuple :: [Term] -> TcM Term
 typeCheckTuple [] = error "typeCheckTuple: empty tuple"
 typeCheckTuple [t] = return t
 typeCheckTuple (a:ts) = do
+    let _Γ = context a
     let _A = termType a
-    let _Γ' = Extend _A
-    _B <- freshMetavar _Γ' (Universe _Γ')
+    _B <- typeCheckHole _Γ
     b <- typeCheckTuple ts
-    unify (Apply (SubstTerm a) _B) (termType b)
-    return $ Pair _A _B a b
+    pair <- typeCheckBuiltIn _Γ "pair"
+    typeCheckApp pair [_A, _B, a, b]

@@ -10,6 +10,19 @@
     Π (c : C(a, refl(A, a))).
     ind-Id(A, a, C, c, a, refl(A, a)) = c
 
+# Dependent sum type.
+:assume Σ' : Π (A : Type). Π (B : A → Type). Type
+:assume pair : Π (A : Type). Π (B : A → Type). Π (a : A). Π (b : B(a)). Σ (a : A). B(a) 
+:assume ind-Σ : Π (A : Type). Π (B : A → Type).
+    Π (C : (Σ (a : A). B(a)) → Type).
+    (Π (a : A). Π (b : B(a)). C(pair(A, B, a, b))) →
+    Π (p : Σ (a : A). B(a)). C(p)
+:assume ind-Σ-pair : Π (A : Type). Π (B : A → Type).
+    Π (C : (Σ (a : A). B(a)) → Type).
+    Π (c : Π (a : A). Π (b : B(a)). C(pair(A, B, a, b))).
+    Π (a : A). Π (b : B(a)). 
+    ind-Σ(A, B, C, c, pair(A, B, a, b)) = c(a, b)
+
 # Empty type.
 :assume 0 : Type
 :assume ind0 : Π (C : 0 → Type). Π (a : 0). C(a)
@@ -20,6 +33,14 @@
 :assume ind-1 : Π (C : 1 → Type). C(tt) → Π (a : 1). C(a)
 :assume ind-1-tt : Π (C : 1 → Type). Π (c : C(tt)). ind-1(C, c, tt) = c
 
+# Boolean type.
+:assume 2 : Type
+:assume 0₂ : 2
+:assume 1₂ : 2
+:assume ind-2 : Π (C : 2 → Type). C(0₂) → C(1₂) → Π (a : 2). C(a)
+:assume ind-2-0₂ : Π (C : 2 → Type). Π (c₀ : C(0₂)). Π (c₁ : C(1₂)). ind-2(C, c₀, c₁, 0₂) = c₀
+:assume ind-2-1₂ : Π (C : 2 → Type). Π (c₀ : C(0₂)). Π (c₁ : C(1₂)). ind-2(C, c₀, c₁, 1₂) = c₁
+
 # Groupoid structure of identity types.
 sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
     := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
@@ -27,3 +48,6 @@ sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
 trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a = c
     := λ (A : Type). λ (a : A). λ (b : A). λ (c : A). λ (p : a = b). λ (q : b = c).
         ind-Id(A, a, λ (b : A). λ (p : a = b). Π (c : A). b = c → a = c, ind-Id(A, a, _, refl(A, a)), b, p)(c, q)
+
+IsContr := λ (A : Type). Σ (a : A). Π (b : A). a = b
+1-IsContr : IsContr(1) := (tt, ind-1(_, refl(1, tt)))
