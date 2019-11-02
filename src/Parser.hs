@@ -85,7 +85,7 @@ expr = makeExprParser apps
     ]
 
 define :: Parser Statement
-define = Define <$> identifier <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
+define = Define <$> identifier <*> (params <|> return []) <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
 
 assume :: Parser Statement
 assume = Assume <$ reservedWord ":assume" <*> identifier <* reservedWord ":" <*> expr

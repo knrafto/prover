@@ -42,12 +42,12 @@
 :assume ind-2-1₂ : Π (C : 2 → Type, c₀ : C(0₂), c₁ : C(1₂)). ind-2(C, c₀, c₁, 1₂) = c₁
 
 # Structure of identity types.
-ap : Π (A : Type, B : Type, f : A → B, x : A, y : A). x = y → f(x) = f(y)
-    := λ (A : Type, B : Type, f : A → B, x : A). ind-Id(A, x, _, refl(_, _))
-subst : Π (A : Type, B : A → Type, x : A, y : A). x = y → B(x) → B(y)
-    := λ (A : Type, B : A → Type, x : A). ind-Id(A, x, _, λ (b : _). b)
-sym : Π (A : Type, x : A, y : A). x = y → y = x
-    := λ (A : Type, x : A). ind-Id(A, x, _, refl(A, x))
-trans : Π (A : Type, x : A, y : A, z : A). x = y → y = z → x = z
-    := λ (A : Type, x : A, y : A, z : A, p : x = y, q : y = z).
+ap(A : Type, B : Type, f : A → B) : Π (x : A, y : A). x = y → f(x) = f(y)
+    := λ (x : A). ind-Id(A, x, _, refl(_, _))
+subst(A : Type, B : A → Type) : Π (x : A, y : A). x = y → B(x) → B(y)
+    := λ (x : A). ind-Id(A, x, _, λ (b : _). b)
+sym(A : Type) : Π (x : A, y : A). x = y → y = x
+    := λ (x : A). ind-Id(A, x, _, refl(A, x))
+trans(A : Type, x : A, y : A, z : A) : x = y → y = z → x = z
+    := λ (p : x = y, q : y = z).
         ind-Id(A, x, λ (y : A, p : x = y). Π (z : A). y = z → x = z, ind-Id(A, x, _, refl(A, x)), y, p)(z, q)

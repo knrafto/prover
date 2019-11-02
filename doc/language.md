@@ -40,7 +40,7 @@ statement = directive | definition
 directive =
     :assume name : expr
     :prove name : expr
-definition = name [ : expr ] := expr
+definition = name [ params ] [ : expr ] := expr
 params = ( name : expr [, name : expr ]* )
 expr =
     _

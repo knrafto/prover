@@ -19,7 +19,7 @@ data Expr
     deriving (Show)
 
 data Statement
-    = Define Text (Maybe Expr) Expr
+    = Define Text [Param] (Maybe Expr) Expr
     | Assume Text Expr
     | Prove Text Expr
     deriving (Show)

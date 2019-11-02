@@ -418,14 +418,14 @@ typeCheck = go initialState
         go s' rest
 
 typeCheckStatement :: TcState -> Syntax.Statement -> IO TcState
-typeCheckStatement s (Syntax.Define name ty body) = do
+typeCheckStatement s (Syntax.Define name params ty body) = do
     putStrLn $ "Checking " ++ Text.unpack name
     result <- runTcM s $ do
-        bodyTerm <- typeCheckExpr Empty [] body
+        bodyTerm <- typeCheckLam Empty [] params body
         case ty of
             Nothing -> return ()
             Just ty' -> do
-                tyTerm <- typeCheckExpr Empty [] ty'
+                tyTerm <- typeCheckPi Empty [] params ty'
                 unify (termType bodyTerm) tyTerm
         checkSolved
         reduce bodyTerm
