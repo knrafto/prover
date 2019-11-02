@@ -21,8 +21,6 @@ _
 Π
 λ
 Type
-π₁
-π₂
 :assume
 :prove
 ```
@@ -48,8 +46,6 @@ expr =
     name
     literal
     ( expr )
-    π₁ ( expr )
-    π₂ ( expr )
     expr ( expr [, expr]* )
     expr = expr
     expr → expr

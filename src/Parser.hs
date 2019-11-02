@@ -43,7 +43,7 @@ identifier = lexeme . try $ do
   where
     reservedWords :: [Text]
     reservedWords =
-        [ "_", ":", ":=", "=", "Σ", "Π", "λ", "→", "×", "π₁", "π₂"
+        [ "_", ":", ":=", "=", "Σ", "Π", "λ", "→", "×"
         , "Type", ":assume", ":prove"
         ]
 
@@ -64,8 +64,6 @@ atom = Hole <$ reservedWord "_"
         <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
         <* symbol '.' <*> expr
    <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
-   <|> Proj1 <$ reservedWord "π₁" <* symbol '(' <*> expr <* symbol ')' 
-   <|> Proj2 <$ reservedWord "π₂" <* symbol '(' <*> expr <* symbol ')' 
 
 apps :: Parser Expr
 apps = do

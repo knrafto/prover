@@ -19,6 +19,4 @@ data Expr
     | Sigma Text Expr Expr
     | Times Expr Expr
     | Tuple [Expr]
-    | Proj1 Expr
-    | Proj2 Expr
     deriving (Show)
