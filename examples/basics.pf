@@ -41,13 +41,13 @@
 :assume ind-2-0₂ : Π (C : 2 → Type). Π (c₀ : C(0₂)). Π (c₁ : C(1₂)). ind-2(C, c₀, c₁, 0₂) = c₀
 :assume ind-2-1₂ : Π (C : 2 → Type). Π (c₀ : C(0₂)). Π (c₁ : C(1₂)). ind-2(C, c₀, c₁, 1₂) = c₁
 
-# Groupoid structure of identity types.
-sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
-    := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
-
-trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a = c
-    := λ (A : Type). λ (a : A). λ (b : A). λ (c : A). λ (p : a = b). λ (q : b = c).
-        ind-Id(A, a, λ (b : A). λ (p : a = b). Π (c : A). b = c → a = c, ind-Id(A, a, _, refl(A, a)), b, p)(c, q)
-
-IsContr := λ (A : Type). Σ (a : A). Π (b : A). a = b
-1-IsContr : IsContr(1) := (tt, ind-1(_, refl(1, tt)))
+# Structure of identity types.
+ap : Π (A : Type). Π (B : Type). Π (f : A → B). Π (x : A). Π (y : A). x = y → f(x) = f(y)
+    := λ (A : Type). λ (B : Type). λ (f : A → B). λ (x : A). ind-Id(A, x, _, refl(_, _))
+subst : Π (A : Type). Π (B : A → Type). Π (x : A). Π (y : A). x = y → B(x) → B(y)
+    := λ (A : Type). λ (B : A → Type). λ (x : A). ind-Id(A, x, _, λ (b : _). b)
+sym : Π (A : Type). Π (x : A). Π (y : A). x = y → y = x
+    := λ (A : Type). λ (x : A). ind-Id(A, x, _, refl(A, x))
+trans : Π (A : Type). Π (x : A). Π (y : A). Π (z : A). x = y → y = z → x = z
+    := λ (A : Type). λ (x : A). λ (y : A). λ (z : A). λ (p : x = y). λ (q : y = z).
+        ind-Id(A, x, λ (y : A). λ (p : x = y). Π (z : A). y = z → x = z, ind-Id(A, x, _, refl(A, x)), y, p)(z, q)
