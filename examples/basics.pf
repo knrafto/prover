@@ -10,19 +10,6 @@
     Π (c : C(a, refl(A, a))).
     ind-Id(A, a, C, c, a, refl(A, a)) = c
 
-# Groupoid structure of identity types.
-sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
-    := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
-
-:prove sym-refl : Π (A : Type). Π (a : A). sym(A, a, a, refl(A, a)) = refl(A, a)
-
-trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a = c
-    := λ (A : Type). λ (a : A). λ (b : A). λ (c : A). λ (p : a = b). λ (q : b = c).
-        ind-Id(A, a, λ (b : A). λ (p : a = b). Π (c : A). b = c → a = c, ind-Id(A, a, _, refl(A, a)), b, p)(c, q)
-
-:prove trans-refl-l : Π (A : Type). Π (a : A). Π (b : A). Π (p : a = b). trans(A, a, a, b, refl(A, a), p) = p
-:prove trans-refl-r : Π (A : Type). Π (a : A). Π (b : A). Π (p : a = b). trans(A, a, b, b, p, refl(A, b)) = p
-
 # Empty type.
 :assume 0 : Type
 :assume ind0 : Π (C : 0 → Type). Π (a : 0). C(a)
@@ -31,31 +18,12 @@ trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a
 :assume 1 : Type
 :assume tt : 1
 :assume ind-1 : Π (C : 1 → Type). C(tt) → Π (a : 1). C(a)
+:assume ind-1-tt : Π (C : 1 → Type). Π (c : C(tt)). ind-1(C, c, tt) = c
 
-IsContr := λ (A : Type). Σ (a : A). Π (b : A). a = b
+# Groupoid structure of identity types.
+sym : Π (A : Type). Π (a : A). Π (b : A). a = b → b = a
+    := λ (A : Type). λ (a : A). ind-Id(A, a, _, refl(A, a))
 
-IsProp := λ (A : Type). Π (a : A). Π (b : A). a = b
-
-IsSet := λ (A : Type). Π (a : A). Π (b : A).
-    Π (p : a = b). Π (q : a = b). p = q
-
-Fiber := λ (A : Type). λ (B : Type). λ (f : A → B). λ (b : B).
-    Σ (a : A). f(a) = b
-
-IsEquiv := λ (A : Type). λ (B : Type). λ (f : A → B).
-    Π (b : B). IsContr(Fiber(_, _, f, b))
-
-IsEmbedding := λ (A : Type). λ (B : Type). λ (f : A → B).
-    Π (b : B). IsProp(Fiber(_, _, f, b))
-
-:prove 0-IsProp : IsProp(0)
-
-:prove 1-IsContr : IsContr(1)
-:prove 1-IsProp : IsProp(1)
-
-# :prove p4 : Π (A : Type). Π (a : A). IsContr(Σ (b : A). a = b)
-
-ind-Σ : Π (A : Type). Π (B : A → Type). Π (C : (Σ (a : A). B(a)) → Type).
-        (Π (a : A). Π (b : B(a)). C((a, b))) → Π (p : Σ (a : A). B(a)). C(p)
-    := λ (A : Type). λ (B : A → Type). λ (C : (Σ (a : A). B(a)) → Type).
-        λ (g : Π (a : A). Π (b : B(a)). C((a, b))). λ (p : Σ (a : A). B(a)). g(π₁(p), π₂(p))
+trans : Π (A : Type). Π (a : A). Π (b : A). Π (c : A). a = b → b = c → a = c
+    := λ (A : Type). λ (a : A). λ (b : A). λ (c : A). λ (p : a = b). λ (q : b = c).
+        ind-Id(A, a, λ (b : A). λ (p : a = b). Π (c : A). b = c → a = c, ind-Id(A, a, _, refl(A, a)), b, p)(c, q)
