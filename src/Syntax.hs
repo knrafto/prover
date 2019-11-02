@@ -2,22 +2,24 @@ module Syntax where
 
 import Data.Text (Text)
 
-data Statement
-    = Define Text (Maybe Expr) Expr
-    | Assume Text Expr
-    | Prove Text Expr
-    deriving (Show)
+type Param = (Text, Expr)
 
 data Expr
     = Hole
     | Var Text
     | Universe
     | Equal Expr Expr
-    | Pi Text Expr Expr
+    | Pi [Param] Expr
     | Arrow Expr Expr
-    | Lam Text Expr Expr
+    | Lam [Param] Expr
     | App Expr [Expr]
-    | Sigma Text Expr Expr
+    | Sigma [Param] Expr
     | Times Expr Expr
     | Tuple [Expr]
+    deriving (Show)
+
+data Statement
+    = Define Text (Maybe Expr) Expr
+    | Assume Text Expr
+    | Prove Text Expr
     deriving (Show)

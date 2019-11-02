@@ -486,32 +486,19 @@ typeCheckExpr _Γ names (Syntax.Equal a b) = do
     a' <- typeCheckExpr _Γ names a
     b' <- typeCheckExpr _Γ names b
     typeCheckApp f' [_A, a', b']
-typeCheckExpr _Γ names (Syntax.Pi name _A _B) = do
-    _A' <- typeCheckExpr _Γ names _A
-    checkIsType _A'
-    _B' <- typeCheckExpr (Extend _A') (name : names) _B
-    checkIsType _B'
-    return (Pi _A' _B')
+typeCheckExpr _Γ names (Syntax.Pi params _B) = typeCheckPi _Γ names params _B
 typeCheckExpr _Γ names (Syntax.Arrow _A _B) = do
     _A' <- typeCheckExpr _Γ names _A
     checkIsType _A'
     _B' <- typeCheckExpr _Γ names _B
     checkIsType _B'
     return (Pi _A' (Apply (SubstWeaken _A') _B'))
-typeCheckExpr _Γ names (Syntax.Lam name _A b) = do
-    _A' <- typeCheckExpr _Γ names _A
-    checkIsType _A'
-    b' <- typeCheckExpr (Extend _A') (name : names) b
-    return (Lam _A' b')
+typeCheckExpr _Γ names (Syntax.Lam params b) = typeCheckLam _Γ names params b
 typeCheckExpr _Γ names (Syntax.App f args) = do
     f' <- typeCheckExpr _Γ names f
     args' <- mapM (typeCheckExpr _Γ names) args
     typeCheckApp f' args'
-typeCheckExpr _Γ names (Syntax.Sigma name _A _B) = do
-    _A' <- typeCheckExpr _Γ names _A
-    _B' <- typeCheckExpr (Extend _A') (name : names) _B
-    f <- typeCheckBuiltIn _Γ "Σ'"
-    typeCheckApp f [_A', Lam _A' _B']
+typeCheckExpr _Γ names (Syntax.Sigma params _B) = typeCheckSigma _Γ names params _B
 typeCheckExpr _Γ names (Syntax.Times _A _B) = do
     _A' <- typeCheckExpr _Γ names _A
     _B' <- typeCheckExpr _Γ names _B
@@ -520,6 +507,31 @@ typeCheckExpr _Γ names (Syntax.Times _A _B) = do
 typeCheckExpr _Γ names (Syntax.Tuple args) = do
     args' <- mapM (typeCheckExpr _Γ names) args
     typeCheckTuple args'
+
+typeCheckPi :: Context -> [Text] -> [Syntax.Param] -> Syntax.Expr -> TcM Term
+typeCheckPi _Γ names [] _B = typeCheckExpr _Γ names _B
+typeCheckPi _Γ names ((name, _A):params) _B = do
+    _A' <- typeCheckExpr _Γ names _A
+    checkIsType _A'
+    _B' <- typeCheckPi (Extend _A') (name : names) params _B
+    checkIsType _B'
+    return (Pi _A' _B')
+
+typeCheckLam :: Context -> [Text] -> [Syntax.Param] -> Syntax.Expr -> TcM Term
+typeCheckLam _Γ names [] b = typeCheckExpr _Γ names b
+typeCheckLam _Γ names ((name, _A):params) b = do
+    _A' <- typeCheckExpr _Γ names _A
+    checkIsType _A'
+    b' <- typeCheckLam (Extend _A') (name : names) params b
+    return (Lam _A' b')
+
+typeCheckSigma :: Context -> [Text] -> [Syntax.Param] -> Syntax.Expr -> TcM Term
+typeCheckSigma _Γ names [] _B = typeCheckExpr _Γ names _B
+typeCheckSigma _Γ names ((name, _A):params) _B = do
+    _A' <- typeCheckExpr _Γ names _A
+    _B' <- typeCheckSigma (Extend _A') (name : names) params _B
+    f <- typeCheckBuiltIn _Γ "Σ'"
+    typeCheckApp f [_A', Lam _A' _B']
 
 typeCheckBuiltIn :: Context -> String -> TcM Term
 typeCheckBuiltIn _Γ name = do

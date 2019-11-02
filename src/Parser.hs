@@ -50,19 +50,18 @@ identifier = lexeme . try $ do
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
 
+params :: Parser [Param]
+params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
+  where
+    param = (,) <$> identifier <* reservedWord ":" <*> expr
+
 atom :: Parser Expr
 atom = Hole <$ reservedWord "_"
    <|> Var <$> identifier
    <|> Universe <$ reservedWord "Type"
-   <|> Sigma <$ reservedWord "Σ"
-        <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
-        <* symbol '.' <*> expr
-   <|> Pi <$ reservedWord "Π"
-        <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
-        <* symbol '.' <*> expr
-   <|> Lam <$ reservedWord "λ"
-        <* symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
-        <* symbol '.' <*> expr
+   <|> Sigma <$ reservedWord "Σ" <*> params  <* symbol '.' <*> expr
+   <|> Pi <$ reservedWord "Π" <*> params  <* symbol '.' <*> expr
+   <|> Lam <$ reservedWord "λ" <*> params  <* symbol '.' <*> expr
    <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
 
 apps :: Parser Expr

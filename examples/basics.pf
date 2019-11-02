@@ -1,53 +1,53 @@
 # Identity types, with based path induction.
 :assume Id : Π (A : Type). A → A → Type
-:assume refl : Π (A : Type). Π (a : A). a = a
-:assume ind-Id : Π (A : Type). Π (a : A).
+:assume refl : Π (A : Type, a : A). a = a
+:assume ind-Id : Π (A : Type, a : A).
     Π (C : Π (b : A). a = b → Type).
     C(a, refl(A, a)) →
-    Π (b : A). Π (p : a = b). C(b, p)
-:assume ind-Id-refl : Π (A : Type). Π (a : A).
+    Π (b : A, p : a = b). C(b, p)
+:assume ind-Id-refl : Π (A : Type, a : A).
     Π (C : Π (b : A). a = b → Type).
     Π (c : C(a, refl(A, a))).
     ind-Id(A, a, C, c, a, refl(A, a)) = c
 
 # Dependent sum type.
-:assume Σ' : Π (A : Type). Π (B : A → Type). Type
-:assume pair : Π (A : Type). Π (B : A → Type). Π (a : A). Π (b : B(a)). Σ (a : A). B(a) 
-:assume ind-Σ : Π (A : Type). Π (B : A → Type).
+:assume Σ' : Π (A : Type, B : A → Type). Type
+:assume pair : Π (A : Type, B : A → Type, a : A, b : B(a)). Σ (a : A). B(a) 
+:assume ind-Σ : Π (A : Type, B : A → Type).
     Π (C : (Σ (a : A). B(a)) → Type).
-    (Π (a : A). Π (b : B(a)). C(pair(A, B, a, b))) →
+    (Π (a : A, b : B(a)). C(pair(A, B, a, b))) →
     Π (p : Σ (a : A). B(a)). C(p)
-:assume ind-Σ-pair : Π (A : Type). Π (B : A → Type).
+:assume ind-Σ-pair : Π (A : Type, B : A → Type).
     Π (C : (Σ (a : A). B(a)) → Type).
-    Π (c : Π (a : A). Π (b : B(a)). C(pair(A, B, a, b))).
-    Π (a : A). Π (b : B(a)). 
+    Π (c : Π (a : A, b : B(a)). C(pair(A, B, a, b))).
+    Π (a : A, b : B(a)). 
     ind-Σ(A, B, C, c, pair(A, B, a, b)) = c(a, b)
 
 # Empty type.
 :assume 0 : Type
-:assume ind0 : Π (C : 0 → Type). Π (a : 0). C(a)
+:assume ind0 : Π (C : 0 → Type, a : 0). C(a)
 
 # Unit type.
 :assume 1 : Type
 :assume tt : 1
 :assume ind-1 : Π (C : 1 → Type). C(tt) → Π (a : 1). C(a)
-:assume ind-1-tt : Π (C : 1 → Type). Π (c : C(tt)). ind-1(C, c, tt) = c
+:assume ind-1-tt : Π (C : 1 → Type, c : C(tt)). ind-1(C, c, tt) = c
 
 # Boolean type.
 :assume 2 : Type
 :assume 0₂ : 2
 :assume 1₂ : 2
 :assume ind-2 : Π (C : 2 → Type). C(0₂) → C(1₂) → Π (a : 2). C(a)
-:assume ind-2-0₂ : Π (C : 2 → Type). Π (c₀ : C(0₂)). Π (c₁ : C(1₂)). ind-2(C, c₀, c₁, 0₂) = c₀
-:assume ind-2-1₂ : Π (C : 2 → Type). Π (c₀ : C(0₂)). Π (c₁ : C(1₂)). ind-2(C, c₀, c₁, 1₂) = c₁
+:assume ind-2-0₂ : Π (C : 2 → Type, c₀ : C(0₂), c₁ : C(1₂)). ind-2(C, c₀, c₁, 0₂) = c₀
+:assume ind-2-1₂ : Π (C : 2 → Type, c₀ : C(0₂), c₁ : C(1₂)). ind-2(C, c₀, c₁, 1₂) = c₁
 
 # Structure of identity types.
-ap : Π (A : Type). Π (B : Type). Π (f : A → B). Π (x : A). Π (y : A). x = y → f(x) = f(y)
-    := λ (A : Type). λ (B : Type). λ (f : A → B). λ (x : A). ind-Id(A, x, _, refl(_, _))
-subst : Π (A : Type). Π (B : A → Type). Π (x : A). Π (y : A). x = y → B(x) → B(y)
-    := λ (A : Type). λ (B : A → Type). λ (x : A). ind-Id(A, x, _, λ (b : _). b)
-sym : Π (A : Type). Π (x : A). Π (y : A). x = y → y = x
-    := λ (A : Type). λ (x : A). ind-Id(A, x, _, refl(A, x))
-trans : Π (A : Type). Π (x : A). Π (y : A). Π (z : A). x = y → y = z → x = z
-    := λ (A : Type). λ (x : A). λ (y : A). λ (z : A). λ (p : x = y). λ (q : y = z).
-        ind-Id(A, x, λ (y : A). λ (p : x = y). Π (z : A). y = z → x = z, ind-Id(A, x, _, refl(A, x)), y, p)(z, q)
+ap : Π (A : Type, B : Type, f : A → B, x : A, y : A). x = y → f(x) = f(y)
+    := λ (A : Type, B : Type, f : A → B, x : A). ind-Id(A, x, _, refl(_, _))
+subst : Π (A : Type, B : A → Type, x : A, y : A). x = y → B(x) → B(y)
+    := λ (A : Type, B : A → Type, x : A). ind-Id(A, x, _, λ (b : _). b)
+sym : Π (A : Type, x : A, y : A). x = y → y = x
+    := λ (A : Type, x : A). ind-Id(A, x, _, refl(A, x))
+trans : Π (A : Type, x : A, y : A, z : A). x = y → y = z → x = z
+    := λ (A : Type, x : A, y : A, z : A, p : x = y, q : y = z).
+        ind-Id(A, x, λ (y : A, p : x = y). Π (z : A). y = z → x = z, ind-Id(A, x, _, refl(A, x)), y, p)(z, q)

@@ -41,6 +41,7 @@ directive =
     :assume name : expr
     :prove name : expr
 definition = name [ : expr ] := expr
+params = ( name : expr [, name : expr ]* )
 expr =
     _
     name
@@ -50,10 +51,10 @@ expr =
     expr = expr
     expr → expr
     expr × expr
-    Σ ( name : expr ) . expr
+    Σ params . expr
     (expr , expr [, expr]*)
-    Π ( name : expr ) . expr
-    λ ( name : expr ) . expr
+    Π params . expr
+    λ params . expr
 ```
 
 Here "→" is right-associative.
