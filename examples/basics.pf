@@ -51,3 +51,6 @@ sym(A : Type) : Π (x : A, y : A). x = y → y = x
 trans(A : Type, x : A, y : A, z : A) : x = y → y = z → x = z
     := λ (p : x = y, q : y = z).
         ind-Id(A, x, λ (y : A, p : x = y). Π (z : A). y = z → x = z, ind-Id(A, x, _, refl(A, x)), y, p)(z, q)
+
+happly(A : Type, B : Type) : Π (f : A → B, g : A → B). f = g → Π (x : A). f(x) = g(x)
+    := λ (f : A → B). ind-Id(A → B, f, _, λ (x : A). refl(B, f(x)))
