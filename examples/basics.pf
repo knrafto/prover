@@ -52,6 +52,7 @@ trans(A : Type, x : A, y : A, z : A) : x = y → y = z → x = z
     := λ (p : x = y, q : y = z).
         ind-Id(A, x, λ (y : A, p : x = y). Π (z : A). y = z → x = z, ind-Id(A, x, _, refl(A, x)), y, p)(z, q)
 
+# Function types.
 happly(A : Type, B : Type) : Π (f : A → B, g : A → B). f = g → Π (x : A). f(x) = g(x)
     := λ (f : A → B). ind-Id(A → B, f, _, λ (x : A). refl(B, f(x)))
 
@@ -65,3 +66,7 @@ happly(A : Type, B : Type) : Π (f : A → B, g : A → B). f = g → Π (x : A)
     := ind-Σ(A, B, _, λ (a : A, b : B(a)). subst(A, B, _, _, sym(A, _, _, π₁-pair(A, B, a, b)), b))
 π₂-pair(A : Type, B : A → Type, a : A, b : B(a)) : π₂(A, B, pair(A, B, a, b)) = subst(A, B, _, _, sym(A, _, _, π₁-pair(A, B, a, b)), b)
     := ind-Σ-pair(A, B, _, _, a, b)
+
+# Sets and logic.
+IsContr(A : Type) := Σ (a : A). Π (x : A). a = x
+IsProp(A : Type) := Π (x : A, y : A). x = y
