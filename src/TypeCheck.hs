@@ -567,7 +567,8 @@ typeCheckTuple [t] = return t
 typeCheckTuple (a:ts) = do
     let _Γ = context a
     let _A = termType a
-    _B <- typeCheckHole _Γ
+    let _Γ' = Extend _A
+    _B <- freshMetavar _Γ' (Universe _Γ')
     b <- typeCheckTuple ts
     pair <- typeCheckBuiltIn _Γ "pair"
     typeCheckApp pair [_A, _B, a, b]

@@ -54,3 +54,10 @@ trans(A : Type, x : A, y : A, z : A) : x = y → y = z → x = z
 
 happly(A : Type, B : Type) : Π (f : A → B, g : A → B). f = g → Π (x : A). f(x) = g(x)
     := λ (f : A → B). ind-Id(A → B, f, _, λ (x : A). refl(B, f(x)))
+
+# Sigma types.
+π₁(A : Type, B : A → Type) : (Σ (a : A). B(a)) → A
+    := ind-Σ(A, B, _, λ (a : A, b : B(a)). a)
+# TODO: use (a, b) instead of pair(A, B, a, b) when eta rule is strong enough
+π₁-pair(A : Type, B : A → Type, a : A, b : B(a)) : π₁(A, B, pair(A, B, a, b)) = a
+    := ind-Σ-pair(A, B, _, _, a, b)
