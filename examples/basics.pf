@@ -41,6 +41,14 @@
 :assume ind-2-0₂ : Π (C : 2 → Type, c₀ : C(0₂), c₁ : C(1₂)). ind-2(C, c₀, c₁, 0₂) = c₀
 :assume ind-2-1₂ : Π (C : 2 → Type, c₀ : C(0₂), c₁ : C(1₂)). ind-2(C, c₀, c₁, 1₂) = c₁
 
+# Natural numbers.
+:assume ℕ : Type
+:assume zero : ℕ
+:assume suc : ℕ → ℕ
+:assume ind-ℕ : Π (C : ℕ → Type). C(zero) → (Π (n : ℕ). C(n) → C(suc(n))) → Π (n : ℕ). C(n)
+:assume ind-ℕ-zero : Π (C : ℕ → Type, base : C(zero), step : Π (n : ℕ). C(n) → C(suc(n))). ind-ℕ(C, base, step, zero) = base
+:assume ind-ℕ-suc : Π (C : ℕ → Type, base : C(zero), step : Π (n : ℕ). C(n) → C(suc(n)), n : ℕ). ind-ℕ(C, base, step, suc(n)) = step(ind-ℕ(C, base, step, n))
+
 # Structure of identity types.
 ap(A : Type, B : Type, f : A → B) : Π (x : A, y : A). x = y → f(x) = f(y)
     := λ (x : A). ind-Id(A, x, _, refl(_, _))
