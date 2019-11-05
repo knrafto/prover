@@ -2,24 +2,38 @@ module Syntax where
 
 import Data.Text (Text)
 
-type Param = (Text, Expr)
+-- A range of text in the source file, represented by two offsets.
+data SrcSpan = SrcSpan !Int !Int
+    deriving (Eq, Show)
+
+data Located e = L SrcSpan e
+
+instance Show e => Show (Located e) where
+    showsPrec d (L _ e) = showsPrec d e
+
+unLoc :: Located e -> e
+unLoc (L _ e) = e
+
+type Param = (Text, LExpr)
 
 data Expr
     = Hole
     | Var Text
     | Universe
-    | Equal Expr Expr
-    | Pi [Param] Expr
-    | Arrow Expr Expr
-    | Lam [Param] Expr
-    | App Expr [Expr]
-    | Sigma [Param] Expr
-    | Times Expr Expr
-    | Tuple [Expr]
+    | Equal LExpr LExpr
+    | Pi [Param] LExpr
+    | Arrow LExpr LExpr
+    | Lam [Param] LExpr
+    | App LExpr [LExpr]
+    | Sigma [Param] LExpr
+    | Times LExpr LExpr
+    | Tuple [LExpr]
     deriving (Show)
+type LExpr = Located Expr
 
 data Statement
-    = Define Text [Param] (Maybe Expr) Expr
-    | Assume Text Expr
-    | Prove Text Expr
+    = Define Text [Param] (Maybe LExpr) LExpr
+    | Assume Text LExpr
+    | Prove Text LExpr
     deriving (Show)
+type LStatement = Located Statement

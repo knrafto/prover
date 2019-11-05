@@ -8,6 +8,7 @@ import           System.IO
 import qualified Data.Text.IO                  as Text
 import           HFlags
 import           Text.Megaparsec
+-- import           Text.Pretty.Simple
 
 import TypeCheck
 import Parser
@@ -28,4 +29,6 @@ main = do
         stmts <- case parse statements path input of
             Left e -> panic (errorBundlePretty e)
             Right x -> return x
+        -- TODO: hide behind flag
+        -- pPrint stmts
         void $ typeCheck stmts

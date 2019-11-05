@@ -3,7 +3,6 @@ module Parser (statements) where
 
 import Control.Monad
 
-import           Control.Monad.Combinators.Expr
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Data.Void
@@ -50,39 +49,76 @@ identifier = lexeme . try $ do
 symbol :: Char -> Parser ()
 symbol c = lexeme (void $ char c)
 
+located :: Parser a -> Parser (Located a)
+located m = do
+  s <- getOffset
+  a <- m
+  e <- getOffset
+  return (L (SrcSpan s e) a)
+
 params :: Parser [Param]
 params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
   where
     param = (,) <$> identifier <* reservedWord ":" <*> expr
 
-atom :: Parser Expr
-atom = Hole <$ reservedWord "_"
-   <|> Var <$> identifier
-   <|> Universe <$ reservedWord "Type"
-   <|> Sigma <$ reservedWord "Σ" <*> params  <* symbol '.' <*> expr
-   <|> Pi <$ reservedWord "Π" <*> params  <* symbol '.' <*> expr
-   <|> Lam <$ reservedWord "λ" <*> params  <* symbol '.' <*> expr
-   <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
-
-apps :: Parser Expr
-apps = do
-    x <- atom
-    rest x    
+atom :: Parser LExpr
+atom = located atom'
   where
-    rest x = app x <|> return x
+    atom' = Hole <$ reservedWord "_"
+        <|> Var <$> identifier
+        <|> Universe <$ reservedWord "Type"
+        <|> Sigma <$ reservedWord "Σ" <*> params  <* symbol '.' <*> expr
+        <|> Pi <$ reservedWord "Π" <*> params  <* symbol '.' <*> expr
+        <|> Lam <$ reservedWord "λ" <*> params  <* symbol '.' <*> expr
+        <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
 
-    app x = do
+apps :: Parser LExpr
+apps = do
+    s <- getOffset
+    x <- atom
+    rest s x    
+  where
+    rest s x = app s x <|> return x
+
+    app s x = do
         symbol '('
         args <- expr `sepBy1` symbol ','
         symbol ')'
-        rest (App x args)
+        e <- getOffset
+        rest s (L (SrcSpan s e) (App x args))
 
-expr :: Parser Expr
-expr = makeExprParser apps
-    [ [InfixR (Times <$ reservedWord "×")]
-    , [InfixN (Equal <$ reservedWord "=")]
-    , [InfixR (Arrow <$ reservedWord "→")]
-    ]
+pInfixN :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
+pInfixN op p = do
+    s <- getOffset
+    x <- p
+    rest s x <|> return x
+  where
+    rest s x = do
+      f <- op
+      y <- p
+      e <- getOffset
+      return (L (SrcSpan s e) (f x y))
+
+pInfixR :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
+pInfixR op p = do
+    s <- getOffset
+    x <- p
+    rest s x
+  where
+    rest s x = rest' s x <|> return x
+
+    rest' s x = do
+      f <- op
+      y <- pInfixR op p
+      e <- getOffset
+      rest s (L (SrcSpan s e) (f x y))
+
+expr :: Parser LExpr
+expr = expr'
+  where
+    times = pInfixR (Times <$ reservedWord "×") apps
+    equals = pInfixN (Equal <$ reservedWord "=") times
+    expr' = pInfixR (Arrow <$ reservedWord "→") equals
 
 define :: Parser Statement
 define = Define <$> identifier <*> (params <|> return []) <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
@@ -93,8 +129,8 @@ assume = Assume <$ reservedWord ":assume" <*> identifier <* reservedWord ":" <*>
 prove :: Parser Statement
 prove = Prove <$ reservedWord ":prove" <*> identifier <* reservedWord ":" <*> expr
 
-statement :: Parser Statement
-statement = L.nonIndented sc $ assume <|> prove <|> define
+statement :: Parser LStatement
+statement = L.nonIndented sc . located $ assume <|> prove <|> define
 
-statements :: Parser [Statement]
+statements :: Parser [LStatement]
 statements = many statement <* eof
