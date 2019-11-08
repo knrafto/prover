@@ -65,14 +65,13 @@ happly(A : Type, B : Type) : Π (f : A → B, g : A → B). f = g → Π (x : A)
     := λ (f : A → B). Id-ind(A → B, f, _, λ (x : A). refl(B, f(x)))
 
 # Sigma types.
-# TODO: use (a, b) instead of pair(A, B, a, b) when eta rule is strong enough
 π₁(A : Type, B : A → Type) : (Σ (a : A). B(a)) → A
     := Σ-ind(A, B, _, λ (a : A, b : B(a)). a)
-π₁-pair(A : Type, B : A → Type, a : A, b : B(a)) : π₁(A, B, pair(A, B, a, b)) = a
+π₁-pair(A : Type, B : A → Type, a : A, b : B(a)) : π₁(A, B, (a, b)) = a
     := Σ-ind-pair(A, B, _, _, a, b)
 π₂(A : Type, B : A → Type) : Π (p : Σ (a : A). B(a)). B(π₁(A, B, p))
     := Σ-ind(A, B, _, λ (a : A, b : B(a)). subst(A, B, _, _, sym(A, _, _, π₁-pair(A, B, a, b)), b))
-π₂-pair(A : Type, B : A → Type, a : A, b : B(a)) : π₂(A, B, pair(A, B, a, b)) = subst(A, B, _, _, sym(A, _, _, π₁-pair(A, B, a, b)), b)
+π₂-pair(A : Type, B : A → Type, a : A, b : B(a)) : π₂(A, B, (a, b)) = subst(A, B, _, _, sym(A, _, _, π₁-pair(A, B, a, b)), b)
     := Σ-ind-pair(A, B, _, _, a, b)
 
 # Sets and logic.

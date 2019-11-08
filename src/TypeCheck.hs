@@ -295,6 +295,9 @@ unify' t2 (App _A _ (Apply (SubstWeaken _) t1) (Var (VZ _))) = unify t1 (Lam _A 
 -- TODO: infer this from principles instead of hacking it in.
 unify' (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _))) t2 = unify t1 (Lam _A (Lam _B t2))
 unify' t2 (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _))) = unify t1 (Lam _A (Lam _B t2))
+-- Eta for var.
+unify' t1@(Lam _A b) t2@(Var _) = unify' t1 (etaExpand _A (termType b) t2)
+unify' t1@(Var _) t2@(Lam _A b) = unify' (etaExpand _A (termType b) t1) t2
 -- If two head-neutral terms don't unify, the terms are unequal; otherwise,
 -- save it for later.
 unify' t1 t2
@@ -357,6 +360,10 @@ isWeakNormal t = isWeakNeutral t
     isWeakNeutral (Pi _ _) = True
     isWeakNeutral (Lam _ _) = False
     isWeakNeutral (App _ _ f _) = isWeakNeutral f
+
+-- Eta-expands a term.
+etaExpand :: Term -> Term -> Term -> Term
+etaExpand _A _B t = Lam _A (App _A _B (Apply (SubstWeaken _A) t) (Var (VZ _A)))
 
 -- Tries to unify something with the given term (which is most likely a metavar).
 search :: Term -> TcM ()
@@ -573,4 +580,4 @@ typeCheckTuple (a:ts) = do
     _B <- freshMetavar _Γ' (Universe _Γ')
     b <- typeCheckTuple ts
     pair <- typeCheckBuiltIn _Γ "pair"
-    typeCheckApp pair [_A, _B, a, b]
+    typeCheckApp pair [_A, (Lam _A _B), a, b]
