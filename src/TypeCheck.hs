@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module TypeCheck where
 
 import           Control.Applicative
@@ -12,12 +11,10 @@ import qualified Data.Map.Strict as Map
 import           Data.Text                      ( Text )
 import qualified Data.Text as Text
 import           Data.Tree
-import           HFlags
 
+import qualified Flags
 import           Search
 import qualified Syntax
-
-defineFlag "print_trace" False "Print trace of program execution."
 
 -- This description of type theory is based on:
 -- Type Theory in Type Theory using Quotient Inductive Types
@@ -217,7 +214,7 @@ type TcM a = SearchM TcState a
 runTcM :: TcState -> TcM a -> IO (Maybe (a, TcState))
 runTcM s m = do
     let Result as bs = runSearch m s
-    when flags_print_trace $ putStr (drawForest bs)
+    when Flags.print_trace $ putStr (drawForest bs)
     return (listToMaybe as)
 
 -- Generate a metavar for the given context and type.

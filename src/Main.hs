@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import           Control.Monad
@@ -6,10 +5,10 @@ import           System.Exit
 import           System.IO
 
 import qualified Data.Text.IO                  as Text
-import           HFlags
 import           Text.Megaparsec
--- import           Text.Pretty.Simple
+import           Text.Pretty.Simple
 
+import qualified Flags
 import TypeCheck
 import Parser
 
@@ -20,8 +19,7 @@ panic message = do
 
 main :: IO ()
 main = do
-    args <- $initHFlags "A theorem prover."
-    path <- case args of
+    path <- case Flags.positionalArgs of
         [path] -> return path
         _ -> panic "usage: prover FILE"
     withFile path ReadMode $ \handle -> do
@@ -29,6 +27,5 @@ main = do
         stmts <- case parse statements path input of
             Left e -> panic (errorBundlePretty e)
             Right x -> return x
-        -- TODO: hide behind flag
-        -- pPrint stmts
+        when Flags.print_parse $ pPrint stmts
         void $ typeCheck stmts
