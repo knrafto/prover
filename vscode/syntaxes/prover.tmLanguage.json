@@ -1,0 +1,19 @@
+{
+    "scopeName": "source.prover",
+    "patterns": [
+        {
+            "include": "#comments"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "begin": "//",
+                    "end": "\\n",
+                    "name": "comment.line"
+                }
+            ]
+        }
+    }
+}
