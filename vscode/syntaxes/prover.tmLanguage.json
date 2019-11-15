@@ -26,16 +26,12 @@
         "keywords": {
             "patterns": [
                 {
-                    "match": "(?<![^(),\\s])define(?![^(),\\s])",
+                    "match": "(?<![^(),\\s])(define|assume|prove)(?![^(),\\s])",
                     "name": "keyword.control"
                 },
                 {
-                    "match": "(?<![^(),\\s])assume(?![^(),\\s])",
-                    "name": "keyword.control"
-                },
-                {
-                    "match": "(?<![^(),\\s])prove(?![^(),\\s])",
-                    "name": "keyword.control"
+                    "match": "(?<![^(),\\s])(Π|Σ|λ)(?![^(),\\s])",
+                    "name": "keyword.other.binder"
                 }
             ]
         }
