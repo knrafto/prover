@@ -3,6 +3,9 @@
     "patterns": [
         {
             "include": "#comments"
+        },
+        {
+            "include": "#keywords"
         }
     ],
     "repository": {
@@ -17,6 +20,22 @@
                     "begin": "{-",
                     "end": "-}",
                     "name": "comment.block"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "match": "(?<![^(),\\s])define(?![^(),\\s])",
+                    "name": "keyword.control"
+                },
+                {
+                    "match": "(?<![^(),\\s])assume(?![^(),\\s])",
+                    "name": "keyword.control"
+                },
+                {
+                    "match": "(?<![^(),\\s])prove(?![^(),\\s])",
+                    "name": "keyword.control"
                 }
             ]
         }
