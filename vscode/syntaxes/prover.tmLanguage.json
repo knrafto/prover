@@ -26,11 +26,11 @@
         "keywords": {
             "patterns": [
                 {
-                    "match": "(?<![^(),\\s])(define|assume|prove)(?![^(),\\s])",
+                    "match": "(?<![^(),.\\s])(define|assume|prove)(?![^(),.\\s])",
                     "name": "keyword.control"
                 },
                 {
-                    "match": "(?<![^(),\\s])(Π|Σ|λ)(?![^(),\\s])",
+                    "match": "(?<![^(),.\\s])(Π|Σ|λ)(?![^(),.\\s])",
                     "name": "keyword.other.binder"
                 }
             ]

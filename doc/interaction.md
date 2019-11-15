@@ -47,6 +47,14 @@ b and c are considered part of the same indented group, although the comment sta
 
 Maybe we should just stick with context-free for now.
 
+# Syntax
+
+A couple points of syntax that I think will be important:
+
+* Function call notation with parentheses, like f(x, y). More familiar to
+  mathematicians and programmers.
+* Dot notation for scoping.
+
 # Parse tree
 
 Each expression represents a span of text. Each expression is assigned an
