@@ -439,7 +439,7 @@ typeCheckStatement s stmt = case Syntax.unLoc stmt of
                 putStrLn $ "Error in " ++ Text.unpack name
                 return s
             Just (bodyTerm, s') -> do
-                putStrLn $ Text.unpack name ++ " := " ++ show bodyTerm
+                putStrLn $ "define " ++ Text.unpack name ++ " := " ++ show bodyTerm
                 return $ s' { envDefinitions = Map.insert name bodyTerm (envDefinitions s') }
     Syntax.Assume name ty -> do
         putStrLn $ "Checking " ++ Text.unpack name
@@ -452,7 +452,7 @@ typeCheckStatement s stmt = case Syntax.unLoc stmt of
                 putStrLn $ "Error in " ++ Text.unpack name
                 return s
             Just (tyTerm, s') -> do
-                putStrLn $ ":assume " ++ Text.unpack name ++ " : " ++ show tyTerm
+                putStrLn $ "assume " ++ Text.unpack name ++ " : " ++ show tyTerm
                 return $ s' { envAssumptions = Map.insert name tyTerm (envAssumptions s') }
     Syntax.Prove name ty -> do
         putStrLn $ "Checking " ++ Text.unpack name
@@ -468,7 +468,7 @@ typeCheckStatement s stmt = case Syntax.unLoc stmt of
                 putStrLn $ "Error in " ++ Text.unpack name
                 return s
             Just (bodyTerm, s') -> do
-                putStrLn $ Text.unpack name ++ " := " ++ show bodyTerm
+                putStrLn $ "prove " ++ Text.unpack name ++ " := " ++ show bodyTerm
                 return $ s' { envDefinitions = Map.insert name bodyTerm (envDefinitions s') }
 
 typeCheckExpr :: Context -> [Text] -> Syntax.LExpr -> TcM Term

@@ -2,13 +2,16 @@ The core language is based on univalent type theory (see HoTT book).
 
 # Lexical structure
 
-Whitespace are space, tab, newline, carriage return, form feed, and vertical tab.
-Comments start with '#'.
+Whitespace are space, tab, newline, carriage return, form feed, and vertical
+tab. Line comments start with `--`. Block comments are delimited with `{-` and
+`-}`, and may be nested.
 
-The symbols `(`, `)`, `,`, and `.` are "punctuation", and are always treated as a
-symbol by themselves. Any other contiguous sequence of non-whitespace,
-non-punctuation Unicode characters is a "word". The following words are
-reserved, and are treated specially in the syntax:
+The symbols `(`, `)`, and `,` are "punctuation", and are always treated as a
+token by themselves.
+
+Any other contiguous sequence of non-whitespace, non-punctuation Unicode
+characters is a "word". The following words are reserved, and are treated
+specially in the syntax:
 
 ```
 _
@@ -21,43 +24,39 @@ _
 Π
 λ
 Type
-:assume
-:prove
+define
+assume
+prove
 ```
-
-TODO: reserve all words starting with `:`?
-
-# File structure
-
-At top-level, the file is broken into statements, where indented lines are
-treated as a continuation of the previous statement. A statement is either
-a definition, or a command. 
 
 # Grammar
 
 ```
-statement = directive | definition
-directive =
-    :assume name : expr
-    :prove name : expr
-definition = name [ params ] [ : expr ] := expr
+module = [ statement ]*
+
+statement =
+    define name [ params ] [ : expr ] := expr
+    assume name : expr
+    prove name : expr
+
 params = ( name : expr [, name : expr ]* )
+
 expr =
     _
     name
-    literal
+    Type
     ( expr )
     expr ( expr [, expr]* )
     expr = expr
     expr → expr
     expr × expr
-    Σ params . expr
+    Σ params expr
     (expr , expr [, expr]*)
-    Π params . expr
-    λ params . expr
+    Π params expr
+    λ params expr
 ```
 
-Here "→" is right-associative.
+TODO: operator precedence and associativity.
 
 # Type theory
 

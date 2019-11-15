@@ -14,17 +14,14 @@ import Syntax
 
 type Parser = Parsec Void Text
 
-lineComment :: Parser ()
-lineComment = L.skipLineComment "#"
-
 sc :: Parser ()
-sc = L.space space1 lineComment empty
+sc = L.space space1 (L.skipLineComment "--") (L.skipBlockComment "{-" "-}")
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
 isWordChar :: Char -> Bool
-isWordChar c = c `notElem` (" \t\r\n\f\v#(),." :: [Char])
+isWordChar c = c `notElem` (" \t\r\n\f\v()," :: [Char])
 
 reservedWord :: Text -> Parser ()
 reservedWord w =
@@ -43,7 +40,7 @@ identifier = lexeme . try $ do
     reservedWords :: [Text]
     reservedWords =
         [ "_", ":", ":=", "=", "Σ", "Π", "λ", "→", "×"
-        , "Type", ":assume", ":prove"
+        , "Type", "define", "assume", "prove"
         ]
 
 symbol :: Char -> Parser ()
@@ -67,9 +64,9 @@ atom = located atom'
     atom' = Hole <$ reservedWord "_"
         <|> Var <$> identifier
         <|> Universe <$ reservedWord "Type"
-        <|> Sigma <$ reservedWord "Σ" <*> params  <* symbol '.' <*> expr
-        <|> Pi <$ reservedWord "Π" <*> params  <* symbol '.' <*> expr
-        <|> Lam <$ reservedWord "λ" <*> params  <* symbol '.' <*> expr
+        <|> Sigma <$ reservedWord "Σ" <*> params <*> expr
+        <|> Pi <$ reservedWord "Π" <*> params <*> expr
+        <|> Lam <$ reservedWord "λ" <*> params <*> expr
         <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
 
 apps :: Parser LExpr
@@ -121,16 +118,16 @@ expr = expr'
     expr' = pInfixR (Arrow <$ reservedWord "→") equals
 
 define :: Parser Statement
-define = Define <$> identifier <*> (params <|> return []) <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
+define = Define <$ reservedWord "define" <*> identifier <*> (params <|> return []) <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
 
 assume :: Parser Statement
-assume = Assume <$ reservedWord ":assume" <*> identifier <* reservedWord ":" <*> expr
+assume = Assume <$ reservedWord "assume" <*> identifier <* reservedWord ":" <*> expr
 
 prove :: Parser Statement
-prove = Prove <$ reservedWord ":prove" <*> identifier <* reservedWord ":" <*> expr
+prove = Prove <$ reservedWord "prove" <*> identifier <* reservedWord ":" <*> expr
 
 statement :: Parser LStatement
-statement = L.nonIndented sc . located $ assume <|> prove <|> define
+statement = located $ define <|> assume <|> prove
 
 statements :: Parser [LStatement]
-statements = many statement <* eof
+statements = sc *> many statement <* eof
