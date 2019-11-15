@@ -28,10 +28,6 @@
                 {
                     "match": "(?<![^(),.\\s])(define|assume|prove)(?![^(),.\\s])",
                     "name": "keyword.control"
-                },
-                {
-                    "match": "(?<![^(),.\\s])(Π|Σ|λ)(?![^(),.\\s])",
-                    "name": "keyword.other.binder"
                 }
             ]
         }
