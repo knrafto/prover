@@ -4,7 +4,9 @@ The core language is based on univalent type theory (see HoTT book).
 
 Whitespace are space, tab, newline, carriage return, form feed, and vertical
 tab. Line comments start with `--`. Block comments are delimited with `{-` and
-`-}`, and may be nested.
+`-}`.
+
+TODO: allow nested block comments.
 
 The symbols `(`, `)`, and `,` are "punctuation", and are always treated as a
 token by themselves.

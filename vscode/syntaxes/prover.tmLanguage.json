@@ -9,9 +9,14 @@
         "comments": {
             "patterns": [
                 {
-                    "begin": "//",
+                    "begin": "--",
                     "end": "\\n",
                     "name": "comment.line"
+                },
+                {
+                    "begin": "{-",
+                    "end": "-}",
+                    "name": "comment.block"
                 }
             ]
         }
