@@ -24,6 +24,9 @@ getFlag name = unsafePerformIO $ do
     (flags, _) <- splitArgs <$> getArgs
     return ("--" ++ name `elem` flags)
 
+print_tokens :: Bool
+print_tokens = getFlag "print_tokens"
+
 print_parse :: Bool
 print_parse = getFlag "print_parse"
 

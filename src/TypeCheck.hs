@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import           Data.Tree
 
 import qualified Flags
+import           Location
 import           Search
 import qualified Syntax
 
@@ -422,7 +423,7 @@ typeCheck = go initialState
         go s' rest
 
 typeCheckStatement :: TcState -> Syntax.LStatement -> IO TcState
-typeCheckStatement s stmt = case Syntax.unLoc stmt of
+typeCheckStatement s stmt = case unLoc stmt of
     Syntax.Define name params ty body -> do
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
@@ -472,7 +473,7 @@ typeCheckStatement s stmt = case Syntax.unLoc stmt of
                 return $ s' { envDefinitions = Map.insert name bodyTerm (envDefinitions s') }
 
 typeCheckExpr :: Context -> [Text] -> Syntax.LExpr -> TcM Term
-typeCheckExpr _Γ names expr = case Syntax.unLoc expr of
+typeCheckExpr _Γ names expr = case unLoc expr of
     Syntax.Hole -> typeCheckHole _Γ
     Syntax.Var name -> do
         definitions <- gets envDefinitions

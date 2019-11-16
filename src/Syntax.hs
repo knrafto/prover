@@ -1,18 +1,8 @@
 module Syntax where
 
+import Location
+
 import Data.Text (Text)
-
--- A range of text in the source file, represented by two offsets.
-data SrcSpan = SrcSpan !Int !Int
-    deriving (Eq, Show)
-
-data Located e = L SrcSpan e
-
-instance Show e => Show (Located e) where
-    showsPrec d (L _ e) = showsPrec d e
-
-unLoc :: Located e -> e
-unLoc (L _ e) = e
 
 type Param = (Text, LExpr)
 

@@ -10,6 +10,7 @@ import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer    as L
 
+import Location
 import Syntax
 
 type Parser = Parsec Void Text
