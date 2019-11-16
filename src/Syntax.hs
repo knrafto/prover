@@ -1,8 +1,8 @@
 module Syntax where
 
-import Location
+import           Location
 
-import Data.Text (Text)
+import           Data.Text                      ( Text )
 
 type Param = (Text, LExpr)
 

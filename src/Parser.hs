@@ -1,17 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Parser (statements) where
+module Parser
+    ( statements
+    )
+where
 
-import Control.Monad
+import           Control.Monad
 
-import           Data.Text (Text)
-import qualified Data.Text as Text
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as Text
 import           Data.Void
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer    as L
 
-import Location
-import Syntax
+import           Location
+import           Syntax
 
 type Parser = Parsec Void Text
 
@@ -40,8 +43,19 @@ identifier = lexeme . try $ do
   where
     reservedWords :: [Text]
     reservedWords =
-        [ "_", ":", ":=", "=", "Σ", "Π", "λ", "→", "×"
-        , "Type", "define", "assume", "prove"
+        [ "_"
+        , ":"
+        , ":="
+        , "="
+        , "Σ"
+        , "Π"
+        , "λ"
+        , "→"
+        , "×"
+        , "Type"
+        , "define"
+        , "assume"
+        , "prove"
         ]
 
 symbol :: Char -> Parser ()
@@ -49,32 +63,31 @@ symbol c = lexeme (void $ char c)
 
 located :: Parser a -> Parser (Located a)
 located m = do
-  s <- getOffset
-  a <- m
-  e <- getOffset
-  return (L (Range s e) a)
+    s <- getOffset
+    a <- m
+    e <- getOffset
+    return (L (Range s e) a)
 
 params :: Parser [Param]
 params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
-  where
-    param = (,) <$> identifier <* reservedWord ":" <*> expr
+    where param = (,) <$> identifier <* reservedWord ":" <*> expr
 
 atom :: Parser LExpr
-atom = located atom'
-  where
-    atom' = Hole <$ reservedWord "_"
-        <|> Var <$> identifier
-        <|> Universe <$ reservedWord "Type"
-        <|> Sigma <$ reservedWord "Σ" <*> params <*> expr
-        <|> Pi <$ reservedWord "Π" <*> params <*> expr
-        <|> Lam <$ reservedWord "λ" <*> params <*> expr
-        <|> Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
+atom = located $ choice
+    [ Hole <$ reservedWord "_"
+    , Var <$> identifier
+    , Universe <$ reservedWord "Type"
+    , Sigma <$ reservedWord "Σ" <*> params <*> expr
+    , Pi <$ reservedWord "Π" <*> params <*> expr
+    , Lam <$ reservedWord "λ" <*> params <*> expr
+    , Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
+    ]
 
 apps :: Parser LExpr
 apps = do
     s <- getOffset
     x <- atom
-    rest s x    
+    rest s x
   where
     rest s x = app s x <|> return x
 
@@ -92,10 +105,10 @@ pInfixN op p = do
     rest s x <|> return x
   where
     rest s x = do
-      f <- op
-      y <- p
-      e <- getOffset
-      return (L (Range s e) (f x y))
+        f <- op
+        y <- p
+        e <- getOffset
+        return (L (Range s e) (f x y))
 
 pInfixR :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
 pInfixR op p = do
@@ -106,26 +119,35 @@ pInfixR op p = do
     rest s x = rest' s x <|> return x
 
     rest' s x = do
-      f <- op
-      y <- pInfixR op p
-      e <- getOffset
-      rest s (L (Range s e) (f x y))
+        f <- op
+        y <- pInfixR op p
+        e <- getOffset
+        rest s (L (Range s e) (f x y))
 
 expr :: Parser LExpr
 expr = expr'
   where
-    times = pInfixR (Times <$ reservedWord "×") apps
+    times  = pInfixR (Times <$ reservedWord "×") apps
     equals = pInfixN (Equal <$ reservedWord "=") times
-    expr' = pInfixR (Arrow <$ reservedWord "→") equals
+    expr'  = pInfixR (Arrow <$ reservedWord "→") equals
 
 define :: Parser Statement
-define = Define <$ reservedWord "define" <*> identifier <*> (params <|> return []) <*> optional (reservedWord ":" *> expr) <* reservedWord ":=" <*> expr
+define =
+    Define
+        <$  reservedWord "define"
+        <*> identifier
+        <*> (params <|> return [])
+        <*> optional (reservedWord ":" *> expr)
+        <*  reservedWord ":="
+        <*> expr
 
 assume :: Parser Statement
-assume = Assume <$ reservedWord "assume" <*> identifier <* reservedWord ":" <*> expr
+assume =
+    Assume <$ reservedWord "assume" <*> identifier <* reservedWord ":" <*> expr
 
 prove :: Parser Statement
-prove = Prove <$ reservedWord "prove" <*> identifier <* reservedWord ":" <*> expr
+prove =
+    Prove <$ reservedWord "prove" <*> identifier <* reservedWord ":" <*> expr
 
 statement :: Parser LStatement
 statement = located $ define <|> assume <|> prove

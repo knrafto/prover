@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Location where
 
-import Data.Aeson
+import           Data.Aeson
 
 -- A range of text in the source file, represented by two offsets in Unicode
 -- code points.
@@ -27,4 +27,5 @@ data Decoration = Decoration Range String
     deriving (Show)
 
 instance ToJSON Decoration where
-    toJSON (Decoration range scope) = object ["range" .= range, "scope" .= scope]
+    toJSON (Decoration range scope) =
+        object ["range" .= range, "scope" .= scope]
