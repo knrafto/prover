@@ -5,6 +5,11 @@ import Data.List
 import System.Environment
 import System.IO.Unsafe
 
+commandLine :: [String]
+commandLine = unsafePerformIO getArgs
+
+{-# NOINLINE commandLine #-}
+
 -- Split command line into lists of flag names and positional args.
 splitArgs :: [String] -> ([String], [String])
 splitArgs args = case args of
@@ -14,21 +19,20 @@ splitArgs args = case args of
         | "--" `isPrefixOf` arg -> let (flags, posArgs) = splitArgs rest in (arg : flags, posArgs)
         | otherwise -> let (flags, posArgs) = splitArgs rest in (flags, arg : posArgs)
 
+commandLineFlags :: [String]
+commandLineFlags = fst (splitArgs commandLine)
+
 positionalArgs :: [String]
-positionalArgs = unsafePerformIO $ do
-    (_, posArgs) <- splitArgs <$> getArgs
-    return posArgs
+positionalArgs = snd (splitArgs commandLine)
     
-getFlag :: String -> Bool
-getFlag name = unsafePerformIO $ do
-    (flags, _) <- splitArgs <$> getArgs
-    return ("--" ++ name `elem` flags)
+boolFlag :: String -> Bool
+boolFlag name = "--" ++ name `elem` commandLineFlags
 
 print_tokens :: Bool
-print_tokens = getFlag "print_tokens"
+print_tokens = boolFlag "print_tokens"
 
 print_parse :: Bool
-print_parse = getFlag "print_parse"
+print_parse = boolFlag "print_parse"
 
 print_trace :: Bool
-print_trace = getFlag "print_trace"
+print_trace = boolFlag "print_trace"
