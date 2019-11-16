@@ -52,7 +52,7 @@ located m = do
   s <- getOffset
   a <- m
   e <- getOffset
-  return (L (SrcSpan s e) a)
+  return (L (Range s e) a)
 
 params :: Parser [Param]
 params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
@@ -83,7 +83,7 @@ apps = do
         args <- expr `sepBy1` symbol ','
         symbol ')'
         e <- getOffset
-        rest s (L (SrcSpan s e) (App x args))
+        rest s (L (Range s e) (App x args))
 
 pInfixN :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
 pInfixN op p = do
@@ -95,7 +95,7 @@ pInfixN op p = do
       f <- op
       y <- p
       e <- getOffset
-      return (L (SrcSpan s e) (f x y))
+      return (L (Range s e) (f x y))
 
 pInfixR :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
 pInfixR op p = do
@@ -109,7 +109,7 @@ pInfixR op p = do
       f <- op
       y <- pInfixR op p
       e <- getOffset
-      rest s (L (SrcSpan s e) (f x y))
+      rest s (L (Range s e) (f x y))
 
 expr :: Parser LExpr
 expr = expr'

@@ -64,7 +64,7 @@ token = do
     t <- symbol <|> reservedWord <|> identifier
     e <- getOffset
     sc
-    return (L (SrcSpan s e) t)
+    return (L (Range s e) t)
 
 tokenize :: Text -> [LToken]
 tokenize input = case parse (sc *> many token <* eof) "" input of

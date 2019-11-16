@@ -84,3 +84,32 @@ Procedure:
 * Finally, we must parse atoms. What do we do with "extra stuff"? The binders
   Π, Σ, λ are straightforward. For parentheses and identifiers, we should use
   the first token/group and error on the rest.
+
+# JSON output
+
+For syntax highlighting:
+
+```
+"decorations": [
+  {
+    "span": {
+      "start": 1000
+      "end": 1005
+    }
+    "scope": "prover.function"
+  },
+  ...
+]
+"diagnostics": [
+  {
+    "span": {
+      "start": 1000
+      "end": 1005
+    }
+    "level": "error",
+  },
+  ...
+]
+```
+
+The extension uses the text decoration API to set the markers.

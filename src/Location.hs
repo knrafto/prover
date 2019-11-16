@@ -1,13 +1,20 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Location where
 
--- A range of text in the source file, represented by two offsets.
-data SrcSpan = SrcSpan !Int !Int
+import Data.Aeson
+
+-- A range of text in the source file, represented by two offsets in Unicode
+-- code points.
+data Range = Range !Int !Int
     deriving (Eq)
 
-instance Show SrcSpan where
-    show (SrcSpan s e) = show s ++ ":" ++ show e
+instance Show Range where
+    show (Range s e) = show s ++ ":" ++ show e
 
-data Located e = L SrcSpan e
+instance ToJSON Range where
+    toJSON (Range s e) = object ["start" .= s, "end" .= e]
+
+data Located e = L Range e
 
 instance Show e => Show (Located e) where
     showsPrec d (L _ e) = showsPrec d e
@@ -15,3 +22,9 @@ instance Show e => Show (Located e) where
 unLoc :: Located e -> e
 unLoc (L _ e) = e
 
+-- A range and TextMate scope representing style information.
+data Decoration = Decoration Range String
+    deriving (Show)
+
+instance ToJSON Decoration where
+    toJSON (Decoration range scope) = object ["range" .= range, "scope" .= scope]
