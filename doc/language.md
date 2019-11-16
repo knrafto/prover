@@ -33,6 +33,12 @@ prove
 
 # Grammar
 
+Summary of operators, from tightest to least tight:
+* Application (left-associative)
+* = (non-associative)
+* × (right-associative)
+* → (right-associative)
+
 ```
 module = [ statement ]*
 
@@ -43,22 +49,34 @@ statement =
 
 params = ( name : expr [, name : expr ]* )
 
-expr =
+atom =
     _
     name
     Type
     ( expr )
-    expr ( expr [, expr]* )
-    expr = expr
-    expr → expr
-    expr × expr
     Σ params expr
-    (expr , expr [, expr]*)
+    ( expr , expr [, expr]* )
     Π params expr
     λ params expr
-```
 
-TODO: operator precedence and associativity.
+apps =
+    atom
+    apps ( expr [, expr]* )
+
+equals =
+    apps
+    apps = apps
+
+times =
+    equals
+    equals × times
+
+arrow =
+    times
+    times → arrow
+
+expr = arrow
+```
 
 # Type theory
 
