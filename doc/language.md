@@ -8,7 +8,7 @@ tab. Line comments start with `--`. Block comments are delimited with `{-` and
 
 TODO: allow nested block comments.
 
-The symbols `(`, `)`, `,`, and `.` are "punctuation", and are always
+The symbols `(`, `)`, and `,` are "punctuation", and are always
 treated as a token by themselves.
 
 Any other contiguous sequence of non-whitespace, non-punctuation Unicode

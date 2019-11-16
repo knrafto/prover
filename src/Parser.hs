@@ -21,7 +21,7 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
 isWordChar :: Char -> Bool
-isWordChar c = c `notElem` (" \t\r\n\f\v(),." :: [Char])
+isWordChar c = c `notElem` (" \t\r\n\f\v()," :: [Char])
 
 reservedWord :: Text -> Parser ()
 reservedWord w =
