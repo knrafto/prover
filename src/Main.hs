@@ -34,4 +34,6 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = resolveNames stmts
-        void $ typeCheck stmts'
+        when Flags.json $ putStrLn "{}"
+        unless Flags.json $
+            void (typeCheck stmts')

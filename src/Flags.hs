@@ -39,3 +39,6 @@ print_parse = boolFlag "print_parse"
 
 print_trace :: Bool
 print_trace = boolFlag "print_trace"
+
+json :: Bool
+json = boolFlag "json"
