@@ -33,33 +33,75 @@ function runCommand(
   });
 }
 
+type Range = {
+  start: number,
+  end: number,
+};
+
+type Occurrence = {
+  introduction?: Range, usage: Range, kind: string,
+};
+
+type Response = {
+  occurrences: Occurrence[],
+};
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
   console.log('Extension "prover" is now active!');
 
+  let decorationTypes: Record<string, vscode.TextEditorDecorationType> = {
+    local: vscode.window.createTextEditorDecorationType({color: '#ffffff'}),
+    define: vscode.window.createTextEditorDecorationType({color: '#0000ff'}),
+    assume: vscode.window.createTextEditorDecorationType({color: '#00ff00'}),
+    unbound: vscode.window.createTextEditorDecorationType({color: '#ff0000'}),
+  };
+
   let disposable = vscode.workspace.onDidSaveTextDocument((document) => {
     let path = document.uri.path;
-    console.log('Document saved:', path);
-
     if (!path.endsWith('.pf')) {
       return;
     }
 
     runCommand(binaryPath, ['--json', document.uri.path], (stdout, stderr) => {
-      if (stdout.length !== 0) {
-        console.log('Output:\n' + stdout);
-      }
       if (stderr.length !== 0) {
         console.log('Error:\n' + stderr);
       }
 
-      var json;
+      var resp: Response = {
+        occurrences: [],
+      };
       try {
-        json = JSON.parse(stdout);
+        resp = JSON.parse(stdout);
       } catch (e) {
         console.log('Error decoding JSON:', e);
-        return;
+      }
+
+      // Collect decorations
+      let decorations: Record<string, vscode.Range[]> = {};
+      for (let occurrence of resp.occurrences) {
+        let range = new vscode.Range(
+            document.positionAt(occurrence.usage.start),
+            document.positionAt(occurrence.usage.end));
+        if (occurrence.kind in decorations) {
+          decorations[occurrence.kind].push(range);
+        } else {
+          decorations[occurrence.kind] = [range];
+        }
+      }
+      // Set decorations
+      for (let textEditor of vscode.window.visibleTextEditors) {
+        if (textEditor.document.uri === document.uri) {
+          for (let kind in decorationTypes) {
+            let decorationType = decorationTypes[kind];
+            if (kind in decorations) {
+              textEditor.setDecorations(decorationType, decorations[kind]);
+            } else {
+              textEditor.setDecorations(decorationType, []);
+            }
+          }
+        }
       }
     });
   });
