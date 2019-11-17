@@ -119,7 +119,7 @@ data Term
     -- U : Tm Γ U
     = Universe Context
     -- A named assumption in Tm Γ A.
-    | Constant Text Context Term
+    | Assume Text Context Term
     -- A metavar with a context and type.
     | Metavar VarId Context Term
     -- If σ : Subst Δ Γ and t : Tm Γ A, then t[σ] : Tm Δ A[σ].
@@ -136,7 +136,7 @@ data Term
 
 instance Eq Term where
     (Universe _     ) == (Universe _     ) = True
-    (Constant n1 _ _) == (Constant n2 _ _) = n1 == n2
+    (Assume n1 _ _) == (Assume n2 _ _) = n1 == n2
     (Metavar  i1 _ _) == (Metavar  i2 _ _) = i1 == i2
     (Apply σ1 t1    ) == (Apply σ2 t2    ) = σ1 == σ2 && t1 == t2
     (Var v1         ) == (Var v2         ) = v1 == v2
@@ -147,7 +147,7 @@ instance Eq Term where
 
 instance Show Term where
     showsPrec _ (Universe _    ) = showString "U"
-    showsPrec _ (Constant n _ _) = showString (Text.unpack n)
+    showsPrec _ (Assume n _ _) = showString (Text.unpack n)
     showsPrec _ (Metavar (VarId i) _ _) =
         showString "α" . showString (subscript i)
     showsPrec _ (Apply σ t) =
@@ -162,7 +162,7 @@ instance Show Term where
 -- Extracts the context from a term.
 context :: Term -> Context
 context (Universe _Γ    ) = _Γ
-context (Constant _ _Γ _) = _Γ
+context (Assume _ _Γ _) = _Γ
 context (Metavar  _ _Γ _) = _Γ
 context (Apply σ _      ) = substDomain σ
 context (Var v          ) = go v
@@ -176,7 +176,7 @@ context (App _A _ _ _) = context _A
 -- Extracts the type of a term.
 termType :: Term -> Term
 termType (Universe _Γ    ) = Universe _Γ
-termType (Constant _ _ _A) = _A
+termType (Assume _ _ _A) = _A
 termType (Metavar  _ _ _A) = _A
 termType (Apply σ t      ) = Apply σ (termType t)
 termType (Var v          ) = go v
@@ -282,7 +282,7 @@ unify' t1 t2 | t1 == t2                               = return ()
 unify' (Universe _) (Universe _)                      = return ()
 unify' (Universe _) (Apply σ t) = unify (Universe (substCodomain σ)) t
 unify' (Apply σ t) (Universe _) = unify (Universe (substCodomain σ)) t
-unify' (Constant n1 _ _) (Constant n2 _ _) | n1 == n2 = return ()
+unify' (Assume n1 _ _) (Assume n2 _ _) | n1 == n2 = return ()
 unify' (Metavar i _ _)           t                           = assign i t
 unify' t                         (Metavar i _ _            ) = assign i t
 unify' (Var (VZ _   )          ) (Var (VZ _   )            ) = return ()
@@ -329,7 +329,7 @@ unify' t1 t2 | isWeakNormal t1 && isWeakNormal t2 = unificationFailure t1 t2
 -- TODO: reduce contexts, types too?
 reduce :: Term -> TcM Term
 reduce t@(Universe _    ) = return t
-reduce t@(Constant _ _ _) = return t
+reduce t@(Assume _ _ _) = return t
 reduce t@(Metavar  i _ _) = do
     currentSubst <- gets subst
     -- TODO: path compression
@@ -340,8 +340,8 @@ reduce (Apply σ t) = do
     t' <- reduce t
     case t' of
         Universe _ -> return $ Universe (substDomain σ)
-        Constant name _ _A ->
-            return $ Constant name (substDomain σ) (Apply σ _A)
+        Assume name _ _A ->
+            return $ Assume name (substDomain σ) (Apply σ _A)
         Metavar _ _ _ -> return $ Apply σ t'
         Apply τ t''   -> case (σ, τ) of
             (SubstTerm _, SubstWeaken _) -> return t''
@@ -378,7 +378,7 @@ isWeakNormal (Lam _ _) = True
 isWeakNormal t         = isWeakNeutral t
   where
     isWeakNeutral (Universe _    ) = True
-    isWeakNeutral (Constant _ _ _) = True
+    isWeakNeutral (Assume _ _ _) = True
     isWeakNeutral (Metavar  _ _ _) = False
     isWeakNeutral (Apply _ _     ) = False
     isWeakNeutral (Var _         ) = True
@@ -418,7 +418,7 @@ searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
     assumptions <- gets envAssumptions
     asum $ map
-        (\(name, ty) -> try (weakenGlobal _Γ (Constant name Empty ty)))
+        (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty)))
         (Map.toList assumptions)
   where
     _Γ = context t
@@ -539,7 +539,7 @@ typeCheckExpr _Γ names expr = case unLoc expr of
                 | Just body <- Map.lookup name definitions
                 -> return (weakenGlobal _Γ body)
                 | Just _A <- Map.lookup name assumptions
-                -> return (weakenGlobal _Γ (Constant name Empty _A))
+                -> return (weakenGlobal _Γ (Assume name Empty _A))
                 | otherwise
                 -> fail $ "unbound name: " ++ Text.unpack name
     Syntax.Type      -> return (Universe _Γ)
@@ -549,19 +549,19 @@ typeCheckExpr _Γ names expr = case unLoc expr of
         a' <- typeCheckExpr _Γ names a
         b' <- typeCheckExpr _Γ names b
         typeCheckApp f' [_A, a', b']
-    Syntax.PiExpr params _B -> typeCheckPi _Γ names params _B
+    Syntax.Pi params _B -> typeCheckPi _Γ names params _B
     Syntax.Arrow  _A     _B -> do
         _A' <- typeCheckExpr _Γ names _A
         checkIsType _A'
         _B' <- typeCheckExpr _Γ names _B
         checkIsType _B'
         return (Pi _A' (Apply (SubstWeaken _A') _B'))
-    Syntax.LamExpr params b    -> typeCheckLam _Γ names params b
-    Syntax.AppExpr f      args -> do
+    Syntax.Lam params b    -> typeCheckLam _Γ names params b
+    Syntax.App f      args -> do
         f'    <- typeCheckExpr _Γ names f
         args' <- mapM (typeCheckExpr _Γ names) args
         typeCheckApp f' args'
-    Syntax.SigmaExpr params _B -> typeCheckSigma _Γ names params _B
+    Syntax.Sigma params _B -> typeCheckSigma _Γ names params _B
     Syntax.Times     _A     _B -> do
         _A' <- typeCheckExpr _Γ names _A
         _B' <- typeCheckExpr _Γ names _B
@@ -605,7 +605,7 @@ typeCheckBuiltIn _Γ name = do
     let name' = Text.pack name
     assumptions <- gets envAssumptions
     case Map.lookup name' assumptions of
-        Just _A -> return (weakenGlobal _Γ (Constant name' Empty _A))
+        Just _A -> return (weakenGlobal _Γ (Assume name' Empty _A))
         _       -> fail $ "can't find built-in: " ++ name
 
 typeCheckHole :: Context -> TcM Term

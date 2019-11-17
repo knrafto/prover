@@ -77,9 +77,9 @@ atom = located $ choice
     [ Hole <$ reservedWord "_"
     , Ident <$> identifier
     , Type <$ reservedWord "Type"
-    , SigmaExpr <$ reservedWord "Σ" <*> params <*> expr
-    , PiExpr <$ reservedWord "Π" <*> params <*> expr
-    , LamExpr <$ reservedWord "λ" <*> params <*> expr
+    , Sigma <$ reservedWord "Σ" <*> params <*> expr
+    , Pi <$ reservedWord "Π" <*> params <*> expr
+    , Lam <$ reservedWord "λ" <*> params <*> expr
     , Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
     ]
 
@@ -96,7 +96,7 @@ apps = do
         args <- expr `sepBy1` symbol ','
         symbol ')'
         e <- getOffset
-        rest s (L (Range s e) (AppExpr x args))
+        rest s (L (Range s e) (App x args))
 
 pInfixN :: Parser (Expr -> Expr -> Expr') -> Parser Expr -> Parser Expr
 pInfixN op p = do

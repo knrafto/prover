@@ -11,11 +11,11 @@ data Expr'
     | Ident Ident
     | Type
     | Equal Expr Expr
-    | PiExpr [Param] Expr
+    | Pi [Param] Expr
     | Arrow Expr Expr
-    | LamExpr [Param] Expr
-    | AppExpr Expr [Expr]
-    | SigmaExpr [Param] Expr
+    | Lam [Param] Expr
+    | App Expr [Expr]
+    | Sigma [Param] Expr
     | Times Expr Expr
     | Tuple [Expr]
     deriving (Show)
