@@ -1,11 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Naming
     ( Name(..)
     , resolveNames
-    , nameDecorations
+    , Occurrence(..)
+    , nameOccurrences
     )
 where
 
-
+import           Data.Aeson
 import           Data.Text                      ( Text )
 import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict               as Map
@@ -15,20 +17,20 @@ import           Syntax
 
 -- Identifier locations track where the name was introduced, not where it was used.
 data Name
-    = BoundName Ident
+    = LocalName Ident
     | DefineName Ident
     | AssumeName Ident
     | UnboundName Text
     deriving (Show)
 
 data Env = Env
-    { envBoundNames :: Map Text Ident
+    { envLocalNames :: Map Text Ident
     , envDefinitions :: Map Text Ident
     , envAssumptions :: Map Text Ident
     }
 
 emptyEnv :: Env
-emptyEnv = Env { envBoundNames  = Map.empty
+emptyEnv = Env { envLocalNames  = Map.empty
                , envDefinitions = Map.empty
                , envAssumptions = Map.empty
                }
@@ -43,9 +45,9 @@ resolveExpr env expr = case expr of
         let name = unLoc ident
         in  case () of
                 _
-                    | Just ident' <- Map.lookup name (envBoundNames env) -> Var
+                    | Just ident' <- Map.lookup name (envLocalNames env) -> Var
                         l
-                        (BoundName ident')
+                        (LocalName ident')
                     | Just ident' <- Map.lookup name (envDefinitions env) -> Var
                         l
                         (DefineName ident')
@@ -72,7 +74,7 @@ resolveParams :: Env -> [Param Range Ident] -> ([Param Range Name], Env)
 resolveParams env [] = ([], env)
 resolveParams env ((i, e) : rest) =
     let param = (i, resolveExpr env e)
-        env' = env { envBoundNames = insertIdent i (envBoundNames env) }
+        env' = env { envLocalNames = insertIdent i (envLocalNames env) }
         (params, env'') = resolveParams env' rest
     in  (param : params, env'')
 
@@ -96,40 +98,47 @@ resolveNames = go emptyEnv
     go env (stmt : rest) =
         let (stmt', env') = resolveStatement env stmt in stmt' : go env' rest
 
+-- A range and enum representing style information.
+data Occurrence = Occurrence Range Name
+    deriving (Show)
+
+instance ToJSON Occurrence where
+    toJSON (Occurrence l n) = object $ ["usage" .= l] ++ case n of
+        LocalName i ->
+            ["kind" .= ("local" :: Text), "introduction" .= location i]
+        DefineName i ->
+            ["kind" .= ("define" :: Text), "introduction" .= location i]
+        AssumeName i ->
+            ["kind" .= ("assume" :: Text), "introduction" .= location i]
+        UnboundName _ -> ["kind" .= ("unbound" :: Text)]
+
 -- TODO: DList?
-decorate :: Range -> Name -> Decoration
-decorate l n = Decoration l scope
-  where
-    scope = case n of
-        BoundName   _ -> "local"
-        DefineName  _ -> "define"
-        AssumeName  _ -> "assume"
-        UnboundName _ -> "unbound"
-
-exprDecorations :: Expr Range Name -> [Decoration]
-exprDecorations expr = case expr of
+exprOccurrences :: Expr Range Name -> [Occurrence]
+exprOccurrences expr = case expr of
     Hole _        -> []
-    Var l n       -> [decorate l n]
+    Var l n       -> [Occurrence l n]
     Type _        -> []
-    Equal _ x  y  -> exprDecorations x ++ exprDecorations y
-    Pi    _ ps e  -> paramsDecorations ps ++ exprDecorations e
-    Arrow _ x  y  -> exprDecorations x ++ exprDecorations y
-    Lam   _ ps e  -> paramsDecorations ps ++ exprDecorations e
-    App   _ f  xs -> exprDecorations f ++ concatMap exprDecorations xs
-    Sigma _ ps e  -> paramsDecorations ps ++ exprDecorations e
-    Times _ x  y  -> exprDecorations x ++ exprDecorations y
-    Tuple _ xs    -> concatMap exprDecorations xs
+    Equal _ x  y  -> exprOccurrences x ++ exprOccurrences y
+    Pi    _ ps e  -> paramsOccurrences ps ++ exprOccurrences e
+    Arrow _ x  y  -> exprOccurrences x ++ exprOccurrences y
+    Lam   _ ps e  -> paramsOccurrences ps ++ exprOccurrences e
+    App   _ f  xs -> exprOccurrences f ++ concatMap exprOccurrences xs
+    Sigma _ ps e  -> paramsOccurrences ps ++ exprOccurrences e
+    Times _ x  y  -> exprOccurrences x ++ exprOccurrences y
+    Tuple _ xs    -> concatMap exprOccurrences xs
 
-paramsDecorations :: [Param Range Name] -> [Decoration]
-paramsDecorations = concatMap $ \(i, ty) ->
-    [decorate (location i) (BoundName i)] ++ exprDecorations ty
+paramsOccurrences :: [Param Range Name] -> [Occurrence]
+paramsOccurrences = concatMap $ \(i, ty) ->
+    [Occurrence (location i) (LocalName i)] ++ exprOccurrences ty
 
-nameDecorations :: [Statement Range Name] -> [Decoration]
-nameDecorations = concatMap $ \stmt -> case stmt of
+nameOccurrences :: [Statement Range Name] -> [Occurrence]
+nameOccurrences = concatMap $ \stmt -> case stmt of
     Define i ps ty body ->
-        [decorate (location i) (DefineName i)]
-            ++ paramsDecorations ps
-            ++ foldMap exprDecorations ty
-            ++ exprDecorations body
-    Assume i ty -> [decorate (location i) (DefineName i)] ++ exprDecorations ty
-    Prove  i ty -> [decorate (location i) (DefineName i)] ++ exprDecorations ty
+        [Occurrence (location i) (DefineName i)]
+            ++ paramsOccurrences ps
+            ++ foldMap exprOccurrences ty
+            ++ exprOccurrences body
+    Assume i ty ->
+        [Occurrence (location i) (AssumeName i)] ++ exprOccurrences ty
+    Prove i ty ->
+        [Occurrence (location i) (DefineName i)] ++ exprOccurrences ty

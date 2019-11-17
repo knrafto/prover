@@ -530,10 +530,10 @@ typeCheckStatement s stmt = case stmt of
 
 typeCheckExpr :: Context -> [Text] -> Expr Range Name -> TcM Term
 typeCheckExpr _Γ names expr = case expr of
-    Syntax.Hole _      -> typeCheckHole _Γ
+    Syntax.Hole _  -> typeCheckHole _Γ
     -- We assume that name resolution is correct and these cannot fail.
     Syntax.Var _ n -> case n of
-        BoundName ident -> do
+        LocalName ident -> do
             let Just i = elemIndex (unLoc ident) names
             return (Var (fromDeBruijn _Γ i))
         DefineName ident -> do

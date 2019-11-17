@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import           Control.Monad
@@ -22,6 +23,13 @@ panic message = do
     hPutStrLn stderr message
     exitWith (ExitFailure 1)
 
+data Response = Response
+    { occurrences :: [Occurrence] }
+    deriving (Show)
+
+instance ToJSON Response where
+    toJSON r = object ["occurrences" .= occurrences r]
+
 main :: IO ()
 main = do
     path <- case Flags.positionalArgs of
@@ -36,6 +44,6 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = resolveNames stmts
-        let r = Response { decorations = nameDecorations stmts' }
+        let r = Response { occurrences = nameOccurrences stmts' }
         when Flags.json $ B.putStrLn (encode r)
         unless Flags.json $ void (typeCheck stmts')
