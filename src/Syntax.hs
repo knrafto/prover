@@ -8,14 +8,14 @@ type Param = (Text, LExpr)
 
 data Expr
     = Hole
-    | Var Text
-    | Universe
+    | Ident Text
+    | Type
     | Equal LExpr LExpr
-    | Pi [Param] LExpr
+    | PiExpr [Param] LExpr
     | Arrow LExpr LExpr
-    | Lam [Param] LExpr
-    | App LExpr [LExpr]
-    | Sigma [Param] LExpr
+    | LamExpr [Param] LExpr
+    | AppExpr LExpr [LExpr]
+    | SigmaExpr [Param] LExpr
     | Times LExpr LExpr
     | Tuple [LExpr]
     deriving (Show)

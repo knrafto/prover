@@ -75,11 +75,11 @@ params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
 atom :: Parser LExpr
 atom = located $ choice
     [ Hole <$ reservedWord "_"
-    , Var <$> identifier
-    , Universe <$ reservedWord "Type"
-    , Sigma <$ reservedWord "Σ" <*> params <*> expr
-    , Pi <$ reservedWord "Π" <*> params <*> expr
-    , Lam <$ reservedWord "λ" <*> params <*> expr
+    , Ident <$> identifier
+    , Type <$ reservedWord "Type"
+    , SigmaExpr <$ reservedWord "Σ" <*> params <*> expr
+    , PiExpr <$ reservedWord "Π" <*> params <*> expr
+    , LamExpr <$ reservedWord "λ" <*> params <*> expr
     , Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
     ]
 
@@ -96,7 +96,7 @@ apps = do
         args <- expr `sepBy1` symbol ','
         symbol ')'
         e <- getOffset
-        rest s (L (Range s e) (App x args))
+        rest s (L (Range s e) (AppExpr x args))
 
 pInfixN :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
 pInfixN op p = do

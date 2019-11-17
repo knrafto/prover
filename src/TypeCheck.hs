@@ -119,7 +119,7 @@ data Term
     -- U : Tm Γ U
     = Universe Context
     -- A named assumption in Tm Γ A.
-    | Assume Text Context Term
+    | Constant Text Context Term
     -- A metavar with a context and type.
     | Metavar VarId Context Term
     -- If σ : Subst Δ Γ and t : Tm Γ A, then t[σ] : Tm Δ A[σ].
@@ -135,19 +135,19 @@ data Term
     | App Term Term Term Term
 
 instance Eq Term where
-    (Universe _    ) == (Universe _    ) = True
-    (Assume  n1 _ _) == (Assume  n2 _ _) = n1 == n2
-    (Metavar i1 _ _) == (Metavar i2 _ _) = i1 == i2
-    (Apply σ1 t1   ) == (Apply σ2 t2   ) = σ1 == σ2 && t1 == t2
-    (Var v1        ) == (Var v2        ) = v1 == v2
-    (Pi  _A1 _B1   ) == (Pi  _A2 _B2   ) = _A1 == _A2 && _B1 == _B2
-    (Lam _   b1    ) == (Lam _   b2    ) = b1 == b2
-    (App _ _ f1 a1 ) == (App _ _ f2 a2 ) = f1 == f2 && a1 == a2
-    _                == _                = False
+    (Universe _     ) == (Universe _     ) = True
+    (Constant n1 _ _) == (Constant n2 _ _) = n1 == n2
+    (Metavar  i1 _ _) == (Metavar  i2 _ _) = i1 == i2
+    (Apply σ1 t1    ) == (Apply σ2 t2    ) = σ1 == σ2 && t1 == t2
+    (Var v1         ) == (Var v2         ) = v1 == v2
+    (Pi  _A1 _B1    ) == (Pi  _A2 _B2    ) = _A1 == _A2 && _B1 == _B2
+    (Lam _   b1     ) == (Lam _   b2     ) = b1 == b2
+    (App _ _ f1 a1  ) == (App _ _ f2 a2  ) = f1 == f2 && a1 == a2
+    _                 == _                 = False
 
 instance Show Term where
-    showsPrec _ (Universe _  ) = showString "U"
-    showsPrec _ (Assume n _ _) = showString (Text.unpack n)
+    showsPrec _ (Universe _    ) = showString "U"
+    showsPrec _ (Constant n _ _) = showString (Text.unpack n)
     showsPrec _ (Metavar (VarId i) _ _) =
         showString "α" . showString (subscript i)
     showsPrec _ (Apply σ t) =
@@ -161,11 +161,11 @@ instance Show Term where
 
 -- Extracts the context from a term.
 context :: Term -> Context
-context (Universe _Γ   ) = _Γ
-context (Assume  _ _Γ _) = _Γ
-context (Metavar _ _Γ _) = _Γ
-context (Apply σ _     ) = substDomain σ
-context (Var v         ) = go v
+context (Universe _Γ    ) = _Γ
+context (Constant _ _Γ _) = _Γ
+context (Metavar  _ _Γ _) = _Γ
+context (Apply σ _      ) = substDomain σ
+context (Var v          ) = go v
   where
     go (VZ _A  ) = Extend _A
     go (VS _A _) = Extend _A
@@ -175,11 +175,11 @@ context (App _A _ _ _) = context _A
 
 -- Extracts the type of a term.
 termType :: Term -> Term
-termType (Universe _Γ   ) = Universe _Γ
-termType (Assume  _ _ _A) = _A
-termType (Metavar _ _ _A) = _A
-termType (Apply σ t     ) = Apply σ (termType t)
-termType (Var v         ) = go v
+termType (Universe _Γ    ) = Universe _Γ
+termType (Constant _ _ _A) = _A
+termType (Metavar  _ _ _A) = _A
+termType (Apply σ t      ) = Apply σ (termType t)
+termType (Var v          ) = go v
   where
     go (VZ _A   ) = Apply (SubstWeaken _A) _A
     go (VS _A v') = Apply (SubstWeaken _A) (go v')
@@ -239,9 +239,9 @@ assign i t = do
     eqs <- gets unsolvedEquations
     modify $ \s ->
         s { subst = Map.insert i t (subst s), unsolvedEquations = [] }
-    unless (null eqs)
-        $ trace "Retrying unsolved equations"
-        $ forM_ eqs (uncurry unify)
+    unless (null eqs) $ trace "Retrying unsolved equations" $ forM_
+        eqs
+        (uncurry unify)
 
 unificationFailure :: Term -> Term -> TcM a
 unificationFailure t1 t2 =
@@ -278,11 +278,11 @@ unify t1 t2 = do
         $ unify' t1' t2'
 
 unify' :: Term -> Term -> TcM ()
-unify' t1 t2 | t1 == t2                           = return ()
-unify' (Universe _) (Universe _)                  = return ()
+unify' t1 t2 | t1 == t2                               = return ()
+unify' (Universe _) (Universe _)                      = return ()
 unify' (Universe _) (Apply σ t) = unify (Universe (substCodomain σ)) t
 unify' (Apply σ t) (Universe _) = unify (Universe (substCodomain σ)) t
-unify' (Assume n1 _ _) (Assume n2 _ _) | n1 == n2 = return ()
+unify' (Constant n1 _ _) (Constant n2 _ _) | n1 == n2 = return ()
 unify' (Metavar i _ _)           t                           = assign i t
 unify' t                         (Metavar i _ _            ) = assign i t
 unify' (Var (VZ _   )          ) (Var (VZ _   )            ) = return ()
@@ -328,9 +328,9 @@ unify' t1 t2 | isWeakNormal t1 && isWeakNormal t2 = unificationFailure t1 t2
 -- a normal form.
 -- TODO: reduce contexts, types too?
 reduce :: Term -> TcM Term
-reduce t@(Universe _   ) = return t
-reduce t@(Assume  _ _ _) = return t
-reduce t@(Metavar i _ _) = do
+reduce t@(Universe _    ) = return t
+reduce t@(Constant _ _ _) = return t
+reduce t@(Metavar  i _ _) = do
     currentSubst <- gets subst
     -- TODO: path compression
     case Map.lookup i currentSubst of
@@ -339,10 +339,11 @@ reduce t@(Metavar i _ _) = do
 reduce (Apply σ t) = do
     t' <- reduce t
     case t' of
-        Universe _        -> return $ Universe (substDomain σ)
-        Assume  name _ _A -> return $ Assume name (substDomain σ) (Apply σ _A)
-        Metavar _    _ _  -> return $ Apply σ t'
-        Apply τ t''       -> case (σ, τ) of
+        Universe _ -> return $ Universe (substDomain σ)
+        Constant name _ _A ->
+            return $ Constant name (substDomain σ) (Apply σ _A)
+        Metavar _ _ _ -> return $ Apply σ t'
+        Apply τ t''   -> case (σ, τ) of
             (SubstTerm _, SubstWeaken _) -> return t''
             (SubstExtend σ' _, SubstWeaken _A) ->
                 reduce $ Apply (SubstWeaken (Apply σ' _A)) (Apply σ' t'')
@@ -376,14 +377,14 @@ isWeakNormal :: Term -> Bool
 isWeakNormal (Lam _ _) = True
 isWeakNormal t         = isWeakNeutral t
   where
-    isWeakNeutral (Universe _   ) = True
-    isWeakNeutral (Assume  _ _ _) = True
-    isWeakNeutral (Metavar _ _ _) = False
-    isWeakNeutral (Apply _ _    ) = False
-    isWeakNeutral (Var _        ) = True
-    isWeakNeutral (Pi  _ _      ) = True
-    isWeakNeutral (Lam _ _      ) = False
-    isWeakNeutral (App _ _ f _  ) = isWeakNeutral f
+    isWeakNeutral (Universe _    ) = True
+    isWeakNeutral (Constant _ _ _) = True
+    isWeakNeutral (Metavar  _ _ _) = False
+    isWeakNeutral (Apply _ _     ) = False
+    isWeakNeutral (Var _         ) = True
+    isWeakNeutral (Pi  _ _       ) = True
+    isWeakNeutral (Lam _ _       ) = False
+    isWeakNeutral (App _ _ f _   ) = isWeakNeutral f
 
 -- Eta-expands a term.
 etaExpand :: Term -> Term -> Term -> Term
@@ -416,8 +417,9 @@ accept t guess = do
 searchAssumptions :: Term -> TcM ()
 searchAssumptions t = do
     assumptions <- gets envAssumptions
-    asum $ map (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty)))
-               (Map.toList assumptions)
+    asum $ map
+        (\(name, ty) -> try (weakenGlobal _Γ (Constant name Empty ty)))
+        (Map.toList assumptions)
   where
     _Γ = context t
 
@@ -522,8 +524,8 @@ typeCheckStatement s stmt = case unLoc stmt of
 
 typeCheckExpr :: Context -> [Text] -> Syntax.LExpr -> TcM Term
 typeCheckExpr _Γ names expr = case unLoc expr of
-    Syntax.Hole     -> typeCheckHole _Γ
-    Syntax.Var name -> do
+    Syntax.Hole       -> typeCheckHole _Γ
+    Syntax.Ident name -> do
         definitions <- gets envDefinitions
         assumptions <- gets envAssumptions
         case () of
@@ -533,30 +535,30 @@ typeCheckExpr _Γ names expr = case unLoc expr of
                 | Just body <- Map.lookup name definitions
                 -> return (weakenGlobal _Γ body)
                 | Just _A <- Map.lookup name assumptions
-                -> return (weakenGlobal _Γ (Assume name Empty _A))
+                -> return (weakenGlobal _Γ (Constant name Empty _A))
                 | otherwise
                 -> fail $ "unbound name: " ++ Text.unpack name
-    Syntax.Universe  -> return (Universe _Γ)
+    Syntax.Type      -> return (Universe _Γ)
     Syntax.Equal a b -> do
         f' <- typeCheckBuiltIn _Γ "Id"
         _A <- typeCheckHole _Γ
         a' <- typeCheckExpr _Γ names a
         b' <- typeCheckExpr _Γ names b
         typeCheckApp f' [_A, a', b']
-    Syntax.Pi    params _B -> typeCheckPi _Γ names params _B
-    Syntax.Arrow _A     _B -> do
+    Syntax.PiExpr params _B -> typeCheckPi _Γ names params _B
+    Syntax.Arrow  _A     _B -> do
         _A' <- typeCheckExpr _Γ names _A
         checkIsType _A'
         _B' <- typeCheckExpr _Γ names _B
         checkIsType _B'
         return (Pi _A' (Apply (SubstWeaken _A') _B'))
-    Syntax.Lam params b    -> typeCheckLam _Γ names params b
-    Syntax.App f      args -> do
+    Syntax.LamExpr params b    -> typeCheckLam _Γ names params b
+    Syntax.AppExpr f      args -> do
         f'    <- typeCheckExpr _Γ names f
         args' <- mapM (typeCheckExpr _Γ names) args
         typeCheckApp f' args'
-    Syntax.Sigma params _B -> typeCheckSigma _Γ names params _B
-    Syntax.Times _A     _B -> do
+    Syntax.SigmaExpr params _B -> typeCheckSigma _Γ names params _B
+    Syntax.Times     _A     _B -> do
         _A' <- typeCheckExpr _Γ names _A
         _B' <- typeCheckExpr _Γ names _B
         f   <- typeCheckBuiltIn _Γ "Σ'"
@@ -596,7 +598,7 @@ typeCheckBuiltIn _Γ name = do
     let name' = Text.pack name
     assumptions <- gets envAssumptions
     case Map.lookup name' assumptions of
-        Just _A -> return (weakenGlobal _Γ (Assume name' Empty _A))
+        Just _A -> return (weakenGlobal _Γ (Constant name' Empty _A))
         _       -> fail $ "can't find built-in: " ++ name
 
 typeCheckHole :: Context -> TcM Term
