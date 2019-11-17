@@ -38,3 +38,10 @@ data Decoration = Decoration Range String
 instance ToJSON Decoration where
     toJSON (Decoration range scope) =
         object ["range" .= range, "scope" .= scope]
+
+-- Interaction response
+data Response = Response { decorations :: [Decoration] }
+    deriving (Show)
+
+instance ToJSON Response where
+    toJSON r = object ["decorations" .= decorations r]
