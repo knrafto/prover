@@ -47,7 +47,7 @@ assume zero : ℕ
 assume suc : ℕ → ℕ
 assume ℕ-ind : Π (C : ℕ → Type) C(zero) → (Π (n : ℕ) C(n) → C(suc(n))) → Π (n : ℕ) C(n)
 assume ℕ-ind-zero : Π (C : ℕ → Type, base : C(zero), step : Π (n : ℕ) C(n) → C(suc(n))) ℕ-ind(C, base, step, zero) = base
-assume ℕ-ind-suc : Π (C : ℕ → Type, base : C(zero), step : Π (n : ℕ) C(n) → C(suc(n)), n : ℕ) ℕ-ind(C, base, step, suc(n)) = step(ℕ-ind(C, base, step, n))
+assume ℕ-ind-suc : Π (C : ℕ → Type, base : C(zero), step : Π (n : ℕ) C(n) → C(suc(n)), n : ℕ) ℕ-ind(C, base, step, suc(n)) = step(n, ℕ-ind(C, base, step, n))
 
 -- Structure of identity types.
 define ap(A : Type, B : Type, f : A → B) : Π (x : A, y : A) x = y → f(x) = f(y)
