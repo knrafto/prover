@@ -15,10 +15,16 @@ instance Show Range where
 instance ToJSON Range where
     toJSON (Range s e) = object ["start" .= s, "end" .= e]
 
+spanRange :: Range -> Range -> Range
+spanRange (Range s _) (Range _ e) = Range s e
+
 data Located e = L Range e
 
 instance Show e => Show (Located e) where
     showsPrec d (L _ e) = showsPrec d e
+
+location :: Located e -> Range
+location (L l _) = l
 
 unLoc :: Located e -> e
 unLoc (L _ e) = e
