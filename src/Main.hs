@@ -36,6 +36,6 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = resolveNames stmts
-        let r      = Response { decorations = [] }
+        let r = Response { decorations = nameDecorations stmts' }
         when Flags.json $ B.putStrLn (encode r)
         unless Flags.json $ void (typeCheck stmts')

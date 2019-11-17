@@ -31,13 +31,13 @@ unLoc (L _ e) = e
 
 type Ident = Located Text
 
--- A range and TextMate scope representing style information.
+-- A range and enum representing style information.
 data Decoration = Decoration Range String
     deriving (Show)
 
 instance ToJSON Decoration where
     toJSON (Decoration range scope) =
-        object ["range" .= range, "scope" .= scope]
+        object ["range" .= range, "kind" .= scope]
 
 -- Interaction response
 data Response = Response { decorations :: [Decoration] }

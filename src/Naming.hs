@@ -1,4 +1,9 @@
-module Naming (Name(..), resolveNames) where
+module Naming
+    ( Name(..)
+    , resolveNames
+    , nameDecorations
+    )
+where
 
 
 import           Data.Text                      ( Text )
@@ -90,3 +95,41 @@ resolveNames = go emptyEnv
     go _ [] = []
     go env (stmt : rest) =
         let (stmt', env') = resolveStatement env stmt in stmt' : go env' rest
+
+-- TODO: DList?
+decorate :: Range -> Name -> Decoration
+decorate l n = Decoration l scope
+  where
+    scope = case n of
+        BoundName   _ -> "local"
+        DefineName  _ -> "define"
+        AssumeName  _ -> "assume"
+        UnboundName _ -> "unbound"
+
+exprDecorations :: Expr Range Name -> [Decoration]
+exprDecorations expr = case expr of
+    Hole _        -> []
+    Var l n       -> [decorate l n]
+    Type _        -> []
+    Equal _ x  y  -> exprDecorations x ++ exprDecorations y
+    Pi    _ ps e  -> paramsDecorations ps ++ exprDecorations e
+    Arrow _ x  y  -> exprDecorations x ++ exprDecorations y
+    Lam   _ ps e  -> paramsDecorations ps ++ exprDecorations e
+    App   _ f  xs -> exprDecorations f ++ concatMap exprDecorations xs
+    Sigma _ ps e  -> paramsDecorations ps ++ exprDecorations e
+    Times _ x  y  -> exprDecorations x ++ exprDecorations y
+    Tuple _ xs    -> concatMap exprDecorations xs
+
+paramsDecorations :: [Param Range Name] -> [Decoration]
+paramsDecorations = concatMap $ \(i, ty) ->
+    [decorate (location i) (BoundName i)] ++ exprDecorations ty
+
+nameDecorations :: [Statement Range Name] -> [Decoration]
+nameDecorations = concatMap $ \stmt -> case stmt of
+    Define i ps ty body ->
+        [decorate (location i) (DefineName i)]
+            ++ paramsDecorations ps
+            ++ foldMap exprDecorations ty
+            ++ exprDecorations body
+    Assume i ty -> [decorate (location i) (DefineName i)] ++ exprDecorations ty
+    Prove  i ty -> [decorate (location i) (DefineName i)] ++ exprDecorations ty
