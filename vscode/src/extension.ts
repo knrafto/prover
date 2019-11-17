@@ -4,9 +4,31 @@ import * as child_process from 'child_process';
 
 import * as vscode from 'vscode';
 
+type Range = {
+  start: number,
+  end: number,
+};
+
+type Occurrence = {
+  introduction?: Range, usage: Range, kind: string,
+};
+
+type Response = {
+  occurrences: Occurrence[],
+};
+
 // TODO: configure
 let binaryPath =
     '/Users/knrafto/code/prover/.stack-work/dist/x86_64-osx/Cabal-2.4.0.1/build/prover/prover';
+
+let decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map([
+  ['local', vscode.window.createTextEditorDecorationType({color: '#ffffff'})],
+  ['define', vscode.window.createTextEditorDecorationType({color: '#0000ff'})],
+  ['assume', vscode.window.createTextEditorDecorationType({color: '#00ff00'})],
+  ['unbound', vscode.window.createTextEditorDecorationType({color: '#ff0000'})],
+]);
+
+let cache: Map<string, Response> = new Map();
 
 // Run a command to completion, reporting its output and exit code.
 function runCommand(
@@ -33,79 +55,69 @@ function runCommand(
   });
 }
 
-type Range = {
-  start: number,
-  end: number,
-};
+function onChange(path: string) {
+  if (!path.endsWith('.pf')) {
+    return;
+  }
 
-type Occurrence = {
-  introduction?: Range, usage: Range, kind: string,
-};
+  runCommand(binaryPath, ['--json', path], (stdout, stderr) => {
+    if (stderr.length !== 0) {
+      console.log('Error:\n' + stderr);
+    }
 
-type Response = {
-  occurrences: Occurrence[],
-};
+    var resp: Response = {
+      occurrences: [],
+    };
+    try {
+      resp = JSON.parse(stdout);
+    } catch (e) {
+      console.log('Error decoding JSON:', e);
+    }
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+    cache.set(path, resp);
+    updateEditors();
+  });
+}
+
+function updateEditors() {
+  for (let textEditor of vscode.window.visibleTextEditors) {
+    let path = textEditor.document.uri.path;
+    let resp = cache.get(path);
+    if (resp === undefined) {
+      continue;
+    }
+
+    let decorations: Map<string, vscode.Range[]> = new Map();
+    for (let occurrence of resp.occurrences) {
+      let range = new vscode.Range(
+          textEditor.document.positionAt(occurrence.usage.start),
+          textEditor.document.positionAt(occurrence.usage.end));
+      let ranges = decorations.get(occurrence.kind);
+      if (ranges !== undefined) {
+        ranges.push(range);
+      } else {
+        decorations.set(occurrence.kind, [range]);
+      }
+    }
+
+    for (let [kind, decorationType] of decorationTypes) {
+      textEditor.setDecorations(decorationType, decorations.get(kind) || []);
+    }
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('Extension "prover" is now active!');
 
-  let decorationTypes: Record<string, vscode.TextEditorDecorationType> = {
-    local: vscode.window.createTextEditorDecorationType({color: '#ffffff'}),
-    define: vscode.window.createTextEditorDecorationType({color: '#0000ff'}),
-    assume: vscode.window.createTextEditorDecorationType({color: '#00ff00'}),
-    unbound: vscode.window.createTextEditorDecorationType({color: '#ff0000'}),
-  };
+  for (let textEditor of vscode.window.visibleTextEditors) {
+    onChange(textEditor.document.uri.path);
+  }
 
-  let disposable = vscode.workspace.onDidSaveTextDocument((document) => {
-    let path = document.uri.path;
-    if (!path.endsWith('.pf')) {
-      return;
-    }
+  context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(
+      (document) => onChange(document.uri.path)));
 
-    runCommand(binaryPath, ['--json', document.uri.path], (stdout, stderr) => {
-      if (stderr.length !== 0) {
-        console.log('Error:\n' + stderr);
-      }
-
-      var resp: Response = {
-        occurrences: [],
-      };
-      try {
-        resp = JSON.parse(stdout);
-      } catch (e) {
-        console.log('Error decoding JSON:', e);
-      }
-
-      // Collect decorations
-      let decorations: Record<string, vscode.Range[]> = {};
-      for (let occurrence of resp.occurrences) {
-        let range = new vscode.Range(
-            document.positionAt(occurrence.usage.start),
-            document.positionAt(occurrence.usage.end));
-        if (occurrence.kind in decorations) {
-          decorations[occurrence.kind].push(range);
-        } else {
-          decorations[occurrence.kind] = [range];
-        }
-      }
-      // Set decorations
-      for (let textEditor of vscode.window.visibleTextEditors) {
-        if (textEditor.document.uri === document.uri) {
-          for (let kind in decorationTypes) {
-            let decorationType = decorationTypes[kind];
-            if (kind in decorations) {
-              textEditor.setDecorations(decorationType, decorations[kind]);
-            } else {
-              textEditor.setDecorations(decorationType, []);
-            }
-          }
-        }
-      }
-    });
-  });
-  context.subscriptions.push(disposable);
+  context.subscriptions.push(
+      vscode.window.onDidChangeVisibleTextEditors((_) => updateEditors()));
 }
 
 // this method is called when your extension is deactivated
