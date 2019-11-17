@@ -14,6 +14,7 @@ import           Data.Tree
 
 import qualified Flags
 import           Location
+import           Naming
 import           Search
 import           Syntax                         ( Expr
                                                 , Param
@@ -446,7 +447,7 @@ searchLam t = do
     accept t (Lam _A β)
     search β
 
-typeCheck :: [Statement Range Ident] -> IO TcState
+typeCheck :: [Statement Range Name] -> IO TcState
 typeCheck = go initialState
   where
     go s []            = return s
@@ -454,7 +455,7 @@ typeCheck = go initialState
         s' <- typeCheckStatement s stmt
         go s' rest
 
-typeCheckStatement :: TcState -> Statement Range Ident -> IO TcState
+typeCheckStatement :: TcState -> Statement Range Name -> IO TcState
 typeCheckStatement s stmt = case stmt of
     Syntax.Define ident params ty body -> do
         let name = unLoc ident
@@ -527,23 +528,23 @@ typeCheckStatement s stmt = case stmt of
                                                   (envDefinitions s')
                     }
 
-typeCheckExpr :: Context -> [Text] -> Expr Range Ident -> TcM Term
+typeCheckExpr :: Context -> [Text] -> Expr Range Name -> TcM Term
 typeCheckExpr _Γ names expr = case expr of
     Syntax.Hole _      -> typeCheckHole _Γ
-    Syntax.Var _ ident -> do
-        let name = unLoc ident
-        definitions <- gets envDefinitions
-        assumptions <- gets envAssumptions
-        case () of
-            _
-                | Just i <- elemIndex name names
-                -> return (Var (fromDeBruijn _Γ i))
-                | Just body <- Map.lookup name definitions
-                -> return (weakenGlobal _Γ body)
-                | Just _A <- Map.lookup name assumptions
-                -> return (weakenGlobal _Γ (Assume name Empty _A))
-                | otherwise
-                -> fail $ "unbound name: " ++ Text.unpack name
+    -- We assume that name resolution is correct and these cannot fail.
+    Syntax.Var _ n -> case n of
+        BoundName ident -> do
+            let Just i = elemIndex (unLoc ident) names
+            return (Var (fromDeBruijn _Γ i))
+        DefineName ident -> do
+            definitions <- gets envDefinitions
+            let Just body = Map.lookup (unLoc ident) definitions
+            return (weakenGlobal _Γ body)
+        AssumeName ident -> do
+            assumptions <- gets envAssumptions
+            let Just _A = Map.lookup (unLoc ident) assumptions
+            return (weakenGlobal _Γ (Assume (unLoc ident) Empty _A))
+        UnboundName name -> fail $ "unbound name: " ++ Text.unpack name
     Syntax.Type _      -> return (Universe _Γ)
     Syntax.Equal _ a b -> do
         f' <- typeCheckBuiltIn _Γ "Id"
@@ -574,7 +575,7 @@ typeCheckExpr _Γ names expr = case expr of
         typeCheckTuple args'
 
 typeCheckPi
-    :: Context -> [Text] -> [Param Range Ident] -> Expr Range Ident -> TcM Term
+    :: Context -> [Text] -> [Param Range Name] -> Expr Range Name -> TcM Term
 typeCheckPi _Γ names []                     _B = typeCheckExpr _Γ names _B
 typeCheckPi _Γ names ((ident, _A) : params) _B = do
     let name = unLoc ident
@@ -585,7 +586,7 @@ typeCheckPi _Γ names ((ident, _A) : params) _B = do
     return (Pi _A' _B')
 
 typeCheckLam
-    :: Context -> [Text] -> [Param Range Ident] -> Expr Range Ident -> TcM Term
+    :: Context -> [Text] -> [Param Range Name] -> Expr Range Name -> TcM Term
 typeCheckLam _Γ names []                     b = typeCheckExpr _Γ names b
 typeCheckLam _Γ names ((ident, _A) : params) b = do
     let name = unLoc ident
@@ -595,7 +596,7 @@ typeCheckLam _Γ names ((ident, _A) : params) b = do
     return (Lam _A' b')
 
 typeCheckSigma
-    :: Context -> [Text] -> [Param Range Ident] -> Expr Range Ident -> TcM Term
+    :: Context -> [Text] -> [Param Range Name] -> Expr Range Name -> TcM Term
 typeCheckSigma _Γ names []                     _B = typeCheckExpr _Γ names _B
 typeCheckSigma _Γ names ((ident, _A) : params) _B = do
     let name = unLoc ident

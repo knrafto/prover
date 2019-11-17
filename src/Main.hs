@@ -10,6 +10,7 @@ import           Text.Pretty.Simple
 
 import qualified Flags
 import           Location
+import           Naming
 import           TypeCheck
 import           Parser
 import           Token
@@ -32,4 +33,5 @@ main = do
             Left  e -> panic (errorBundlePretty e)
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
-        void $ typeCheck stmts
+        let stmts' = resolveNames stmts
+        void $ typeCheck stmts'
