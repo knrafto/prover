@@ -444,7 +444,7 @@ searchLam t = do
     accept t (Lam _A β)
     search β
 
-typeCheck :: [Syntax.LStatement] -> IO TcState
+typeCheck :: [Syntax.Statement] -> IO TcState
 typeCheck = go initialState
   where
     go s []            = return s
@@ -452,9 +452,10 @@ typeCheck = go initialState
         s' <- typeCheckStatement s stmt
         go s' rest
 
-typeCheckStatement :: TcState -> Syntax.LStatement -> IO TcState
+typeCheckStatement :: TcState -> Syntax.Statement -> IO TcState
 typeCheckStatement s stmt = case unLoc stmt of
-    Syntax.Define name params ty body -> do
+    Syntax.Define ident params ty body -> do
+        let name = unLoc ident
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
             bodyTerm <- typeCheckLam Empty [] params body
@@ -480,7 +481,8 @@ typeCheckStatement s stmt = case unLoc stmt of
                                                   bodyTerm
                                                   (envDefinitions s')
                     }
-    Syntax.Assume name ty -> do
+    Syntax.Assume ident ty -> do
+        let name = unLoc ident
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
             tyTerm <- typeCheckExpr Empty [] ty
@@ -497,7 +499,8 @@ typeCheckStatement s stmt = case unLoc stmt of
                                                   tyTerm
                                                   (envAssumptions s')
                     }
-    Syntax.Prove name ty -> do
+    Syntax.Prove ident ty -> do
+        let name = unLoc ident
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
             tyTerm  <- typeCheckExpr Empty [] ty
@@ -522,10 +525,11 @@ typeCheckStatement s stmt = case unLoc stmt of
                                                   (envDefinitions s')
                     }
 
-typeCheckExpr :: Context -> [Text] -> Syntax.LExpr -> TcM Term
+typeCheckExpr :: Context -> [Text] -> Syntax.Expr -> TcM Term
 typeCheckExpr _Γ names expr = case unLoc expr of
     Syntax.Hole       -> typeCheckHole _Γ
-    Syntax.Ident name -> do
+    Syntax.Ident ident -> do
+        let name = unLoc ident
         definitions <- gets envDefinitions
         assumptions <- gets envAssumptions
         case () of
@@ -567,27 +571,30 @@ typeCheckExpr _Γ names expr = case unLoc expr of
         args' <- mapM (typeCheckExpr _Γ names) args
         typeCheckTuple args'
 
-typeCheckPi :: Context -> [Text] -> [Syntax.Param] -> Syntax.LExpr -> TcM Term
+typeCheckPi :: Context -> [Text] -> [Syntax.Param] -> Syntax.Expr -> TcM Term
 typeCheckPi _Γ names []                    _B = typeCheckExpr _Γ names _B
-typeCheckPi _Γ names ((name, _A) : params) _B = do
+typeCheckPi _Γ names ((ident, _A) : params) _B = do
+    let name = unLoc ident
     _A' <- typeCheckExpr _Γ names _A
     checkIsType _A'
     _B' <- typeCheckPi (Extend _A') (name : names) params _B
     checkIsType _B'
     return (Pi _A' _B')
 
-typeCheckLam :: Context -> [Text] -> [Syntax.Param] -> Syntax.LExpr -> TcM Term
+typeCheckLam :: Context -> [Text] -> [Syntax.Param] -> Syntax.Expr -> TcM Term
 typeCheckLam _Γ names []                    b = typeCheckExpr _Γ names b
-typeCheckLam _Γ names ((name, _A) : params) b = do
+typeCheckLam _Γ names ((ident, _A) : params) b = do
+    let name = unLoc ident
     _A' <- typeCheckExpr _Γ names _A
     checkIsType _A'
     b' <- typeCheckLam (Extend _A') (name : names) params b
     return (Lam _A' b')
 
 typeCheckSigma
-    :: Context -> [Text] -> [Syntax.Param] -> Syntax.LExpr -> TcM Term
+    :: Context -> [Text] -> [Syntax.Param] -> Syntax.Expr -> TcM Term
 typeCheckSigma _Γ names []                    _B = typeCheckExpr _Γ names _B
-typeCheckSigma _Γ names ((name, _A) : params) _B = do
+typeCheckSigma _Γ names ((ident, _A) : params) _B = do
+    let name = unLoc ident
     _A' <- typeCheckExpr _Γ names _A
     _B' <- typeCheckSigma (Extend _A') (name : names) params _B
     f   <- typeCheckBuiltIn _Γ "Σ'"

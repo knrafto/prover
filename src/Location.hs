@@ -2,6 +2,7 @@
 module Location where
 
 import           Data.Aeson
+import           Data.Text                      ( Text )
 
 -- A range of text in the source file, represented by two offsets in Unicode
 -- code points.
@@ -21,6 +22,8 @@ instance Show e => Show (Located e) where
 
 unLoc :: Located e -> e
 unLoc (L _ e) = e
+
+type Ident = Located Text
 
 -- A range and TextMate scope representing style information.
 data Decoration = Decoration Range String

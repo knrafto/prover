@@ -2,28 +2,28 @@ module Syntax where
 
 import           Location
 
-import           Data.Text                      ( Text )
+type Param = (Ident, Expr)
 
-type Param = (Text, LExpr)
+type Expr = Located Expr'
 
-data Expr
+data Expr'
     = Hole
-    | Ident Text
+    | Ident Ident
     | Type
-    | Equal LExpr LExpr
-    | PiExpr [Param] LExpr
-    | Arrow LExpr LExpr
-    | LamExpr [Param] LExpr
-    | AppExpr LExpr [LExpr]
-    | SigmaExpr [Param] LExpr
-    | Times LExpr LExpr
-    | Tuple [LExpr]
+    | Equal Expr Expr
+    | PiExpr [Param] Expr
+    | Arrow Expr Expr
+    | LamExpr [Param] Expr
+    | AppExpr Expr [Expr]
+    | SigmaExpr [Param] Expr
+    | Times Expr Expr
+    | Tuple [Expr]
     deriving (Show)
-type LExpr = Located Expr
 
-data Statement
-    = Define Text [Param] (Maybe LExpr) LExpr
-    | Assume Text LExpr
-    | Prove Text LExpr
+type Statement = Located Statement'
+
+data Statement'
+    = Define Ident [Param] (Maybe Expr) Expr
+    | Assume Ident Expr
+    | Prove Ident Expr
     deriving (Show)
-type LStatement = Located Statement

@@ -31,8 +31,8 @@ reservedWord :: Text -> Parser ()
 reservedWord w =
     lexeme . try $ (string w *> notFollowedBy (satisfy isWordChar))
 
-identifier :: Parser Text
-identifier = lexeme . try $ do
+identifier :: Parser Ident
+identifier = lexeme . located . try $ do
     w <- takeWhile1P (Just "word character") isWordChar
     when (w `elem` reservedWords) $ fail
         (  "keyword "
@@ -72,7 +72,7 @@ params :: Parser [Param]
 params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
     where param = (,) <$> identifier <* reservedWord ":" <*> expr
 
-atom :: Parser LExpr
+atom :: Parser Expr
 atom = located $ choice
     [ Hole <$ reservedWord "_"
     , Ident <$> identifier
@@ -83,7 +83,7 @@ atom = located $ choice
     , Tuple <$ symbol '(' <*> expr `sepBy1` symbol ',' <* symbol ')'
     ]
 
-apps :: Parser LExpr
+apps :: Parser Expr
 apps = do
     s <- getOffset
     x <- atom
@@ -98,7 +98,7 @@ apps = do
         e <- getOffset
         rest s (L (Range s e) (AppExpr x args))
 
-pInfixN :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
+pInfixN :: Parser (Expr -> Expr -> Expr') -> Parser Expr -> Parser Expr
 pInfixN op p = do
     s <- getOffset
     x <- p
@@ -110,7 +110,7 @@ pInfixN op p = do
         e <- getOffset
         return (L (Range s e) (f x y))
 
-pInfixR :: Parser (LExpr -> LExpr -> Expr) -> Parser LExpr -> Parser LExpr
+pInfixR :: Parser (Expr -> Expr -> Expr') -> Parser Expr -> Parser Expr
 pInfixR op p = do
     s <- getOffset
     x <- p
@@ -124,14 +124,14 @@ pInfixR op p = do
         e <- getOffset
         rest s (L (Range s e) (f x y))
 
-expr :: Parser LExpr
+expr :: Parser Expr
 expr = expr'
   where
     times  = pInfixR (Times <$ reservedWord "×") apps
     equals = pInfixN (Equal <$ reservedWord "=") times
     expr'  = pInfixR (Arrow <$ reservedWord "→") equals
 
-define :: Parser Statement
+define :: Parser Statement'
 define =
     Define
         <$  reservedWord "define"
@@ -141,16 +141,16 @@ define =
         <*  reservedWord ":="
         <*> expr
 
-assume :: Parser Statement
+assume :: Parser Statement'
 assume =
     Assume <$ reservedWord "assume" <*> identifier <* reservedWord ":" <*> expr
 
-prove :: Parser Statement
+prove :: Parser Statement'
 prove =
     Prove <$ reservedWord "prove" <*> identifier <* reservedWord ":" <*> expr
 
-statement :: Parser LStatement
+statement :: Parser Statement
 statement = located $ define <|> assume <|> prove
 
-statements :: Parser [LStatement]
+statements :: Parser [Statement]
 statements = sc *> many statement <* eof
