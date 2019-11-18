@@ -24,11 +24,11 @@ panic message = do
     exitWith (ExitFailure 1)
 
 data Response = Response
-    { occurrences :: [Occurrence] }
+    { names :: [Name] }
     deriving (Show)
 
 instance ToJSON Response where
-    toJSON r = object ["occurrences" .= occurrences r]
+    toJSON r = object ["names" .= names r]
 
 main :: IO ()
 main = do
@@ -44,6 +44,6 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = resolveNames stmts
-        let r = Response { occurrences = nameOccurrences stmts' }
+        let r = Response { names = extractNames stmts' }
         when Flags.json $ B.putStrLn (encode r)
         unless Flags.json $ void (typeCheck stmts')

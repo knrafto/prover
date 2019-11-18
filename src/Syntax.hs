@@ -1,40 +1,49 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Syntax where
 
-import           Location
+-- AST in the style of Trees that grow:
+-- https://www.microsoft.com/en-us/research/uploads/prod/2016/11/trees-that-grow.pdf
+type family Id x
+type family Ann x
 
--- Expressions are labeled with a value of type l, and variables have type v.
-data Expr l v
-    = Hole l
-    | Var l v
-    | Type l
-    | Equal l (Expr l v) (Expr l v)
-    | Pi l [Param l v] (Expr l v)
-    | Arrow l (Expr l v) (Expr l v)
-    | Lam l [Param l v] (Expr l v)
-    | App l (Expr l v) [Expr l v]
-    | Sigma l [Param l v] (Expr l v)
-    | Times l (Expr l v) (Expr l v)
-    | Tuple l [Expr l v]
-    deriving (Show)
+data Expr x
+    = Var (Ann x) (Id x)
+    | Type (Ann x)
+    | Hole (Ann x)
+    | App (Ann x) (Expr x) [Expr x]
+    | Tuple (Ann x) [Expr x]
+    | Pi (Ann x) [Param x] (Expr x)
+    | Lambda (Ann x) [Param x] (Expr x)
+    | Sigma (Ann x) [Param x] (Expr x)
+    | Equal (Ann x) (Expr x) (Expr x)
+    | Arrow (Ann x) (Expr x) (Expr x)
+    | Times (Ann x) (Expr x) (Expr x)
 
-type Param l v = (Ident, Expr l v)
+deriving instance (Show (Id x), Show (Ann x)) => Show (Expr x)
 
-ann :: Expr l v -> l
-ann e = case e of
-    Hole l      -> l
-    Var l _     -> l
-    Type l      -> l
-    Equal l _ _ -> l
-    Pi    l _ _ -> l
-    Arrow l _ _ -> l
-    Lam   l _ _ -> l
-    App   l _ _ -> l
-    Sigma l _ _ -> l
-    Times l _ _ -> l
-    Tuple l _   -> l
+type Param x = (Id x, Expr x)
 
-data Statement l v
-    = Define Ident [Param l v] (Maybe (Expr l v)) (Expr l v)
-    | Assume Ident (Expr l v)
-    | Prove Ident (Expr l v)
-    deriving (Show)
+data Statement x
+    = Define (Id x) [Param x] (Maybe (Expr x)) (Expr x)
+    | Assume (Id x) (Expr x)
+    | Prove (Id x) (Expr x)
+
+deriving instance (Show (Id x), Show (Ann x)) => Show (Statement x)
+
+ann :: Expr x -> Ann x
+ann = \case
+    Var x _      -> x
+    Type x       -> x
+    Hole x       -> x
+    App x _ _    -> x
+    Tuple x _    -> x
+    Pi     x _ _ -> x
+    Lambda x _ _ -> x
+    Sigma  x _ _ -> x
+    Equal  x _ _ -> x
+    Arrow  x _ _ -> x
+    Times  x _ _ -> x

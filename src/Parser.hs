@@ -1,6 +1,8 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Parser
-    ( statements
+    ( P
+    , statements
     )
 where
 
@@ -16,6 +18,11 @@ import qualified Text.Megaparsec.Char.Lexer    as L
 
 import           Location
 import           Syntax
+
+-- Tag for parsed syntax trees, which have been decorated with locations.
+data P
+type instance Id P = Ident
+type instance Ann P = Range
 
 type Parser = Parsec Void Text
 
@@ -33,10 +40,9 @@ reservedWord w = lexeme . try $ do
     s <- getOffset
     _ <- string w
     notFollowedBy (satisfy isWordChar)
-    e <- getOffset
-    return (Range s e)
+    Range s <$> getOffset
 
-identifier :: Parser Ident
+identifier :: Parser (Id P)
 identifier = lexeme . try $ do
     s <- getOffset
     w <- takeWhile1P (Just "word character") isWordChar
@@ -69,21 +75,25 @@ symbol :: Char -> Parser Range
 symbol c = lexeme $ do
     s <- getOffset
     _ <- char c
-    e <- getOffset
-    return (Range s e)
+    Range s <$> getOffset
 
-params :: Parser [Param Range Ident]
+params :: Parser [Param P]
 params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
     where param = (,) <$> identifier <* reservedWord ":" <*> expr
 
-atom :: Parser (Expr Range Ident)
-atom = hole <|> var <|> type_ <|> sigma <|> pi_ <|> lam <|> tuple
+atom :: Parser (Expr P)
+atom = var <|> hole <|> type_ <|> tuple <|> sigma <|> pi_ <|> lam
   where
-    hole = Hole <$> reservedWord "_"
-    var  = do
+    var = do
         i <- identifier
         return (Var (location i) i)
+    hole  = Hole <$> reservedWord "_"
     type_ = Type <$> reservedWord "Type"
+    tuple = do
+        s  <- symbol '('
+        es <- expr `sepBy1` symbol ','
+        e  <- symbol ')'
+        return (Tuple (spanRange s e) es)
     sigma = do
         s <- reservedWord "Σ"
         p <- params
@@ -98,14 +108,9 @@ atom = hole <|> var <|> type_ <|> sigma <|> pi_ <|> lam <|> tuple
         s <- reservedWord "λ"
         p <- params
         e <- expr
-        return (Lam (spanRange s (ann e)) p e)
-    tuple = do
-        s  <- symbol '('
-        es <- expr `sepBy1` symbol ','
-        e  <- symbol ')'
-        return (Tuple (spanRange s e) es)
+        return (Lambda (spanRange s (ann e)) p e)
 
-apps :: Parser (Expr Range Ident)
+apps :: Parser (Expr P)
 apps = do
     x <- atom
     rest x
@@ -118,7 +123,7 @@ apps = do
         e    <- symbol ')'
         rest (App (spanRange (ann x) e) x args)
 
-expr :: Parser (Expr Range Ident)
+expr :: Parser (Expr P)
 expr = makeExprParser
     apps
     [ [InfixR (binop Times <$ reservedWord "×")]
@@ -127,7 +132,7 @@ expr = makeExprParser
     ]
     where binop c e1 e2 = c (spanRange (ann e1) (ann e2)) e1 e2
 
-define :: Parser (Statement Range Ident)
+define :: Parser (Statement P)
 define =
     Define
         <$  reservedWord "define"
@@ -137,16 +142,16 @@ define =
         <*  reservedWord ":="
         <*> expr
 
-assume :: Parser (Statement Range Ident)
+assume :: Parser (Statement P)
 assume =
     Assume <$ reservedWord "assume" <*> identifier <* reservedWord ":" <*> expr
 
-prove :: Parser (Statement Range Ident)
+prove :: Parser (Statement P)
 prove =
     Prove <$ reservedWord "prove" <*> identifier <* reservedWord ":" <*> expr
 
-statement :: Parser (Statement Range Ident)
+statement :: Parser (Statement P)
 statement = define <|> assume <|> prove
 
-statements :: Parser [Statement Range Ident]
+statements :: Parser [Statement P]
 statements = sc *> many statement <* eof

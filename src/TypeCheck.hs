@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module TypeCheck where
 
 import           Control.Applicative
@@ -447,7 +448,7 @@ searchLam t = do
     accept t (Lam _A β)
     search β
 
-typeCheck :: [Statement Range Name] -> IO TcState
+typeCheck :: [Statement N] -> IO TcState
 typeCheck = go initialState
   where
     go s []            = return s
@@ -455,10 +456,10 @@ typeCheck = go initialState
         s' <- typeCheckStatement s stmt
         go s' rest
 
-typeCheckStatement :: TcState -> Statement Range Name -> IO TcState
-typeCheckStatement s stmt = case stmt of
+typeCheckStatement :: TcState -> Statement N -> IO TcState
+typeCheckStatement s = \case
     Syntax.Define ident params ty body -> do
-        let name = unLoc ident
+        let name = unLoc (usage ident)
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
             bodyTerm <- typeCheckLam Empty [] params body
@@ -485,7 +486,7 @@ typeCheckStatement s stmt = case stmt of
                                                   (envDefinitions s')
                     }
     Syntax.Assume ident ty -> do
-        let name = unLoc ident
+        let name = unLoc (usage ident)
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
             tyTerm <- typeCheckExpr Empty [] ty
@@ -503,7 +504,7 @@ typeCheckStatement s stmt = case stmt of
                                                   (envAssumptions s')
                     }
     Syntax.Prove ident ty -> do
-        let name = unLoc ident
+        let name = unLoc (usage ident)
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
             tyTerm  <- typeCheckExpr Empty [] ty
@@ -528,78 +529,75 @@ typeCheckStatement s stmt = case stmt of
                                                   (envDefinitions s')
                     }
 
-typeCheckExpr :: Context -> [Text] -> Expr Range Name -> TcM Term
-typeCheckExpr _Γ names expr = case expr of
-    Syntax.Hole _  -> typeCheckHole _Γ
-    -- We assume that name resolution is correct and these cannot fail.
+typeCheckExpr :: Context -> [Text] -> Expr N -> TcM Term
+typeCheckExpr _Γ names = \case
     Syntax.Var _ n -> case n of
-        LocalName ident -> do
+        -- We assume that name resolution is correct and the map lookups cannot fail.
+        Local _ ident -> do
             let Just i = elemIndex (unLoc ident) names
             return (Var (fromDeBruijn _Γ i))
-        DefineName ident -> do
+        Defined _ ident -> do
             definitions <- gets envDefinitions
             let Just body = Map.lookup (unLoc ident) definitions
             return (weakenGlobal _Γ body)
-        AssumeName ident -> do
+        Assumed _ ident -> do
             assumptions <- gets envAssumptions
             let Just _A = Map.lookup (unLoc ident) assumptions
             return (weakenGlobal _Γ (Assume (unLoc ident) Empty _A))
-        UnboundName name -> fail $ "unbound name: " ++ Text.unpack name
+        Unbound ident -> fail $ "unbound name: " ++ Text.unpack (unLoc ident)
+    Syntax.Hole _  -> typeCheckHole _Γ
     Syntax.Type _      -> return (Universe _Γ)
+    Syntax.App _ f      args -> do
+        f'    <- typeCheckExpr _Γ names f
+        args' <- mapM (typeCheckExpr _Γ names) args
+        typeCheckApp f' args'
+    Syntax.Tuple _ args -> do
+        args' <- mapM (typeCheckExpr _Γ names) args
+        typeCheckTuple args'
+    Syntax.Pi    _ params _B -> typeCheckPi _Γ names params _B
+    Syntax.Lambda _ params b -> typeCheckLam _Γ names params b
+    Syntax.Sigma _ params _B -> typeCheckSigma _Γ names params _B
     Syntax.Equal _ a b -> do
         f' <- typeCheckBuiltIn _Γ "Id"
         _A <- typeCheckHole _Γ
         a' <- typeCheckExpr _Γ names a
         b' <- typeCheckExpr _Γ names b
         typeCheckApp f' [_A, a', b']
-    Syntax.Pi    _ params _B -> typeCheckPi _Γ names params _B
     Syntax.Arrow _ _A     _B -> do
         _A' <- typeCheckExpr _Γ names _A
         checkIsType _A'
         _B' <- typeCheckExpr _Γ names _B
         checkIsType _B'
         return (Pi _A' (Apply (SubstWeaken _A') _B'))
-    Syntax.Lam _ params b    -> typeCheckLam _Γ names params b
-    Syntax.App _ f      args -> do
-        f'    <- typeCheckExpr _Γ names f
-        args' <- mapM (typeCheckExpr _Γ names) args
-        typeCheckApp f' args'
-    Syntax.Sigma _ params _B -> typeCheckSigma _Γ names params _B
     Syntax.Times _ _A     _B -> do
         _A' <- typeCheckExpr _Γ names _A
         _B' <- typeCheckExpr _Γ names _B
         f   <- typeCheckBuiltIn _Γ "Σ'"
         typeCheckApp f [_A', Lam _A' (Apply (SubstWeaken _A') _B')]
-    Syntax.Tuple _ args -> do
-        args' <- mapM (typeCheckExpr _Γ names) args
-        typeCheckTuple args'
 
-typeCheckPi
-    :: Context -> [Text] -> [Param Range Name] -> Expr Range Name -> TcM Term
+typeCheckPi :: Context -> [Text] -> [Param N] -> Expr N -> TcM Term
 typeCheckPi _Γ names []                     _B = typeCheckExpr _Γ names _B
 typeCheckPi _Γ names ((ident, _A) : params) _B = do
-    let name = unLoc ident
+    let name = unLoc (usage ident)
     _A' <- typeCheckExpr _Γ names _A
     checkIsType _A'
     _B' <- typeCheckPi (Extend _A') (name : names) params _B
     checkIsType _B'
     return (Pi _A' _B')
 
-typeCheckLam
-    :: Context -> [Text] -> [Param Range Name] -> Expr Range Name -> TcM Term
+typeCheckLam :: Context -> [Text] -> [Param N] -> Expr N -> TcM Term
 typeCheckLam _Γ names []                     b = typeCheckExpr _Γ names b
 typeCheckLam _Γ names ((ident, _A) : params) b = do
-    let name = unLoc ident
+    let name = unLoc (usage ident)
     _A' <- typeCheckExpr _Γ names _A
     checkIsType _A'
     b' <- typeCheckLam (Extend _A') (name : names) params b
     return (Lam _A' b')
 
-typeCheckSigma
-    :: Context -> [Text] -> [Param Range Name] -> Expr Range Name -> TcM Term
+typeCheckSigma :: Context -> [Text] -> [Param N] -> Expr N -> TcM Term
 typeCheckSigma _Γ names []                     _B = typeCheckExpr _Γ names _B
 typeCheckSigma _Γ names ((ident, _A) : params) _B = do
-    let name = unLoc ident
+    let name = unLoc (usage ident)
     _A' <- typeCheckExpr _Γ names _A
     _B' <- typeCheckSigma (Extend _A') (name : names) params _B
     f   <- typeCheckBuiltIn _Γ "Σ'"

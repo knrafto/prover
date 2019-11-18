@@ -9,12 +9,14 @@ type Range = {
   end: number,
 };
 
-type Occurrence = {
-  introduction?: Range, usage: Range, kind: string,
+type Name = {
+  kind: string,
+  usage: Range,
+  introduction?: Range,
 };
 
 type Response = {
-  occurrences: Occurrence[],
+  names: Name[],
 };
 
 // TODO: configure
@@ -22,10 +24,10 @@ let binaryPath =
     '/Users/knrafto/code/prover/.stack-work/dist/x86_64-osx/Cabal-2.4.0.1/build/prover/prover';
 
 let decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map([
-  ['local', vscode.window.createTextEditorDecorationType({color: '#ffffff'})],
-  ['define', vscode.window.createTextEditorDecorationType({color: '#0000ff'})],
-  ['assume', vscode.window.createTextEditorDecorationType({color: '#00ff00'})],
-  ['unbound', vscode.window.createTextEditorDecorationType({color: '#ff0000'})],
+  ['local', vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})],
+  ['defined', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
+  ['assumed', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
+  ['unbound', vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})],
 ]);
 
 let cache: Map<string, Response> = new Map();
@@ -66,7 +68,7 @@ function onChange(path: string) {
     }
 
     var resp: Response = {
-      occurrences: [],
+      names: [],
     };
     try {
       resp = JSON.parse(stdout);
@@ -88,15 +90,15 @@ function updateEditors() {
     }
 
     let decorations: Map<string, vscode.Range[]> = new Map();
-    for (let occurrence of resp.occurrences) {
+    for (let name of resp.names) {
       let range = new vscode.Range(
-          textEditor.document.positionAt(occurrence.usage.start),
-          textEditor.document.positionAt(occurrence.usage.end));
-      let ranges = decorations.get(occurrence.kind);
+          textEditor.document.positionAt(name.usage.start),
+          textEditor.document.positionAt(name.usage.end));
+      let ranges = decorations.get(name.kind);
       if (ranges !== undefined) {
         ranges.push(range);
       } else {
-        decorations.set(occurrence.kind, [range]);
+        decorations.set(name.kind, [range]);
       }
     }
 
