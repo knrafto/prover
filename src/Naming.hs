@@ -23,7 +23,7 @@ import           Parser
 import           Syntax
 
 -- An occurrence of an identifier.
--- Order of fields is: usage, introductio.
+-- Order of fields is: usage, introduction.
 data Name
     = Local Ident Ident
     | Defined Ident Ident
