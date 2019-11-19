@@ -44,6 +44,10 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = resolveNames stmts
-        let r = Response { names = extractNames stmts' }
+        let r      = Response { names = extractNames stmts' }
         when Flags.json $ B.putStrLn (encode r)
-        unless Flags.json $ void (typeCheck stmts')
+        unless Flags.json $ do
+            result <- runTcM (typeCheck stmts')
+            case result of
+                Nothing           -> putStrLn "Terminated with error"
+                Just (stmts'', _) -> printStatements stmts''

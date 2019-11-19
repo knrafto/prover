@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 module TypeCheck where
 
 import           Control.Applicative
@@ -17,12 +18,25 @@ import qualified Flags
 import           Location
 import           Naming
 import           Search
-import           Syntax                         ( Expr
+import           Syntax                         ( Id
+                                                , Ann
+                                                , ann
+                                                , Expr
                                                 , Param
                                                 , Statement
                                                 )
 import qualified Syntax
 import           Term
+
+data TcAnn = TcAnn Range Term
+
+data Tc
+type instance Id Tc = Name
+type instance Ann Tc = TcAnn
+
+exprTerm :: Expr Tc -> Term
+exprTerm e = case ann e of
+    TcAnn _ t -> t
 
 data TcState = TcState
     -- Global definitions, and their values.
@@ -48,9 +62,9 @@ initialState = TcState { envDefinitions    = Map.empty
 type TcM a = SearchM TcState a
 
 -- Runs a search, reporting any failure
-runTcM :: TcState -> TcM a -> IO (Maybe (a, TcState))
-runTcM s m = do
-    let Result as bs = runSearch m s
+runTcM :: TcM a -> IO (Maybe (a, TcState))
+runTcM m = do
+    let Result as bs = runSearch m initialState
     when Flags.print_trace $ putStr (drawForest bs)
     return (listToMaybe as)
 
@@ -60,6 +74,15 @@ freshMetavar _Γ _A = do
     i <- gets nextId
     modify $ \s -> s { nextId = i + 1 }
     return $ Metavar (VarId i) _Γ _A
+
+-- Generate an unknown term and type.
+hole :: Context -> TcM Term
+hole _Γ = do
+    -- We generate variables for both the hole itself, and its type. Luckily
+    -- for now we don't have to do this forever, since the type of any type is
+    -- the universe.
+    _A <- freshMetavar _Γ (Universe _Γ)
+    freshMetavar _Γ _A
 
 saveEquation :: Term -> Term -> TcM ()
 saveEquation t1 t2 =
@@ -255,179 +278,152 @@ searchLam t = do
     accept t (Lam _A β)
     search β
 
-typeCheck :: [Statement N] -> IO TcState
-typeCheck = go initialState
-  where
-    go s []            = return s
-    go s (stmt : rest) = do
-        s' <- typeCheckStatement s stmt
-        go s' rest
+typeCheck :: [Statement N] -> TcM [Statement Tc]
+typeCheck = mapM typeCheckStatement
 
-typeCheckStatement :: TcState -> Statement N -> IO TcState
-typeCheckStatement s = \case
-    Syntax.Define ident ty body -> do
+typeCheckStatement :: Statement N -> TcM (Statement Tc)
+typeCheckStatement = \case
+    Syntax.Define ident mty body -> do
         let name = unLoc (usage ident)
-        putStrLn $ "Checking " ++ Text.unpack name
-        result <- runTcM s $ do
-            bodyTerm <- typeCheckExpr Empty [] body
-            case ty of
-                Nothing  -> return ()
-                Just ty' -> do
-                    tyTerm <- typeCheckExpr Empty [] ty'
-                    unify (termType bodyTerm) tyTerm
-            checkSolved
-            reduce bodyTerm
-        case result of
-            Nothing -> do
-                putStrLn $ "Error in " ++ Text.unpack name
-                return s
-            Just (bodyTerm, s') -> do
-                putStrLn
-                    $  "define "
-                    ++ Text.unpack name
-                    ++ " := "
-                    ++ show bodyTerm
-                return $ s'
-                    { envDefinitions = Map.insert name
-                                                  bodyTerm
-                                                  (envDefinitions s')
-                    }
+        body' <- typeCheckExpr Empty [] body
+        mty' <- case mty of
+            Nothing -> return Nothing
+            Just ty -> do
+                ty' <- typeCheckExpr Empty [] ty
+                unify (termType (exprTerm body')) (exprTerm ty')
+                return (Just ty')
+        checkSolved
+        modify $ \s -> s { envDefinitions = Map.insert name (exprTerm body') (envDefinitions s) }
+        return (Syntax.Define ident mty' body')
     Syntax.Assume ident ty -> do
         let name = unLoc (usage ident)
-        putStrLn $ "Checking " ++ Text.unpack name
-        result <- runTcM s $ do
-            tyTerm <- typeCheckExpr Empty [] ty
-            checkSolved
-            reduce tyTerm
-        case result of
-            Nothing -> do
-                putStrLn $ "Error in " ++ Text.unpack name
-                return s
-            Just (tyTerm, s') -> do
-                putStrLn $ "assume " ++ Text.unpack name ++ " : " ++ show tyTerm
-                return $ s'
-                    { envAssumptions = Map.insert name
-                                                  tyTerm
-                                                  (envAssumptions s')
-                    }
-    Syntax.Prove ident ty -> do
-        let name = unLoc (usage ident)
-        putStrLn $ "Checking " ++ Text.unpack name
-        result <- runTcM s $ do
-            tyTerm  <- typeCheckExpr Empty [] ty
-            tyTerm' <- reduce tyTerm
-            α       <- freshMetavar (context tyTerm') tyTerm'
-            search α
-            checkSolved
-            reduce α
-        case result of
-            Nothing -> do
-                putStrLn $ "Error in " ++ Text.unpack name
-                return s
-            Just (bodyTerm, s') -> do
-                putStrLn
-                    $  "prove "
-                    ++ Text.unpack name
-                    ++ " := "
-                    ++ show bodyTerm
-                return $ s'
-                    { envDefinitions = Map.insert name
-                                                  bodyTerm
-                                                  (envDefinitions s')
-                    }
+        ty' <- typeCheckExpr Empty [] ty
+        checkSolved
+        modify $ \s -> s { envAssumptions = Map.insert name (exprTerm ty') (envAssumptions s) }
+        return (Syntax.Assume ident ty')
+    Syntax.Prove _ _ -> fail "prove not implemented"
 
-typeCheckExpr :: Context -> [Text] -> Expr N -> TcM Term
+typeCheckExpr :: Context -> [Text] -> Expr N -> TcM (Expr Tc)
 typeCheckExpr _Γ names = \case
-    Syntax.Var _ n -> case n of
+    Syntax.Var l n -> do
         -- We assume that name resolution is correct and the map lookups cannot fail.
-        Local _ ident -> do
-            let Just i = elemIndex (unLoc ident) names
-            return (Var (fromDeBruijn _Γ i))
-        Defined _ ident -> do
-            definitions <- gets envDefinitions
-            let Just body = Map.lookup (unLoc ident) definitions
-            return (weakenGlobal _Γ body)
-        Assumed _ ident -> do
-            assumptions <- gets envAssumptions
-            let Just _A = Map.lookup (unLoc ident) assumptions
-            return (weakenGlobal _Γ (Assume (unLoc ident) Empty _A))
-        Unbound ident -> fail $ "unbound name: " ++ Text.unpack (unLoc ident)
-    Syntax.Hole _  -> typeCheckHole _Γ
-    Syntax.Type _      -> return (Universe _Γ)
-    Syntax.App _ f      args -> do
+        t <- case n of
+            Local _ ident -> do
+                let Just i = elemIndex (unLoc ident) names
+                return (Var (fromDeBruijn _Γ i))
+            Defined _ ident -> do
+                definitions <- gets envDefinitions
+                let Just body = Map.lookup (unLoc ident) definitions
+                return (weakenGlobal _Γ body)
+            Assumed _ ident -> do
+                assumptions <- gets envAssumptions
+                let Just _A = Map.lookup (unLoc ident) assumptions
+                return (weakenGlobal _Γ (Assume (unLoc ident) Empty _A))
+            Unbound ident ->
+                fail $ "unbound name: " ++ Text.unpack (unLoc ident)
+        return (Syntax.Var (TcAnn l t) n)
+    Syntax.Hole l -> do
+        t <- hole _Γ
+        return (Syntax.Hole (TcAnn l t))
+    Syntax.Type l       -> return (Syntax.Type (TcAnn l (Universe _Γ)))
+    Syntax.App l f args -> do
         f'    <- typeCheckExpr _Γ names f
         args' <- mapM (typeCheckExpr _Γ names) args
-        typeCheckApp f' args'
-    Syntax.Tuple _ args -> do
+        t     <- typeCheckApp (exprTerm f') (map exprTerm args')
+        return (Syntax.App (TcAnn l t) f' args')
+    Syntax.Tuple l args -> do
         args' <- mapM (typeCheckExpr _Γ names) args
-        typeCheckTuple args'
-    Syntax.Pi    _ params _B -> typeCheckPi _Γ names params _B
-    Syntax.Lambda _ params b -> typeCheckLam _Γ names params b
-    Syntax.Sigma _ params _B -> typeCheckSigma _Γ names params _B
-    Syntax.Equal _ a b -> do
-        f' <- typeCheckBuiltIn _Γ "Id"
-        _A <- typeCheckHole _Γ
+        t     <- typeCheckTuple (map exprTerm args')
+        return (Syntax.Tuple (TcAnn l t) args')
+    Syntax.Pi l params body -> do
+        params' <- typeCheckParams _Γ names params
+        body'   <- typeCheckBody _Γ names params' body
+        t <- typeCheckPi params' (exprTerm body')
+        return (Syntax.Pi (TcAnn l t) params' body')
+    Syntax.Lambda l params body -> do
+        params' <- typeCheckParams _Γ names params
+        body'   <- typeCheckBody _Γ names params' body
+        t <- typeCheckLambda params' (exprTerm body')
+        return (Syntax.Lambda (TcAnn l t) params' body')
+    Syntax.Sigma  l params body -> do
+        params' <- typeCheckParams _Γ names params
+        body'   <- typeCheckBody _Γ names params' body
+        t <- typeCheckSigma params' (exprTerm body')
+        return (Syntax.Sigma (TcAnn l t) params' body')
+    Syntax.Equal  l a      b  -> do
+        f' <- builtin _Γ "Id"
+        _A <- hole _Γ
         a' <- typeCheckExpr _Γ names a
         b' <- typeCheckExpr _Γ names b
-        typeCheckApp f' [_A, a', b']
-    Syntax.Arrow _ _A     _B -> do
-        _A' <- typeCheckExpr _Γ names _A
-        checkIsType _A'
-        _B' <- typeCheckExpr _Γ names _B
-        checkIsType _B'
-        return (Pi _A' (Apply (SubstWeaken _A') _B'))
-    Syntax.Times _ _A     _B -> do
-        _A' <- typeCheckExpr _Γ names _A
-        _B' <- typeCheckExpr _Γ names _B
-        f   <- typeCheckBuiltIn _Γ "Σ'"
-        typeCheckApp f [_A', Lam _A' (Apply (SubstWeaken _A') _B')]
+        t  <- typeCheckApp f' [_A, exprTerm a', exprTerm b']
+        return (Syntax.Equal (TcAnn l t) a' b')
+    Syntax.Arrow l a b -> do
+        a' <- typeCheckExpr _Γ names a
+        b' <- typeCheckExpr _Γ names b
+        let _A = exprTerm a'
+        let _B = exprTerm b'
+        checkIsType _A
+        checkIsType _B
+        let t = Pi _A (Apply (SubstWeaken _A) _B)
+        return (Syntax.Arrow (TcAnn l t) a' b')
+    Syntax.Times l a b -> do
+        a' <- typeCheckExpr _Γ names a
+        b' <- typeCheckExpr _Γ names b
+        let _A = exprTerm a'
+        let _B = exprTerm b'
+        f   <- builtin _Γ "Σ'"
+        t <- typeCheckApp f [_A, Lam _A (Apply (SubstWeaken _A) _B)]
+        return (Syntax.Times (TcAnn l t) a' b')
 
-typeCheckPi :: Context -> [Text] -> [Param N] -> Expr N -> TcM Term
-typeCheckPi _Γ names []                     _B = typeCheckExpr _Γ names _B
-typeCheckPi _Γ names ((ident, _A) : params) _B = do
-    let name = unLoc (usage ident)
-    _A' <- typeCheckExpr _Γ names _A
-    checkIsType _A'
-    _B' <- typeCheckPi (Extend _A') (name : names) params _B
-    checkIsType _B'
-    return (Pi _A' _B')
-
-typeCheckLam :: Context -> [Text] -> [Param N] -> Expr N -> TcM Term
-typeCheckLam _Γ names []                     b = typeCheckExpr _Γ names b
-typeCheckLam _Γ names ((ident, _A) : params) b = do
-    let name = unLoc (usage ident)
-    _A' <- typeCheckExpr _Γ names _A
-    checkIsType _A'
-    b' <- typeCheckLam (Extend _A') (name : names) params b
-    return (Lam _A' b')
-
-typeCheckSigma :: Context -> [Text] -> [Param N] -> Expr N -> TcM Term
-typeCheckSigma _Γ names []                     _B = typeCheckExpr _Γ names _B
-typeCheckSigma _Γ names ((ident, _A) : params) _B = do
-    let name = unLoc (usage ident)
-    _A' <- typeCheckExpr _Γ names _A
-    _B' <- typeCheckSigma (Extend _A') (name : names) params _B
-    f   <- typeCheckBuiltIn _Γ "Σ'"
-    typeCheckApp f [_A', Lam _A' _B']
-
-typeCheckBuiltIn :: Context -> String -> TcM Term
-typeCheckBuiltIn _Γ name = do
+builtin :: Context -> String -> TcM Term
+builtin _Γ name = do
     let name' = Text.pack name
     assumptions <- gets envAssumptions
     case Map.lookup name' assumptions of
         Just _A -> return (weakenGlobal _Γ (Assume name' Empty _A))
         _       -> fail $ "can't find built-in: " ++ name
 
-typeCheckHole :: Context -> TcM Term
-typeCheckHole _Γ = do
-    -- We generate variables for both the hole itself, and its type. Luckily
-    -- for now we don't have to do this forever, since the type of any type is
-    -- the universe.
-    _A <- freshMetavar _Γ (Universe _Γ)
-    freshMetavar _Γ _A
-
 checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))
+
+typeCheckParams :: Context -> [Text] -> [Param N] -> TcM [Param Tc]
+typeCheckParams _Γ _     [] = return []
+typeCheckParams _Γ names ((ident, e) : params) = do
+    let name = unLoc (usage ident)
+    e'      <- typeCheckExpr _Γ names e
+    params' <- typeCheckParams (Extend (exprTerm e')) (name : names) params
+    return ((ident, e') : params')
+
+typeCheckBody :: Context -> [Text] -> [Param Tc] -> Expr N -> TcM (Expr Tc)
+typeCheckBody _Γ names [] body = typeCheckExpr _Γ names body
+typeCheckBody _Γ names ((ident, e) : params) body = do
+    let name = unLoc (usage ident)
+    typeCheckBody (Extend (exprTerm e)) (name : names) params body
+
+typeCheckPi :: [Param Tc] -> Term -> TcM Term
+typeCheckPi []            _B = return _B
+typeCheckPi (param : params) _B = do
+    let _A = exprTerm (snd param)
+    checkIsType _A
+    _B' <- typeCheckPi params _B
+    checkIsType _B'
+    return (Pi _A _B')
+
+typeCheckLambda :: [Param Tc] -> Term -> TcM Term
+typeCheckLambda []            _B = return _B
+typeCheckLambda (param : params) _B = do
+    let _A = exprTerm (snd param)
+    checkIsType _A
+    _B' <- typeCheckLambda params _B
+    return (Lam _A _B')
+
+typeCheckSigma :: [Param Tc] -> Term -> TcM Term
+typeCheckSigma []            _B = return _B
+typeCheckSigma (param : params) _B = do
+    let _A = exprTerm (snd param)
+    _B' <- typeCheckSigma params _B
+    f   <- builtin (context _A) "Σ'"
+    typeCheckApp f [_A, Lam _A _B']
 
 typeCheckApp :: Term -> [Term] -> TcM Term
 typeCheckApp f []           = return f
@@ -447,5 +443,18 @@ typeCheckTuple (a : ts) = do
     let _Γ' = Extend _A
     _B   <- freshMetavar _Γ' (Universe _Γ')
     b    <- typeCheckTuple ts
-    pair <- typeCheckBuiltIn _Γ "pair"
+    pair <- builtin _Γ "pair"
     typeCheckApp pair [_A, Lam _A _B, a, b]
+
+printStatements :: [Statement Tc] -> IO ()
+printStatements = mapM_ printStatement
+
+printStatement :: Statement Tc -> IO ()
+printStatement = \case
+    Syntax.Define ident _ body -> do
+        let name = unLoc (usage ident)
+        putStrLn $ "define " ++ Text.unpack name ++ " := " ++ show (exprTerm body)
+    Syntax.Assume ident ty -> do
+        let name = unLoc (usage ident)
+        putStrLn $ "assume " ++ Text.unpack name ++ " : " ++ show (exprTerm ty)
+    Syntax.Prove _ _ -> fail "prove not implemented"
