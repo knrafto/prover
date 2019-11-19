@@ -28,7 +28,7 @@ deriving instance (Show (Id x), Show (Ann x)) => Show (Expr x)
 type Param x = (Id x, Expr x)
 
 data Statement x
-    = Define (Id x) [Param x] (Maybe (Expr x)) (Expr x)
+    = Define (Id x) (Maybe (Expr x)) (Expr x)
     | Assume (Id x) (Expr x)
     | Prove (Id x) (Expr x)
 

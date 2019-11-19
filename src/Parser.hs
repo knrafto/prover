@@ -137,7 +137,6 @@ define =
     Define
         <$  reservedWord "define"
         <*> identifier
-        <*> (params <|> return [])
         <*> optional (reservedWord ":" *> expr)
         <*  reservedWord ":="
         <*> expr

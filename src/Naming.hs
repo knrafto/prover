@@ -115,14 +115,12 @@ resolveParams env ((i, e) : rest) =
 
 resolveStatement :: Env -> Statement P -> (Statement N, Env)
 resolveStatement env = \case
-    Define i ps ty body ->
-        let (ps', env') = resolveParams env ps
-        in  ( Define (Defined i i)
-                     ps'
-                     (fmap (resolveExpr env') ty)
-                     (resolveExpr env' body)
-            , env { envDefinitions = insertIdent i (envDefinitions env) }
-            )
+    Define i ty body ->
+        ( Define (Defined i i)
+                     (fmap (resolveExpr env) ty)
+                     (resolveExpr env body)
+        , env { envDefinitions = insertIdent i (envDefinitions env) }
+        )
     Assume i ty ->
         ( Assume (Assumed i i) (resolveExpr env ty)
         , env { envAssumptions = insertIdent i (envAssumptions env) }
@@ -156,7 +154,6 @@ paramsNames = concatMap $ \(n, ty) -> n : exprNames ty
 
 extractNames :: [Statement N] -> [Name]
 extractNames = concatMap $ \stmt -> case stmt of
-    Define n ps ty body ->
-        n : (paramsNames ps ++ foldMap exprNames ty ++ exprNames body)
+    Define n ty body -> n : (foldMap exprNames ty ++ exprNames body)
     Assume n ty -> n : exprNames ty
     Prove  n ty -> n : exprNames ty

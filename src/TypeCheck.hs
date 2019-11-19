@@ -265,15 +265,15 @@ typeCheck = go initialState
 
 typeCheckStatement :: TcState -> Statement N -> IO TcState
 typeCheckStatement s = \case
-    Syntax.Define ident params ty body -> do
+    Syntax.Define ident ty body -> do
         let name = unLoc (usage ident)
         putStrLn $ "Checking " ++ Text.unpack name
         result <- runTcM s $ do
-            bodyTerm <- typeCheckLam Empty [] params body
+            bodyTerm <- typeCheckExpr Empty [] body
             case ty of
                 Nothing  -> return ()
                 Just ty' -> do
-                    tyTerm <- typeCheckPi Empty [] params ty'
+                    tyTerm <- typeCheckExpr Empty [] ty'
                     unify (termType bodyTerm) tyTerm
             checkSolved
             reduce bodyTerm

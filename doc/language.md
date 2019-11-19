@@ -43,7 +43,7 @@ Summary of operators, from tightest to least tight:
 module = [ statement ]*
 
 statement =
-    define name [ params ] [ : expr ] := expr
+    define name [ : expr ] := expr
     assume name : expr
     prove name : expr
 
