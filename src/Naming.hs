@@ -93,25 +93,23 @@ resolveExpr env = \case
     Hole l      -> Hole l
     App l f a  -> App l (resolveExpr env f) (resolveExpr env a)
     Tuple l xs  -> Tuple l (map (resolveExpr env) xs)
-    Pi l ps e ->
-        let (ps', env') = resolveParams env ps in Pi l ps' (resolveExpr env' e)
-    Lambda l ps e ->
-        let (ps', env') = resolveParams env ps
-        in  Lambda l ps' (resolveExpr env' e)
-    Sigma l ps e ->
-        let (ps', env') = resolveParams env ps
-        in  Sigma l ps' (resolveExpr env' e)
+    Pi l p e ->
+        let (p', env') = resolveParam env p in Pi l p' (resolveExpr env' e)
+    Lambda l p e ->
+        let (p', env') = resolveParam env p
+        in  Lambda l p' (resolveExpr env' e)
+    Sigma l p e ->
+        let (p', env') = resolveParam env p
+        in  Sigma l p' (resolveExpr env' e)
     Equal l x y -> Equal l (resolveExpr env x) (resolveExpr env y)
     Arrow l x y -> Arrow l (resolveExpr env x) (resolveExpr env y)
     Times l x y -> Times l (resolveExpr env x) (resolveExpr env y)
 
-resolveParams :: Env -> [Param P] -> ([Param N], Env)
-resolveParams env [] = ([], env)
-resolveParams env ((i, e) : rest) =
+resolveParam :: Env -> (Param P) -> (Param N, Env)
+resolveParam env (i, e) =
     let param = (Local i i, resolveExpr env e)
         env' = env { envLocalNames = insertIdent i (envLocalNames env) }
-        (params, env'') = resolveParams env' rest
-    in  (param : params, env'')
+    in  (param, env')
 
 resolveStatement :: Env -> Statement P -> (Statement N, Env)
 resolveStatement env = \case
@@ -142,15 +140,15 @@ exprNames = \case
     Type _        -> []
     App _ f a     -> exprNames f ++ exprNames a
     Tuple _ xs    -> concatMap exprNames xs
-    Pi     _ ps e -> paramsNames ps ++ exprNames e
-    Lambda _ ps e -> paramsNames ps ++ exprNames e
-    Sigma  _ ps e -> paramsNames ps ++ exprNames e
+    Pi     _ p e -> paramNames p ++ exprNames e
+    Lambda _ p e -> paramNames p ++ exprNames e
+    Sigma  _ p e -> paramNames p ++ exprNames e
     Equal  _ x  y -> exprNames x ++ exprNames y
     Arrow  _ x  y -> exprNames x ++ exprNames y
     Times  _ x  y -> exprNames x ++ exprNames y
 
-paramsNames :: [Param N] -> [Name]
-paramsNames = concatMap $ \(n, ty) -> n : exprNames ty
+paramNames :: (Param N) -> [Name]
+paramNames (n, ty) = n : exprNames ty
 
 extractNames :: [Statement N] -> [Name]
 extractNames = concatMap $ \stmt -> case stmt of

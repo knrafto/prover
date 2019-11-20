@@ -77,9 +77,8 @@ symbol c = lexeme $ do
     _ <- char c
     Range s <$> getOffset
 
-params :: Parser [Param P]
-params = symbol '(' *> param `sepBy1` symbol ',' <* symbol ')'
-    where param = (,) <$> identifier <* reservedWord ":" <*> expr
+param :: Parser (Param P)
+param = (,) <$ symbol '(' <*> identifier <* reservedWord ":" <*> expr <* symbol ')'
 
 atom :: Parser (Expr P)
 atom = var <|> hole <|> type_ <|> tuple <|> sigma <|> pi_ <|> lam
@@ -96,17 +95,17 @@ atom = var <|> hole <|> type_ <|> tuple <|> sigma <|> pi_ <|> lam
         return (Tuple (spanRange s e) es)
     sigma = do
         s <- reservedWord "Σ"
-        p <- params
+        p <- param
         e <- expr
         return (Sigma (spanRange s (ann e)) p e)
     pi_ = do
         s <- reservedWord "Π"
-        p <- params
+        p <- param
         e <- expr
         return (Pi (spanRange s (ann e)) p e)
     lam = do
         s <- reservedWord "λ"
-        p <- params
+        p <- param
         e <- expr
         return (Lambda (spanRange s (ann e)) p e)
 

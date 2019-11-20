@@ -16,9 +16,9 @@ data Expr x
     | Hole (Ann x)
     | App (Ann x) (Expr x) (Expr x)
     | Tuple (Ann x) [Expr x]
-    | Pi (Ann x) [Param x] (Expr x)
-    | Lambda (Ann x) [Param x] (Expr x)
-    | Sigma (Ann x) [Param x] (Expr x)
+    | Pi (Ann x) (Param x) (Expr x)
+    | Lambda (Ann x) (Param x) (Expr x)
+    | Sigma (Ann x) (Param x) (Expr x)
     | Equal (Ann x) (Expr x) (Expr x)
     | Arrow (Ann x) (Expr x) (Expr x)
     | Times (Ann x) (Expr x) (Expr x)

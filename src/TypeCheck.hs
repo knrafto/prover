@@ -335,21 +335,18 @@ typeCheckExpr _Γ names = \case
         args' <- mapM (typeCheckExpr _Γ names) args
         t     <- typeCheckTuple (map exprTerm args')
         return (Syntax.Tuple (TcAnn l t) args')
-    Syntax.Pi l params body -> do
-        params' <- typeCheckParams _Γ names params
-        body'   <- typeCheckBody _Γ names params' body
-        t <- typeCheckPi params' (exprTerm body')
-        return (Syntax.Pi (TcAnn l t) params' body')
-    Syntax.Lambda l params body -> do
-        params' <- typeCheckParams _Γ names params
-        body'   <- typeCheckBody _Γ names params' body
-        t <- typeCheckLambda params' (exprTerm body')
-        return (Syntax.Lambda (TcAnn l t) params' body')
-    Syntax.Sigma  l params body -> do
-        params' <- typeCheckParams _Γ names params
-        body'   <- typeCheckBody _Γ names params' body
-        t <- typeCheckSigma params' (exprTerm body')
-        return (Syntax.Sigma (TcAnn l t) params' body')
+    Syntax.Pi l param body -> do
+        (param', body') <- typeCheckParam _Γ names param body
+        t <- typeCheckPi (exprTerm (snd param')) (exprTerm body')
+        return (Syntax.Pi (TcAnn l t) param' body')
+    Syntax.Lambda l param body -> do
+        (param', body') <- typeCheckParam _Γ names param body
+        t <- typeCheckLambda (exprTerm (snd param')) (exprTerm body')
+        return (Syntax.Lambda (TcAnn l t) param' body')
+    Syntax.Sigma  l param body -> do
+        (param', body') <- typeCheckParam _Γ names param body
+        t <- typeCheckSigma (exprTerm (snd param')) (exprTerm body')
+        return (Syntax.Sigma (TcAnn l t) param' body')
     Syntax.Equal  l a      b  -> do
         f' <- builtin _Γ "Id"
         _A <- hole _Γ
@@ -386,44 +383,28 @@ builtin _Γ name = do
 checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))
 
-typeCheckParams :: Context -> [Text] -> [Param N] -> TcM [Param Tc]
-typeCheckParams _Γ _     [] = return []
-typeCheckParams _Γ names ((ident, e) : params) = do
+typeCheckParam :: Context -> [Text] -> Param N -> Expr N -> TcM (Param Tc, Expr Tc)
+typeCheckParam _Γ names (ident, e) body = do
     let name = unLoc (usage ident)
-    e'      <- typeCheckExpr _Γ names e
-    params' <- typeCheckParams (Extend (exprTerm e')) (name : names) params
-    return ((ident, e') : params')
+    e' <- typeCheckExpr _Γ names e
+    body' <- typeCheckExpr (Extend (exprTerm e')) (name : names) body
+    return ((ident, e'), body')
 
-typeCheckBody :: Context -> [Text] -> [Param Tc] -> Expr N -> TcM (Expr Tc)
-typeCheckBody _Γ names [] body = typeCheckExpr _Γ names body
-typeCheckBody _Γ names ((ident, e) : params) body = do
-    let name = unLoc (usage ident)
-    typeCheckBody (Extend (exprTerm e)) (name : names) params body
-
-typeCheckPi :: [Param Tc] -> Term -> TcM Term
-typeCheckPi []            _B = return _B
-typeCheckPi (param : params) _B = do
-    let _A = exprTerm (snd param)
+typeCheckPi :: Term -> Term -> TcM Term
+typeCheckPi _A _B = do
     checkIsType _A
-    _B' <- typeCheckPi params _B
-    checkIsType _B'
-    return (Pi _A _B')
+    checkIsType _B
+    return (Pi _A _B)
 
-typeCheckLambda :: [Param Tc] -> Term -> TcM Term
-typeCheckLambda []            _B = return _B
-typeCheckLambda (param : params) _B = do
-    let _A = exprTerm (snd param)
+typeCheckLambda :: Term -> Term -> TcM Term
+typeCheckLambda _A _B = do
     checkIsType _A
-    _B' <- typeCheckLambda params _B
-    return (Lam _A _B')
+    return (Lam _A _B)
 
-typeCheckSigma :: [Param Tc] -> Term -> TcM Term
-typeCheckSigma []            _B = return _B
-typeCheckSigma (param : params) _B = do
-    let _A = exprTerm (snd param)
-    _B' <- typeCheckSigma params _B
-    f   <- builtin (context _A) "Σ'"
-    typeCheckApps f [_A, Lam _A _B']
+typeCheckSigma :: Term -> Term -> TcM Term
+typeCheckSigma _A _B = do
+    f <- builtin (context _A) "Σ'"
+    typeCheckApps f [_A, Lam _A _B]
 
 typeCheckApp :: Term -> Term -> TcM Term
 typeCheckApp f arg = do
