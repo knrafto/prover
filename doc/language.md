@@ -16,28 +16,49 @@ characters is a "word". The following words are reserved, and are treated
 specially in the syntax:
 
 ```
-_
-:
-:=
-=
-→
-×
-Σ
-Π
-λ
 Type
-define
-assume
-prove
+_
+: :=
+= → ×
+Π λ Σ
+define assume prove
 ```
 
-# Grammar
+# Parentheses
 
-Summary of operators, from tightest to least tight:
-* Application (left-associative)
+Parentheses are matched in a "greedy" fashion. Unmatched left parens are
+terminated at EOF; right parens are ignored (and of course these are both
+errors).
+
+# Operators
+
+`= → ×` are operators. From tightest to least tight:
 * = (non-associative)
 * × (right-associative)
 * → (right-associative)
+
+These work by splitting the token stream (not looking inside of parentheses)
+into parts and proceeding on those.
+
+# Binders
+
+`Π λ Σ` are binders, which act like prefix operators. They expect a
+parenthesized group of "params", which are `name : type` pairs.
+
+# Function application
+
+The remaining tokens are atoms
+
+Juxtaposition represents function application, like `f x`. If the argument
+requires parentheses, we write it with no space like `f(x)`.
+
+Multi-argument functions can be written using 
+```
+R : A × A → Type
+R(a, b) := a < b
+```
+
+# Grammar
 
 ```
 module = [ statement ]*
@@ -47,33 +68,24 @@ statement =
     assume name : expr
     prove name : expr
 
-params = ( name : expr [, name : expr ]* )
+param = name [ : expr ]
 
 atom =
     _
     name
     Type
-    ( expr )
-    Σ params expr
-    ( expr , expr [, expr]* )
-    Π params expr
-    λ params expr
+    ( expr [, expr]* )
+    Π param , expr
+    λ param , expr
+    Σ param , expr
 
-apps =
+apps = [ apps ] atom
     atom
-    apps ( expr [, expr]* )
+    apps atom
 
-equals =
-    apps
-    apps = apps
-
-times =
-    equals
-    equals × times
-
-arrow =
-    times
-    times → arrow
+equals = apps [ = apps ]
+times = equals [ × times ]
+arrow = times [ → arrow ]
 
 expr = arrow
 ```

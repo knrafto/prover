@@ -113,3 +113,38 @@ For syntax highlighting:
 ```
 
 The extension uses the text decoration API to set the markers.
+
+# Binder syntax
+
+```
+Agda:
+  (a : A) → B   |   ∀ a → B   |
+ λ (a : A) → B  |   λ a → B   |
+  Σ[ a ∈ A ] B  |  ∃ λ a → B  |
+
+Agda-style:
+ Π (a : A) → B  |   Π a → B   |
+ λ (a : A) → B  |   λ a → B   |
+ Σ (a : A) → B  |   Σ a → B   |
+
+Book-style:
+   Π a : A. B   |   Π a. B    |
+   λ a : A. B   |   λ a. B    |
+   Σ a : A. B   |   Σ a. B    |
+
+Lean:
+   Π a : A, B   |   Π a, B    |
+   λ a : A, B   |   λ a, B    |
+   Σ a : A, B   |   Σ a, B    |
+```
+
+I'd like consistency in the binder syntax, so one of Agda-style, Book-style, or
+Lean.
+
+A major downside of Book-style is that it uses `.`, so it would be overloaded if
+we used `.` for scoping too.
+
+Agda's `(a : A) → B` is visually clean and looks nice with `A → B`. We could add
+it as a synonym to any style.
+
+I think Lean (with `(a : A) → B`) wins.
