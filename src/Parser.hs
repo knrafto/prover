@@ -118,10 +118,8 @@ apps = do
     rest x = app x <|> return x
 
     app x = do
-        _    <- symbol '('
-        args <- expr `sepBy1` symbol ','
-        e    <- symbol ')'
-        rest (App (spanRange (ann x) e) x args)
+        arg <- atom
+        rest (App (spanRange (ann x) (ann arg)) x arg)
 
 expr :: Parser (Expr P)
 expr = makeExprParser

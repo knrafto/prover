@@ -326,11 +326,11 @@ typeCheckExpr _Γ names = \case
         t <- hole _Γ
         return (Syntax.Hole (TcAnn l t))
     Syntax.Type l       -> return (Syntax.Type (TcAnn l (Universe _Γ)))
-    Syntax.App l f args -> do
+    Syntax.App l f arg -> do
         f'    <- typeCheckExpr _Γ names f
-        args' <- mapM (typeCheckExpr _Γ names) args
-        t     <- typeCheckApp (exprTerm f') (map exprTerm args')
-        return (Syntax.App (TcAnn l t) f' args')
+        arg'  <- typeCheckExpr _Γ names arg
+        t     <- typeCheckApp (exprTerm f') (exprTerm arg')
+        return (Syntax.App (TcAnn l t) f' arg')
     Syntax.Tuple l args -> do
         args' <- mapM (typeCheckExpr _Γ names) args
         t     <- typeCheckTuple (map exprTerm args')
@@ -355,7 +355,7 @@ typeCheckExpr _Γ names = \case
         _A <- hole _Γ
         a' <- typeCheckExpr _Γ names a
         b' <- typeCheckExpr _Γ names b
-        t  <- typeCheckApp f' [_A, exprTerm a', exprTerm b']
+        t  <- typeCheckApps f' [_A, exprTerm a', exprTerm b']
         return (Syntax.Equal (TcAnn l t) a' b')
     Syntax.Arrow l a b -> do
         a' <- typeCheckExpr _Γ names a
@@ -372,7 +372,7 @@ typeCheckExpr _Γ names = \case
         let _A = exprTerm a'
         let _B = exprTerm b'
         f   <- builtin _Γ "Σ'"
-        t <- typeCheckApp f [_A, Lam _A (Apply (SubstWeaken _A) _B)]
+        t <- typeCheckApps f [_A, Lam _A (Apply (SubstWeaken _A) _B)]
         return (Syntax.Times (TcAnn l t) a' b')
 
 builtin :: Context -> String -> TcM Term
@@ -423,16 +423,21 @@ typeCheckSigma (param : params) _B = do
     let _A = exprTerm (snd param)
     _B' <- typeCheckSigma params _B
     f   <- builtin (context _A) "Σ'"
-    typeCheckApp f [_A, Lam _A _B']
+    typeCheckApps f [_A, Lam _A _B']
 
-typeCheckApp :: Term -> [Term] -> TcM Term
-typeCheckApp f []           = return f
-typeCheckApp f (arg : args) = do
+typeCheckApp :: Term -> Term -> TcM Term
+typeCheckApp f arg = do
     let _Γ = context f
     let _A = termType arg
     _B <- freshMetavar _Γ (Universe _Γ)
     unify (termType f) (Pi _A _B)
-    typeCheckApp (App _A _B f arg) args
+    return (App _A _B f arg)
+
+typeCheckApps :: Term -> [Term] -> TcM Term
+typeCheckApps f []           = return f
+typeCheckApps f (arg : args) = do
+    f' <- typeCheckApp f arg
+    typeCheckApps f' args
 
 typeCheckTuple :: [Term] -> TcM Term
 typeCheckTuple []       = error "typeCheckTuple: empty tuple"
@@ -444,7 +449,7 @@ typeCheckTuple (a : ts) = do
     _B   <- freshMetavar _Γ' (Universe _Γ')
     b    <- typeCheckTuple ts
     pair <- builtin _Γ "pair"
-    typeCheckApp pair [_A, Lam _A _B, a, b]
+    typeCheckApps pair [_A, Lam _A _B, a, b]
 
 printStatements :: [Statement Tc] -> IO ()
 printStatements = mapM_ printStatement

@@ -14,7 +14,7 @@ data Expr x
     = Var (Ann x) (Id x)
     | Type (Ann x)
     | Hole (Ann x)
-    | App (Ann x) (Expr x) [Expr x]
+    | App (Ann x) (Expr x) (Expr x)
     | Tuple (Ann x) [Expr x]
     | Pi (Ann x) [Param x] (Expr x)
     | Lambda (Ann x) [Param x] (Expr x)

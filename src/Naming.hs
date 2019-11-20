@@ -91,7 +91,7 @@ resolveExpr env = \case
     Var l ident -> Var l (lookupIdent env ident)
     Type l      -> Type l
     Hole l      -> Hole l
-    App l f xs  -> App l (resolveExpr env f) (map (resolveExpr env) xs)
+    App l f a  -> App l (resolveExpr env f) (resolveExpr env a)
     Tuple l xs  -> Tuple l (map (resolveExpr env) xs)
     Pi l ps e ->
         let (ps', env') = resolveParams env ps in Pi l ps' (resolveExpr env' e)
@@ -140,7 +140,7 @@ exprNames = \case
     Var _ n       -> [n]
     Hole _        -> []
     Type _        -> []
-    App _ f xs    -> exprNames f ++ concatMap exprNames xs
+    App _ f a     -> exprNames f ++ exprNames a
     Tuple _ xs    -> concatMap exprNames xs
     Pi     _ ps e -> paramsNames ps ++ exprNames e
     Lambda _ ps e -> paramsNames ps ++ exprNames e
