@@ -141,10 +141,10 @@ Lean:
 I'd like consistency in the binder syntax, so one of Agda-style, Book-style, or
 Lean.
 
-A major downside of Book-style is that it uses `.`, so it would be overloaded if
-we used `.` for scoping too.
+A potential downside of Book-style is that it uses `.`, so it would be
+overloaded if we used `.` for scoping too. However, when used for scoping, the
+`.` will be attached to an identifier with no intervening whitespace, so we can
+use that to avoid ambiguity.
 
 Agda's `(a : A) → B` is visually clean and looks nice with `A → B`. We could add
 it as a synonym to any style.
-
-I think Lean (with `(a : A) → B`) wins.

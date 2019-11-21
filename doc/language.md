@@ -8,7 +8,7 @@ tab. Line comments start with `--`. Block comments are delimited with `{-` and
 
 TODO: allow nested block comments.
 
-The symbols `(`, `)`, and `,` are "punctuation", and are always
+The symbols `(`, `)`, `,`, and `.` are "punctuation", and are always
 treated as a token by themselves.
 
 Any other contiguous sequence of non-whitespace, non-punctuation Unicode
@@ -75,9 +75,9 @@ atom =
     name
     Type
     ( expr [, expr]* )
-    Π param , expr
-    λ param , expr
-    Σ param , expr
+    Π param . expr
+    λ param . expr
+    Σ param . expr
 
 apps = [ apps ] atom
     atom
