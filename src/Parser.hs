@@ -78,7 +78,7 @@ symbol c = lexeme $ do
     Range s <$> getOffset
 
 param :: Parser (Param P)
-param = (,) <$> identifier <* reservedWord ":" <*> expr
+param = (,) <$> identifier <*> optional (reservedWord ":" *> expr)
 
 atom :: Parser (Expr P)
 atom = var <|> hole <|> type_ <|> tuple <|> try sigma <|> try pi_ <|> try lam <|> sigma' <|> pi_' <|> lam'

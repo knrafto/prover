@@ -336,16 +336,16 @@ typeCheckExpr _Γ names = \case
         t     <- typeCheckTuple (map exprTerm args')
         return (Syntax.Tuple (TcAnn l t) args')
     Syntax.Pi l param body -> do
-        (param', body') <- typeCheckParam _Γ names param body
-        t <- typeCheckPi (exprTerm (snd param')) (exprTerm body')
+        (param', paramTerm, body') <- typeCheckParam _Γ names param body
+        t <- typeCheckPi paramTerm (exprTerm body')
         return (Syntax.Pi (TcAnn l t) param' body')
     Syntax.Lambda l param body -> do
-        (param', body') <- typeCheckParam _Γ names param body
-        t <- typeCheckLambda (exprTerm (snd param')) (exprTerm body')
+        (param', paramTerm, body') <- typeCheckParam _Γ names param body
+        t <- typeCheckLambda paramTerm (exprTerm body')
         return (Syntax.Lambda (TcAnn l t) param' body')
     Syntax.Sigma  l param body -> do
-        (param', body') <- typeCheckParam _Γ names param body
-        t <- typeCheckSigma (exprTerm (snd param')) (exprTerm body')
+        (param', paramTerm, body') <- typeCheckParam _Γ names param body
+        t <- typeCheckSigma paramTerm (exprTerm body')
         return (Syntax.Sigma (TcAnn l t) param' body')
     Syntax.Equal  l a      b  -> do
         f' <- builtin _Γ "Id"
@@ -383,12 +383,18 @@ builtin _Γ name = do
 checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))
 
-typeCheckParam :: Context -> [Text] -> Param N -> Expr N -> TcM (Param Tc, Expr Tc)
-typeCheckParam _Γ names (ident, e) body = do
+typeCheckParam :: Context -> [Text] -> Param N -> Expr N -> TcM (Param Tc, Term, Expr Tc)
+typeCheckParam _Γ names (ident, me) body = do
     let name = unLoc (usage ident)
-    e' <- typeCheckExpr _Γ names e
-    body' <- typeCheckExpr (Extend (exprTerm e')) (name : names) body
-    return ((ident, e'), body')
+    (me', t) <- case me of
+        Nothing -> do
+            t <- hole _Γ
+            return (Nothing, t)
+        Just e -> do
+            e' <- typeCheckExpr _Γ names e
+            return (Just e', exprTerm e')
+    body' <- typeCheckExpr (Extend t) (name : names) body
+    return ((ident, me'), t, body')
 
 typeCheckPi :: Term -> Term -> TcM Term
 typeCheckPi _A _B = do

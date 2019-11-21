@@ -107,7 +107,7 @@ resolveExpr env = \case
 
 resolveParam :: Env -> (Param P) -> (Param N, Env)
 resolveParam env (i, e) =
-    let param = (Local i i, resolveExpr env e)
+    let param = (Local i i, fmap (resolveExpr env) e)
         env' = env { envLocalNames = insertIdent i (envLocalNames env) }
     in  (param, env')
 
@@ -148,7 +148,7 @@ exprNames = \case
     Times  _ x  y -> exprNames x ++ exprNames y
 
 paramNames :: (Param N) -> [Name]
-paramNames (n, ty) = n : exprNames ty
+paramNames (n, ty) = n : foldMap exprNames ty
 
 extractNames :: [Statement N] -> [Name]
 extractNames = concatMap $ \stmt -> case stmt of
