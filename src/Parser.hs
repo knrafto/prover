@@ -81,7 +81,7 @@ param :: Parser (Param P)
 param = (,) <$> identifier <*> optional (reservedWord ":" *> expr)
 
 atom :: Parser (Expr P)
-atom = var <|> hole <|> type_ <|> tuple <|> try sigma <|> try pi_ <|> try lam <|> sigma' <|> pi_' <|> lam'
+atom = var <|> hole <|> type_ <|> tuple <|> sigma <|> pi_ <|> lam
   where
     var = do
         i <- identifier
@@ -95,38 +95,17 @@ atom = var <|> hole <|> type_ <|> tuple <|> try sigma <|> try pi_ <|> try lam <|
         return (Tuple (spanRange s e) es)
     sigma = do
         s <- reservedWord "Σ"
-        _ <- symbol '(' 
         p <- param
-        _ <- symbol ')' 
+        _ <- symbol '.'
         e <- expr
         return (Sigma (spanRange s (ann e)) p e)
     pi_ = do
         s <- reservedWord "Π"
-        _ <- symbol '(' 
         p <- param
-        _ <- symbol ')' 
+        _ <- symbol '.'
         e <- expr
         return (Pi (spanRange s (ann e)) p e)
     lam = do
-        s <- reservedWord "λ"
-        _ <- symbol '(' 
-        p <- param
-        _ <- symbol ')' 
-        e <- expr
-        return (Lambda (spanRange s (ann e)) p e)
-    sigma' = do
-        s <- reservedWord "Σ"
-        p <- param
-        _ <- symbol '.'
-        e <- expr
-        return (Sigma (spanRange s (ann e)) p e)
-    pi_' = do
-        s <- reservedWord "Π"
-        p <- param
-        _ <- symbol '.'
-        e <- expr
-        return (Pi (spanRange s (ann e)) p e)
-    lam' = do
         s <- reservedWord "λ"
         p <- param
         _ <- symbol '.'
