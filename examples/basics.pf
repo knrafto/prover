@@ -1,88 +1,88 @@
 -- Identity types, with based path induction.
-assume Id : Π (A : Type) A → A → Type
-assume refl : Π (A : Type) Π (a : A) a = a
-assume Id-ind : Π (A : Type) Π (a : A)
-    Π (C : Π (b : A) a = b → Type)
+assume Id : Π A : Type. A → A → Type
+assume refl : Π A : Type. Π a : A. a = a
+assume Id-ind : Π A : Type. Π a : A.
+    Π C : (Π b : A. a = b → Type).
     C a (refl A a) →
-    Π (b : A) Π (p : a = b) C b p
-assume Id-ind-refl : Π (A : Type) Π (a : A)
-    Π (C : Π (b : A) a = b → Type)
-    Π (c : C a (refl A a))
+    Π b : A. Π p : a = b. C b p
+assume Id-ind-refl : Π A : Type. Π a : A.
+    Π C : (Π b : A. a = b → Type).
+    Π c : C a (refl A a).
     Id-ind A a C c a (refl A a) = c
 
 -- Dependent sum type.
-assume Σ' : Π (A : Type) Π (B : A → Type) Type
-assume pair : Π (A : Type) Π (B : A → Type) Π (a : A) Π (b : B a) Σ (a : A) B a 
-assume Σ-ind : Π (A : Type) Π (B : A → Type)
-    Π (C : (Σ (a : A) B a) → Type)
-    (Π (a : A) Π (b : B a) C (pair A B a b)) →
-    Π (p : Σ (a : A) B a) C p
-assume Σ-ind-pair : Π (A : Type) Π (B : A → Type)
-    Π (C : (Σ (a : A) B a) → Type)
-    Π (c : Π (a : A) Π (b : B a) C (pair A B a b))
-    Π (a : A) Π (b : B a) 
+assume Σ' : Π A : Type. Π B : A → Type. Type
+assume pair : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. Σ a : A. B a
+assume Σ-ind : Π A : Type. Π B : A → Type.
+    Π C : (Σ a : A. B a) → Type.
+    (Π a : A. Π b : B a. C (pair A B a b)) →
+    Π p : (Σ a : A. B a). C p
+assume Σ-ind-pair : Π A : Type. Π B : A → Type.
+    Π C : (Σ a : A. B a) → Type.
+    Π c : (Π a : A. Π b : B a. C (pair A B a b)).
+    Π a : A. Π b : B a. 
     Σ-ind A B C c (pair A B a b) = c a b
 
 -- Empty type.
 assume 0 : Type
-assume 0-ind : Π (C : 0 → Type) Π (a : 0) C a
+assume 0-ind : Π C : 0 → Type. Π a : 0. C a
 
 -- Unit type.
 assume 1 : Type
 assume tt : 1
-assume 1-ind : Π (C : 1 → Type) C tt → Π (a : 1) C a
-assume 1-ind-tt : Π (C : 1 → Type) Π (c : C tt) 1-ind C c tt = c
+assume 1-ind : Π C : 1 → Type. C tt → Π a : 1. C a
+assume 1-ind-tt : Π C : 1 → Type. Π c : C tt. 1-ind C c tt = c
 
 -- Boolean type.
 assume 2 : Type
 assume 0₂ : 2
 assume 1₂ : 2
-assume 2-ind : Π (C : 2 → Type) C 0₂ → C 1₂ → Π (a : 2) C a
-assume 2-ind-0₂ : Π (C : 2 → Type) Π (c₀ : C 0₂) Π (c₁ : C 1₂) 2-ind C c₀ c₁ 0₂ = c₀
-assume 2-ind-1₂ : Π (C : 2 → Type) Π (c₀ : C 0₂) Π (c₁ : C 1₂) 2-ind C c₀ c₁ 1₂ = c₁
+assume 2-ind : Π C : 2 → Type. C 0₂ → C 1₂ → Π a : 2. C a
+assume 2-ind-0₂ : Π C : 2 → Type. Π c₀ : C 0₂. Π c₁ : C 1₂. 2-ind C c₀ c₁ 0₂ = c₀
+assume 2-ind-1₂ : Π C : 2 → Type. Π c₀ : C 0₂. Π c₁ : C 1₂. 2-ind C c₀ c₁ 1₂ = c₁
 
 -- Natural numbers.
 assume ℕ : Type
 assume zero : ℕ
 assume suc : ℕ → ℕ
-assume ℕ-ind : Π (C : ℕ → Type) C zero → (Π (n : ℕ) C n → C (suc n)) → Π (n : ℕ) C n
-assume ℕ-ind-zero : Π (C : ℕ → Type) Π (base : C zero) Π (step : Π (n : ℕ) C n → C (suc n)) ℕ-ind C base step zero = base
-assume ℕ-ind-suc : Π (C : ℕ → Type) Π (base : C zero) Π (step : Π (n : ℕ) C n → C (suc n)) Π (n : ℕ) ℕ-ind C base step (suc n) = step n (ℕ-ind C base step n)
+assume ℕ-ind : Π C : ℕ → Type. C zero → (Π n : ℕ. C n → C (suc n)) → Π n : ℕ. C n
+assume ℕ-ind-zero : Π C : ℕ → Type. Π base : C zero. Π step : (Π n : ℕ. C n → C (suc n)). ℕ-ind C base step zero = base
+assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n : ℕ. C n → C (suc n)). Π n : ℕ. ℕ-ind C base step (suc n) = step n (ℕ-ind C base step n)
 
 -- Structure of identity types.
 define ap
-    : Π (A : Type) Π (B : Type) Π (f : A → B) Π (x : A) Π (y : A) x = y → f x = f y
-    := λ (A : Type) λ (B : Type) λ (f : A → B) λ (x : A) Id-ind A x _ (refl _ _)
+    : Π A : Type. Π B : Type. Π f : A → B. Π x : A. Π y : A. x = y → f x = f y
+    := λ A : Type. λ B : Type. λ f : A → B. λ x : A. Id-ind A x _ (refl _ _)
 define subst
-    : Π (A : Type) Π (B : A → Type) Π (x : A) Π (y : A) x = y → B x → B y
-    := λ (A : Type) λ (B : A → Type) λ (x : A) Id-ind A x _ λ (b : _) b
+    : Π A : Type. Π B : A → Type. Π x : A. Π y : A. x = y → B x → B y
+    := λ A : Type. λ B : A → Type. λ x : A. Id-ind A x _ λ b : _. b
 define sym
-    : Π (A : Type) Π (x : A) Π (y : A) x = y → y = x
-    := λ (A : Type) λ (x : A) Id-ind A x _ (refl A x)
+    : Π A : Type. Π x : A. Π y : A. x = y → y = x
+    := λ A : Type. λ x : A. Id-ind A x _ (refl A x)
 define trans
-    : Π (A : Type) Π (x : A) Π (y : A) Π (z : A) x = y → y = z → x = z
-    := λ (A : Type) λ (x : A) λ (y : A) λ (z : A) λ (p : x = y) λ (q : y = z)
-        Id-ind A x (λ (y : A) λ (p : x = y) Π (z : A) y = z → x = z) (Id-ind A x _ (refl A x)) y p z q
+    : Π A : Type. Π x : A. Π y : A. Π z : A. x = y → y = z → x = z
+    := λ A : Type. λ x : A. λ y : A. λ z : A. λ p : x = y. λ q : y = z.
+        Id-ind A x (λ y : A. λ p : x = y. Π z : A. y = z → x = z) (Id-ind A x _ (refl A x)) y p z q
 
 -- Function types.
 define happly
-    : Π (A : Type) Π (B : Type) Π (f : A → B) Π (g : A → B) f = g → Π (x : A) f x = g x
-    := λ (A : Type) λ (B : Type) λ (f : A → B) Id-ind (A → B) f _ λ (x : A) refl B (f x)
+    : Π A : Type. Π B : Type. Π f : A → B. Π g : A → B. f = g → Π x : A. f x = g x
+    := λ A : Type. λ B : Type. λ f : A → B. Id-ind (A → B) f _ λ x : A. refl B (f x)
 
 -- Sigma types.
 define π₁
-    : Π (A : Type) Π (B : A → Type) (Σ (a : A) B a) → A
-    := λ (A : Type) λ (B : A → Type) Σ-ind A B _ λ (a : A) λ (b : B a) a
+    : Π A : Type. Π B : A → Type. (Σ a : A. B a) → A
+    := λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. a
 define π₁-pair
-    : Π (A : Type) Π (B : A → Type) Π (a : A) Π (b : B a) π₁ A B (a, b) = a
-    := λ (A : Type) λ (B : A → Type) λ (a : A) λ (b : B a) Σ-ind-pair A B _ _ a b
+    : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. π₁ A B (a, b) = a
+    := λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
 define π₂
-    : Π (A : Type) Π (B : A → Type) Π (p : Σ (a : A) B a) B (π₁ A B p)
-    := λ (A : Type) λ (B : A → Type) Σ-ind A B _ λ (a : A) λ (b : B a) subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
+    : Π A : Type. Π B : A → Type. Π p : Σ a : A. B a. B (π₁ A B p)
+    := λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
 define π₂-pair
-    : Π (A : Type) Π (B : A → Type) Π (a : A) Π (b : B a) π₂ A B (a, b) = subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
-    := λ (A : Type) λ (B : A → Type) λ (a : A) λ (b : B a) Σ-ind-pair A B _ _ a b
+    : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. π₂ A B (a, b) = subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
+    := λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
 
 -- Sets and logic.
-define IsContr := λ (A : Type) Σ (a : A) Π (x : A) a = x
-define IsProp := λ (A : Type) Π (x : A) Π (y : A) x = y
+define IsContr := λ A : Type. Σ a : A. Π x : A. a = x
+define IsProp := λ A : Type. Π x : A. Π y : A. x = y
