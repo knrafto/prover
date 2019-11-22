@@ -9,6 +9,12 @@ type Range = {
   end: number,
 };
 
+type Token = {
+  kind: string,
+  range: Range,
+  text: string,
+};
+
 type Name = {
   kind: string,
   usage: Range,
@@ -16,6 +22,7 @@ type Name = {
 };
 
 type Response = {
+  tokens: Token[],
   names: Name[],
 };
 
@@ -28,9 +35,20 @@ let decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map([
   ['defined', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
   ['assumed', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
   ['unbound', vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})],
+  [
+    'reserved_word',
+    vscode.window.createTextEditorDecorationType({color: '#FF0000'})
+  ],
+  ['symbol', vscode.window.createTextEditorDecorationType({color: '#00FF00'})],
 ]);
 
 let cache: Map<string, Response> = new Map();
+
+function convertRange(
+    document: vscode.TextDocument, range: Range): vscode.Range {
+  return new vscode.Range(
+      document.positionAt(range.start), document.positionAt(range.end));
+}
 
 // Run a command to completion, reporting its output and exit code.
 function runCommand(
@@ -68,6 +86,7 @@ function onChange(path: string) {
     }
 
     var resp: Response = {
+      tokens: [],
       names: [],
     };
     try {
@@ -90,10 +109,20 @@ function updateEditors() {
     }
 
     let decorations: Map<string, vscode.Range[]> = new Map();
+    for (let token of resp.tokens) {
+      let range = convertRange(textEditor.document, token.range);
+      if (token.kind === 'identifier') {
+        continue;
+      }
+      let ranges = decorations.get(token.kind);
+      if (ranges !== undefined) {
+        ranges.push(range);
+      } else {
+        decorations.set(token.kind, [range]);
+      }
+    }
     for (let name of resp.names) {
-      let range = new vscode.Range(
-          textEditor.document.positionAt(name.usage.start),
-          textEditor.document.positionAt(name.usage.end));
+      let range = convertRange(textEditor.document, name.usage);
       let ranges = decorations.get(name.kind);
       if (ranges !== undefined) {
         ranges.push(range);
