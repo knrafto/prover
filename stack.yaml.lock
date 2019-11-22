@@ -13,7 +13,7 @@ packages:
     hackage: hflags-0.4.3@sha256:f6b85fc7cbd170787f49225646e62d5589e5dd75abe6f26d16287e5fff3e678e,3121
 snapshots:
 - completed:
-    size: 524786
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/11.yaml
-    sha256: 088bb91b545839510a41ae92fa5feb36779ef3529571a42bd12b9f51eb89ded3
-  original: lts-14.11
+    size: 525662
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/15.yaml
+    sha256: c5e673e5723931b64ef2eb5004f6d9ea3c95b58d48388dbc4de6f66b97c81f7a
+  original: lts-14.15

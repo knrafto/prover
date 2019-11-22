@@ -16,7 +16,7 @@ copyright:           "2019 Author name here"
 description:         Please see the README on GitHub at <https://github.com/githubuser/prover#readme>
 
 dependencies:
-- aeson >= 1.4.5.0 && < 2
+- aeson >= 1.4.6.0 && < 2
 - base >= 4.7 && < 5
 - bytestring >= 0.10.8.2 && < 1
 - containers >= 0.6.0.1 && < 1
