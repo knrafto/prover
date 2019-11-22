@@ -47,3 +47,28 @@ ann = \case
     Equal  x _ _ -> x
     Arrow  x _ _ -> x
     Times  x _ _ -> x
+
+class HasNames t where
+    foldNames :: Monoid m => (Id x -> m) -> t x -> m
+
+instance HasNames Expr where
+    foldNames f = \case
+        Var _ i      -> f i
+        Type _       -> mempty
+        Hole _       -> mempty
+        App _ a b    -> foldNames f a <> foldNames f b
+        Tuple _ xs   -> foldMap (foldNames f) xs
+        Pi     _ p e -> foldParam p <> foldNames f e
+        Lambda _ p e -> foldParam p <> foldNames f e
+        Sigma  _ p e -> foldParam p <> foldNames f e
+        Equal  _ a b -> foldNames f a <> foldNames f b
+        Arrow  _ a b -> foldNames f a <> foldNames f b
+        Times  _ a b -> foldNames f a <> foldNames f b
+      where
+        foldParam (i, t) = f i <> foldMap (foldNames f) t
+
+instance HasNames Statement where
+    foldNames f = \case
+        Define n ty body -> f n <> foldMap (foldNames f) ty <> foldNames f body
+        Assume n ty -> f n <> foldNames f ty
+        Prove  n ty -> f n <> foldNames f ty

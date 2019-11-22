@@ -3,6 +3,7 @@
 module Main where
 
 import           Control.Monad
+import           Data.Monoid
 import           System.Exit
 import           System.IO
 
@@ -16,9 +17,10 @@ import           Text.Pretty.Simple
 import qualified Flags
 import           Location
 import           Naming
+import           Syntax
+import           Token
 import           TypeCheck
 import           Parser
-import           Token
 
 panic :: String -> IO a
 panic message = do
@@ -53,6 +55,9 @@ nameHighlighting = map (\n -> HighlightedRange (location (nameUsage n)) (nameCla
         Defined -> "global"
         Assumed -> "global"
         Unbound -> "local"
+
+extractNames :: [Statement N] -> [Name]
+extractNames stmts = appEndo (foldMap (foldNames (\n -> Endo (n :))) stmts) []
 
 main :: IO ()
 main = do

@@ -6,7 +6,6 @@ module Naming
     , Name(..)
     , N
     , resolveNames
-    , extractNames
     )
 where
 
@@ -111,27 +110,3 @@ resolveNames = go emptyEnv
     go _ [] = []
     go env (stmt : rest) =
         let (stmt', env') = resolveStatement env stmt in stmt' : go env' rest
-
--- TODO: DList?
-exprNames :: Expr N -> [Name]
-exprNames = \case
-    Var _ n       -> [n]
-    Hole _        -> []
-    Type _        -> []
-    App _ f a     -> exprNames f ++ exprNames a
-    Tuple _ xs    -> concatMap exprNames xs
-    Pi     _ p e -> paramNames p ++ exprNames e
-    Lambda _ p e -> paramNames p ++ exprNames e
-    Sigma  _ p e -> paramNames p ++ exprNames e
-    Equal  _ x  y -> exprNames x ++ exprNames y
-    Arrow  _ x  y -> exprNames x ++ exprNames y
-    Times  _ x  y -> exprNames x ++ exprNames y
-
-paramNames :: (Param N) -> [Name]
-paramNames (n, ty) = n : foldMap exprNames ty
-
-extractNames :: [Statement N] -> [Name]
-extractNames = concatMap $ \stmt -> case stmt of
-    Define n ty body -> n : (foldMap exprNames ty ++ exprNames body)
-    Assume n ty -> n : exprNames ty
-    Prove  n ty -> n : exprNames ty
