@@ -24,9 +24,7 @@ let binaryPath =
 
 let decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map([
   ['local', vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})],
-  ['defined', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
-  ['assumed', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
-  ['unbound', vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})],
+  ['global', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
   [
     'reserved_word',
     vscode.window.createTextEditorDecorationType({color: '#FF0000'})
