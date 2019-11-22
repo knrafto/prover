@@ -17,17 +17,10 @@ import           Location
 type Parser = Parsec Void Text
 
 data Token
-    = Identifier Text
-    | ReservedWord Text
-    | Symbol Char
-    deriving (Eq)
-
-instance Show Token where
-    show (Identifier   t) = Text.unpack t
-    show (ReservedWord t) = Text.unpack t
-    show (Symbol       c) = [c]
-
-type LToken = Located Token
+    = Identifier Ident
+    | ReservedWord Ident
+    | Symbol Ident
+    deriving (Eq, Show)
 
 spaceChars :: [Char]
 spaceChars = " \t\r\n\f\v"
@@ -60,27 +53,31 @@ reservedWords =
 isWordChar :: Char -> Bool
 isWordChar c = c `notElem` (spaceChars ++ symbolChars)
 
-symbol :: Parser Token
-symbol = Symbol <$> choice [ char c | c <- symbolChars ]
+located :: Parser a -> Parser (Located a)
+located m = do
+    s <- getOffset
+    a <- m
+    e <- getOffset
+    return (L (Range s e) a)
 
-reservedWord :: Parser Token
-reservedWord = ReservedWord <$> choice
+symbol :: Parser Ident
+symbol = located $ choice [ string (Text.pack [c]) | c <- symbolChars ]
+
+reservedWord :: Parser Ident
+reservedWord = located $ choice
     [ try (string w <* notFollowedBy (satisfy isWordChar))
     | w <- reservedWords
     ]
 
-identifier :: Parser Token
-identifier = Identifier <$> takeWhile1P (Just "word character") isWordChar
+identifier :: Parser Ident
+identifier = located $ takeWhile1P (Just "word character") isWordChar
 
-token :: Parser LToken
-token = do
-    s <- getOffset
-    t <- symbol <|> reservedWord <|> identifier
-    e <- getOffset
-    sc
-    return (L (Range s e) t)
+token :: Parser Token
+token = Symbol <$> symbol
+    <|> ReservedWord <$> reservedWord
+    <|> Identifier <$> identifier
 
-tokenize :: Text -> [LToken]
-tokenize input = case parse (sc *> many token <* eof) "" input of
+tokenize :: Text -> [Token]
+tokenize input = case parse (sc *> many (token <* sc) <* eof) "" input of
     Left  e  -> error ("parse error when tokenizing:\n" ++ errorBundlePretty e)
     Right xs -> xs
