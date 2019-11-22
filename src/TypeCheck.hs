@@ -283,8 +283,8 @@ typeCheck = mapM typeCheckStatement
 
 typeCheckStatement :: Statement N -> TcM (Statement Tc)
 typeCheckStatement = \case
-    Syntax.Define ident mty body -> do
-        let name = unLoc (usage ident)
+    Syntax.Define n mty body -> do
+        let name = unLoc (nameUsage n)
         body' <- typeCheckExpr Empty [] body
         mty' <- case mty of
             Nothing -> return Nothing
@@ -294,33 +294,34 @@ typeCheckStatement = \case
                 return (Just ty')
         checkSolved
         modify $ \s -> s { envDefinitions = Map.insert name (exprTerm body') (envDefinitions s) }
-        return (Syntax.Define ident mty' body')
-    Syntax.Assume ident ty -> do
-        let name = unLoc (usage ident)
+        return (Syntax.Define n mty' body')
+    Syntax.Assume n ty -> do
+        let name = unLoc (nameUsage n)
         ty' <- typeCheckExpr Empty [] ty
         checkSolved
         modify $ \s -> s { envAssumptions = Map.insert name (exprTerm ty') (envAssumptions s) }
-        return (Syntax.Assume ident ty')
+        return (Syntax.Assume n ty')
     Syntax.Prove _ _ -> fail "prove not implemented"
 
 typeCheckExpr :: Context -> [Text] -> Expr N -> TcM (Expr Tc)
 typeCheckExpr _Γ names = \case
     Syntax.Var l n -> do
+        let name = unLoc (nameUsage n)
         -- We assume that name resolution is correct and the map lookups cannot fail.
-        t <- case n of
-            Local _ ident -> do
-                let Just i = elemIndex (unLoc ident) names
+        t <- case nameKind n of
+            Local -> do
+                let Just i = elemIndex name names
                 return (Var (fromDeBruijn _Γ i))
-            Defined _ ident -> do
+            Defined -> do
                 definitions <- gets envDefinitions
-                let Just body = Map.lookup (unLoc ident) definitions
+                let Just body = Map.lookup name definitions
                 return (weakenGlobal _Γ body)
-            Assumed _ ident -> do
+            Assumed -> do
                 assumptions <- gets envAssumptions
-                let Just _A = Map.lookup (unLoc ident) assumptions
-                return (weakenGlobal _Γ (Assume (unLoc ident) Empty _A))
-            Unbound ident ->
-                fail $ "unbound name: " ++ Text.unpack (unLoc ident)
+                let Just _A = Map.lookup name assumptions
+                return (weakenGlobal _Γ (Assume name Empty _A))
+            Unbound ->
+                fail $ "unbound name: " ++ Text.unpack name
         return (Syntax.Var (TcAnn l t) n)
     Syntax.Hole l -> do
         t <- hole _Γ
@@ -384,8 +385,8 @@ checkIsType :: Term -> TcM ()
 checkIsType t = unify (termType t) (Universe (context t))
 
 typeCheckParam :: Context -> [Text] -> Param N -> Expr N -> TcM (Param Tc, Term, Expr Tc)
-typeCheckParam _Γ names (ident, me) body = do
-    let name = unLoc (usage ident)
+typeCheckParam _Γ names (n, me) body = do
+    let name = unLoc (nameUsage n)
     (me', t) <- case me of
         Nothing -> do
             t <- hole _Γ
@@ -394,7 +395,7 @@ typeCheckParam _Γ names (ident, me) body = do
             e' <- typeCheckExpr _Γ names e
             return (Just e', exprTerm e')
     body' <- typeCheckExpr (Extend t) (name : names) body
-    return ((ident, me'), t, body')
+    return ((n, me'), t, body')
 
 typeCheckPi :: Term -> Term -> TcM Term
 typeCheckPi _A _B = do
@@ -443,10 +444,10 @@ printStatements = mapM_ printStatement
 
 printStatement :: Statement Tc -> IO ()
 printStatement = \case
-    Syntax.Define ident _ body -> do
-        let name = unLoc (usage ident)
+    Syntax.Define n _ body -> do
+        let name = unLoc (nameUsage n)
         putStrLn $ "define " ++ Text.unpack name ++ " := " ++ show (exprTerm body)
-    Syntax.Assume ident ty -> do
-        let name = unLoc (usage ident)
+    Syntax.Assume n ty -> do
+        let name = unLoc (nameUsage n)
         putStrLn $ "assume " ++ Text.unpack name ++ " : " ++ show (exprTerm ty)
     Syntax.Prove _ _ -> fail "prove not implemented"

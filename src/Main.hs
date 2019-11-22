@@ -46,11 +46,13 @@ tokenHighlighting = mapMaybe $ \case
     Symbol i -> Just (HighlightedRange (location i) "symbol")
 
 nameHighlighting :: [Name] -> [HighlightedRange]
-nameHighlighting = map $ \case
-    Local i _ -> HighlightedRange (location i) "local"
-    Defined i _ -> HighlightedRange (location i) "global"
-    Assumed i _ -> HighlightedRange (location i) "global"
-    Unbound i -> HighlightedRange (location i) "local"
+nameHighlighting = map (\n -> HighlightedRange (location (nameUsage n)) (nameClass n))
+  where
+    nameClass n = case nameKind n of
+        Local   -> "local"
+        Defined -> "global"
+        Assumed -> "global"
+        Unbound -> "local"
 
 main :: IO ()
 main = do

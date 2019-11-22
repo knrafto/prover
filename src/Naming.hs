@@ -2,9 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Naming
-    ( Name(..)
-    , usage
-    , introduction
+    ( NameKind(..)
+    , Name(..)
     , N
     , resolveNames
     , extractNames
@@ -21,28 +20,24 @@ import           Location
 import           Parser
 import           Syntax
 
+data NameKind
+    -- Introduced via a binder
+    = Local
+    -- A symbol from a `define`
+    | Defined
+    -- A symbol from an `assume`
+    | Assumed
+    -- An unknown symbol
+    | Unbound
+    deriving (Eq, Show)
+
 -- An occurrence of an identifier.
--- Order of fields is: usage, introduction.
-data Name
-    = Local Ident Ident
-    | Defined Ident Ident
-    | Assumed Ident Ident
-    | Unbound Ident
-    deriving (Show)
-
-usage :: Name -> Ident
-usage = \case
-    Local   i _ -> i
-    Defined i _ -> i
-    Assumed i _ -> i
-    Unbound i   -> i
-
-introduction :: Name -> Maybe Ident
-introduction = \case
-    Local   _ i -> Just i
-    Defined _ i -> Just i
-    Assumed _ i -> Just i
-    Unbound _   -> Nothing
+data Name = Name
+    { nameKind :: NameKind
+    , nameUsage :: Ident
+    , nameIntroduction :: Ident
+    }
+    deriving (Eq, Show)
 
 data N
 type instance Id N = Name
@@ -64,10 +59,10 @@ insertIdent :: Ident -> Map Text Ident -> Map Text Ident
 insertIdent ident = Map.insert (unLoc ident) ident
 
 lookupIdent :: Env -> Ident -> Name
-lookupIdent env ident = fromMaybe (Unbound ident) $ asum
-    [ Local ident <$> Map.lookup name (envLocalNames env)
-    , Defined ident <$> Map.lookup name (envDefinitions env)
-    , Assumed ident <$> Map.lookup name (envAssumptions env)
+lookupIdent env ident = fromMaybe (Name Unbound ident ident) $ asum
+    [ Name Local ident <$> Map.lookup name (envLocalNames env)
+    , Name Defined ident <$> Map.lookup name (envDefinitions env)
+    , Name Assumed ident <$> Map.lookup name (envAssumptions env)
     ]
     where name = unLoc ident
 
@@ -92,23 +87,23 @@ resolveExpr env = \case
 
 resolveParam :: Env -> (Param P) -> (Param N, Env)
 resolveParam env (i, e) =
-    let param = (Local i i, fmap (resolveExpr env) e)
+    let param = (Name Local i i, fmap (resolveExpr env) e)
         env' = env { envLocalNames = insertIdent i (envLocalNames env) }
     in  (param, env')
 
 resolveStatement :: Env -> Statement P -> (Statement N, Env)
 resolveStatement env = \case
     Define i ty body ->
-        ( Define (Defined i i)
+        ( Define (Name Defined i i)
                      (fmap (resolveExpr env) ty)
                      (resolveExpr env body)
         , env { envDefinitions = insertIdent i (envDefinitions env) }
         )
     Assume i ty ->
-        ( Assume (Assumed i i) (resolveExpr env ty)
+        ( Assume (Name Assumed i i) (resolveExpr env ty)
         , env { envAssumptions = insertIdent i (envAssumptions env) }
         )
-    Prove i ty -> (Prove (Defined i i) (resolveExpr env ty), env)
+    Prove i ty -> (Prove (Name Defined i i) (resolveExpr env ty), env)
 
 resolveNames :: [Statement P] -> [Statement N]
 resolveNames = go emptyEnv
