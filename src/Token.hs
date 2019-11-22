@@ -4,7 +4,6 @@ module Token where
 
 import           Control.Monad
 
-import           Data.Aeson
 import           Data.Text                      ( Text )
 import           Data.Text                     as Text
 import           Data.Void
@@ -23,15 +22,6 @@ data Token
     | ReservedWord Ident
     | Symbol Ident
     deriving (Eq, Show)
-
-instance ToJSON Token where
-    toJSON = \case
-        Identifier i ->
-            object ["range" .= location i, "text" .= unLoc i, "kind" .= ("identifier" :: Text)]
-        ReservedWord i ->
-            object ["range" .= location i, "text" .= unLoc i, "kind" .= ("reserved_word" :: Text)]
-        Symbol i ->
-            object ["range" .= location i, "text" .= unLoc i, "kind" .= ("symbol" :: Text)]
 
 spaceChars :: [Char]
 spaceChars = " \t\r\n\f\v"

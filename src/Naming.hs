@@ -11,7 +11,6 @@ module Naming
     )
 where
 
-import           Data.Aeson
 import           Data.Foldable
 import           Data.Maybe
 import           Data.Text                      ( Text )
@@ -44,20 +43,6 @@ introduction = \case
     Defined _ i -> Just i
     Assumed _ i -> Just i
     Unbound _   -> Nothing
-
-instance ToJSON Name where
-    toJSON n = object $
-        [ "kind" .= kind n
-        , "usage" .= location (usage n)
-        , "introduction" .= fmap location (introduction n)
-        ]
-      where
-        kind :: Name -> String
-        kind = \case
-            Local _ _ -> "local"
-            Defined _ _ -> "defined"
-            Assumed _ _ -> "assumed"
-            Unbound _ -> "unbound"
 
 data N
 type instance Id N = Name

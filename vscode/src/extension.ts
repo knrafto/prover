@@ -9,21 +9,13 @@ type Range = {
   end: number,
 };
 
-type Token = {
-  kind: string,
+type HighlightedRange = {
   range: Range,
-  text: string,
-};
-
-type Name = {
   kind: string,
-  usage: Range,
-  introduction?: Range,
 };
 
 type Response = {
-  tokens: Token[],
-  names: Name[],
+  highlighting: HighlightedRange[],
 };
 
 // TODO: configure
@@ -86,8 +78,7 @@ function onChange(path: string) {
     }
 
     var resp: Response = {
-      tokens: [],
-      names: [],
+      highlighting: [],
     };
     try {
       resp = JSON.parse(stdout);
@@ -109,25 +100,13 @@ function updateEditors() {
     }
 
     let decorations: Map<string, vscode.Range[]> = new Map();
-    for (let token of resp.tokens) {
-      let range = convertRange(textEditor.document, token.range);
-      if (token.kind === 'identifier') {
-        continue;
-      }
-      let ranges = decorations.get(token.kind);
+    for (let highlightedRange of resp.highlighting) {
+      let range = convertRange(textEditor.document, highlightedRange.range);
+      let ranges = decorations.get(highlightedRange.kind);
       if (ranges !== undefined) {
         ranges.push(range);
       } else {
-        decorations.set(token.kind, [range]);
-      }
-    }
-    for (let name of resp.names) {
-      let range = convertRange(textEditor.document, name.usage);
-      let ranges = decorations.get(name.kind);
-      if (ranges !== undefined) {
-        ranges.push(range);
-      } else {
-        decorations.set(name.kind, [range]);
+        decorations.set(highlightedRange.kind, [range]);
       }
     }
 
