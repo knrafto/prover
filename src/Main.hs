@@ -49,33 +49,33 @@ tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
   where
     tokenClass t = case tokenKind t of
         Token.Identifier  -> Nothing
-        Token.LParen      -> Just "symbol"
-        Token.RParen      -> Just "symbol"
-        Token.Comma       -> Just "symbol"
-        Token.Dot         -> Just "symbol"
-        Token.Underscore  -> Just "reserved_word"
-        Token.Colon       -> Just "reserved_word"
-        Token.ColonEquals -> Just "reserved_word"
-        Token.Sigma       -> Just "reserved_word"
-        Token.Pi          -> Just "reserved_word"
-        Token.Lambda      -> Just "reserved_word"
-        Token.Equals      -> Just "reserved_word"
-        Token.Times       -> Just "reserved_word"
-        Token.Arrow       -> Just "reserved_word"
-        Token.Type        -> Just "reserved_word"
-        Token.Define      -> Just "reserved_word"
-        Token.Assume      -> Just "reserved_word"
-        Token.Prove       -> Just "reserved_word"
+        Token.LParen      -> Just "lparen"
+        Token.RParen      -> Just "rparen"
+        Token.Comma       -> Just "comma"
+        Token.Dot         -> Just "dot"
+        Token.Underscore  -> Just "underscore"
+        Token.Colon       -> Just "colon"
+        Token.ColonEquals -> Just "colon_equals"
+        Token.Sigma       -> Just "sigma"
+        Token.Pi          -> Just "pi"
+        Token.Lambda      -> Just "lambda"
+        Token.Equals      -> Just "equals"
+        Token.Times       -> Just "times"
+        Token.Arrow       -> Just "arrow"
+        Token.Type        -> Just "type"
+        Token.Define      -> Just "define"
+        Token.Assume      -> Just "assume"
+        Token.Prove       -> Just "prove"
 
 
 nameHighlighting :: [Name] -> [HighlightedRange]
 nameHighlighting = map (\n -> HighlightedRange (location (nameUsage n)) (nameClass n))
   where
     nameClass n = case nameKind n of
-        Local   -> "local"
-        Defined -> "global"
-        Assumed -> "global"
-        Unbound -> "local"
+        Local   -> "local_name"
+        Defined -> "defined_name"
+        Assumed -> "assumed_name"
+        Unbound -> "unbound_name"
 
 extractNames :: [Statement N] -> [Name]
 extractNames stmts = appEndo (foldMap (foldNames (\n -> Endo (n :))) stmts) []

@@ -22,9 +22,40 @@ type Response = {
 let binaryPath =
     '/Users/knrafto/code/prover/.stack-work/dist/x86_64-osx/Cabal-2.4.0.1/build/prover/prover';
 
-let decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map([
-  ['local', vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})],
-  ['global', vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})],
+
+let highlightStyles: Map<string, string> = new Map([
+  ['lparen', 'symbol'],
+  ['rparen', 'symbol'],
+  ['comma', 'symbol'],
+  ['dot', 'symbol'],
+  ['underscore', 'reserved_word'],
+  ['colon', 'reserved_word'],
+  ['colon_equals', 'reserved_word'],
+  ['sigma', 'reserved_word'],
+  ['pi', 'reserved_word'],
+  ['lambda', 'reserved_word'],
+  ['equals', 'reserved_word'],
+  ['times', 'reserved_word'],
+  ['arrow', 'reserved_word'],
+  ['type', 'reserved_word'],
+  ['define', 'reserved_word'],
+  ['assume', 'reserved_word'],
+  ['prove', 'reserved_word'],
+  ['local_name', 'local_name'],
+  ['defined_name', 'global_name'],
+  ['assumed_name', 'global_name'],
+  ['unbound_name', 'local_name'],
+]);
+
+let styles: Map<string, vscode.TextEditorDecorationType> = new Map([
+  [
+    'local_name',
+    vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})
+  ],
+  [
+    'global_name',
+    vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})
+  ],
   [
     'reserved_word',
     vscode.window.createTextEditorDecorationType({color: '#FF0000'})
@@ -100,16 +131,24 @@ function updateEditors() {
     let decorations: Map<string, vscode.Range[]> = new Map();
     for (let highlightedRange of resp.highlighting) {
       let range = convertRange(textEditor.document, highlightedRange.range);
-      let ranges = decorations.get(highlightedRange.kind);
+      let style = highlightStyles.get(highlightedRange.kind);
+      if (style === undefined) {
+        console.log(
+            'Could not find style for highlighted range of kind',
+            highlightedRange.kind);
+        continue;
+      }
+      let ranges = decorations.get(style);
       if (ranges !== undefined) {
         ranges.push(range);
       } else {
-        decorations.set(highlightedRange.kind, [range]);
+        decorations.set(style, [range]);
       }
     }
 
-    for (let [kind, decorationType] of decorationTypes) {
-      textEditor.setDecorations(decorationType, decorations.get(kind) || []);
+    for (let [styleName, decorationType] of styles) {
+      textEditor.setDecorations(
+          decorationType, decorations.get(styleName) || []);
     }
   }
 }
