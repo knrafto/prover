@@ -17,10 +17,31 @@ import           Location
 
 type Parser = Parsec Void Text
 
-data Token
-    = Identifier Ident
-    | ReservedWord Ident
-    | Symbol Ident
+data TokenType
+    = Identifier
+    | LParen
+    | RParen
+    | Comma
+    | Dot
+    | Underscore
+    | Colon
+    | ColonEquals
+    | Sigma
+    | Pi
+    | Lambda
+    | Equals
+    | Times
+    | Arrow
+    | Type
+    | Define
+    | Assume
+    | Prove
+    deriving (Eq, Show)
+
+data Token = Token
+    { tokenKind :: TokenType
+    , tokenIdent :: Ident
+    }
     deriving (Eq, Show)
 
 spaceChars :: [Char]
@@ -61,22 +82,36 @@ located m = do
     e <- getOffset
     return (L (Range s e) a)
 
-symbol :: Parser Ident
-symbol = located $ choice [ string (Text.pack [c]) | c <- symbolChars ]
+symbol :: Char -> Parser Ident
+symbol c = located $ string (Text.pack [c])
 
-reservedWord :: Parser Ident
-reservedWord = located $ choice
-    [ try (string w <* notFollowedBy (satisfy isWordChar))
-    | w <- reservedWords
-    ]
+reservedWord :: Text -> Parser Ident
+reservedWord w = located $ try (string w <* notFollowedBy (satisfy isWordChar))
 
 identifier :: Parser Ident
 identifier = located $ takeWhile1P (Just "word character") isWordChar
 
 token :: Parser Token
-token = Symbol <$> symbol
-    <|> ReservedWord <$> reservedWord
-    <|> Identifier <$> identifier
+token = choice
+    [ Token LParen      <$> symbol '('
+    , Token RParen      <$> symbol ')'
+    , Token Comma       <$> symbol ','
+    , Token Dot         <$> symbol '.'
+    , Token Underscore  <$> reservedWord "_"
+    , Token Colon       <$> reservedWord ":"
+    , Token ColonEquals <$> reservedWord ":="
+    , Token Sigma       <$> reservedWord "Σ"
+    , Token Pi          <$> reservedWord "Π"
+    , Token Lambda      <$> reservedWord "λ"
+    , Token Equals      <$> reservedWord "="
+    , Token Times       <$> reservedWord "×"
+    , Token Arrow       <$> reservedWord "→"
+    , Token Type        <$> reservedWord "Type"
+    , Token Define      <$> reservedWord "define"
+    , Token Assume      <$> reservedWord "assume"
+    , Token Prove       <$> reservedWord "prove"
+    , Token Identifier  <$> identifier
+    ]
 
 tokenize :: Text -> [Token]
 tokenize input = case parse (sc *> many (token <* sc) <* eof) "" input of

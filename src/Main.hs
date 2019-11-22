@@ -18,7 +18,8 @@ import qualified Flags
 import           Location
 import           Naming
 import           Syntax
-import           Token
+import           Token (Token(..))
+import qualified Token
 import           TypeCheck
 import           Parser
 
@@ -42,10 +43,30 @@ instance ToJSON Response where
     toJSON r = object ["highlighting" .= highlighting r]
 
 tokenHighlighting :: [Token] -> [HighlightedRange]
-tokenHighlighting = mapMaybe $ \case
-    Identifier _ -> Nothing
-    ReservedWord i -> Just (HighlightedRange (location i) "reserved_word")
-    Symbol i -> Just (HighlightedRange (location i) "symbol")
+tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
+    Nothing -> Nothing
+    Just s -> Just (HighlightedRange (location (tokenIdent t)) s)
+  where
+    tokenClass t = case tokenKind t of
+        Token.Identifier  -> Nothing
+        Token.LParen      -> Just "symbol"
+        Token.RParen      -> Just "symbol"
+        Token.Comma       -> Just "symbol"
+        Token.Dot         -> Just "symbol"
+        Token.Underscore  -> Just "reserved_word"
+        Token.Colon       -> Just "reserved_word"
+        Token.ColonEquals -> Just "reserved_word"
+        Token.Sigma       -> Just "reserved_word"
+        Token.Pi          -> Just "reserved_word"
+        Token.Lambda      -> Just "reserved_word"
+        Token.Equals      -> Just "reserved_word"
+        Token.Times       -> Just "reserved_word"
+        Token.Arrow       -> Just "reserved_word"
+        Token.Type        -> Just "reserved_word"
+        Token.Define      -> Just "reserved_word"
+        Token.Assume      -> Just "reserved_word"
+        Token.Prove       -> Just "reserved_word"
+
 
 nameHighlighting :: [Name] -> [HighlightedRange]
 nameHighlighting = map (\n -> HighlightedRange (location (nameUsage n)) (nameClass n))
@@ -66,7 +87,7 @@ main = do
         _      -> panic "usage: prover FILE"
     withFile path ReadMode $ \handle -> do
         input <- Text.hGetContents handle
-        let tokens = tokenize input
+        let tokens = Token.tokenize input
         when Flags.print_tokens $ forM_ tokens print
         stmts <- case parse statements path input of
             Left  e -> panic (errorBundlePretty e)
