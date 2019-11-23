@@ -74,8 +74,10 @@ let colors: Map<string, string> = new Map([
 
 let styles: Map<string, vscode.TextEditorDecorationType> = new Map();
 for (let [name, color] of colors) {
-  styles.set(
-      name, vscode.window.createTextEditorDecorationType({color: color}));
+  styles.set(name, vscode.window.createTextEditorDecorationType({
+    color: color,
+    rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+  }));
 }
 
 let cache: Map<string, Response> = new Map();
