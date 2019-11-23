@@ -25,7 +25,7 @@ data TokenType
     | Dot
     | Underscore
     | Colon
-    | ColonEquals
+    | DefEquals
     | Sigma
     | Pi
     | Lambda
@@ -82,7 +82,7 @@ token = choice
     , Token Dot         <$> symbol '.'
     , Token Underscore  <$> reservedWord "_"
     , Token Colon       <$> reservedWord ":"
-    , Token ColonEquals <$> reservedWord ":="
+    , Token DefEquals   <$> reservedWord "≡"
     , Token Sigma       <$> reservedWord "Σ"
     , Token Pi          <$> reservedWord "Π"
     , Token Lambda      <$> reservedWord "λ"

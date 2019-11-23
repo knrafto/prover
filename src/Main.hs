@@ -55,7 +55,7 @@ tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
         Token.Dot         -> Just "dot"
         Token.Underscore  -> Just "underscore"
         Token.Colon       -> Just "colon"
-        Token.ColonEquals -> Just "colon_equals"
+        Token.DefEquals -> Just "def_equals"
         Token.Sigma       -> Just "sigma"
         Token.Pi          -> Just "pi"
         Token.Lambda      -> Just "lambda"

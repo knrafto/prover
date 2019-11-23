@@ -52,37 +52,37 @@ assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n : �
 -- Structure of identity types.
 define ap
     : Π A : Type. Π B : Type. Π f : A → B. Π x : A. Π y : A. x = y → f x = f y
-    := λ A : Type. λ B : Type. λ f : A → B. λ x : A. Id-ind A x _ (refl _ _)
+    ≡ λ A : Type. λ B : Type. λ f : A → B. λ x : A. Id-ind A x _ (refl _ _)
 define subst
     : Π A : Type. Π B : A → Type. Π x : A. Π y : A. x = y → B x → B y
-    := λ A : Type. λ B : A → Type. λ x : A. Id-ind A x _ λ b : _. b
+    ≡ λ A : Type. λ B : A → Type. λ x : A. Id-ind A x _ λ b : _. b
 define sym
     : Π A : Type. Π x : A. Π y : A. x = y → y = x
-    := λ A : Type. λ x : A. Id-ind A x _ (refl A x)
+    ≡ λ A : Type. λ x : A. Id-ind A x _ (refl A x)
 define trans
     : Π A : Type. Π x : A. Π y : A. Π z : A. x = y → y = z → x = z
-    := λ A : Type. λ x : A. λ y : A. λ z : A. λ p : x = y. λ q : y = z.
+    ≡ λ A : Type. λ x : A. λ y : A. λ z : A. λ p : x = y. λ q : y = z.
         Id-ind A x (λ y : A. λ p : x = y. Π z : A. y = z → x = z) (Id-ind A x _ (refl A x)) y p z q
 
 -- Function types.
 define happly
     : Π A : Type. Π B : Type. Π f : A → B. Π g : A → B. f = g → Π x : A. f x = g x
-    := λ A : Type. λ B : Type. λ f : A → B. Id-ind (A → B) f _ λ x : A. refl B (f x)
+    ≡ λ A : Type. λ B : Type. λ f : A → B. Id-ind (A → B) f _ λ x : A. refl B (f x)
 
 -- Sigma types.
 define π₁
     : Π A : Type. Π B : A → Type. (Σ a : A. B a) → A
-    := λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. a
+    ≡ λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. a
 define π₁-pair
     : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. π₁ A B (a, b) = a
-    := λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
+    ≡ λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
 define π₂
     : Π A : Type. Π B : A → Type. Π p : Σ a : A. B a. B (π₁ A B p)
-    := λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
+    ≡ λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
 define π₂-pair
     : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. π₂ A B (a, b) = subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
-    := λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
+    ≡ λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
 
 -- Sets and logic.
-define IsContr := λ A : Type. Σ a : A. Π x : A. a = x
-define IsProp := λ A : Type. Π x : A. Π y : A. x = y
+define IsContr ≡ λ A : Type. Σ a : A. Π x : A. a = x
+define IsProp ≡ λ A : Type. Π x : A. Π y : A. x = y

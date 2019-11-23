@@ -58,7 +58,7 @@ identifier = lexeme . try $ do
     reservedWords =
         [ "_"
         , ":"
-        , ":="
+        , "≡"
         , "="
         , "Σ"
         , "Π"
@@ -138,7 +138,7 @@ define =
         <$  reservedWord "define"
         <*> identifier
         <*> optional (reservedWord ":" *> expr)
-        <*  reservedWord ":="
+        <*  reservedWord "≡"
         <*> expr
 
 assume :: Parser (Statement P)

@@ -18,7 +18,7 @@ specially in the syntax:
 ```
 Type
 _
-: :=
+: ≡
 = → ×
 Π λ Σ
 define assume prove
@@ -55,7 +55,7 @@ requires parentheses, we write it with no space like `f(x)`.
 Multi-argument functions can be written using 
 ```
 R : A × A → Type
-R(a, b) := a < b
+R(a, b) ≡ a < b
 ```
 
 # Grammar
@@ -64,7 +64,7 @@ R(a, b) := a < b
 module = [ statement ]*
 
 statement =
-    define name [ : expr ] := expr
+    define name [ : expr ] ≡ expr
     assume name : expr
     prove name : expr
 

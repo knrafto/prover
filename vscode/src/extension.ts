@@ -35,7 +35,7 @@ let highlightStyles: Map<string, string> = new Map([
   ['dot', 'yellow'],
   // Operators
   ['colon', 'green'],
-  ['colon_equals', 'green'],
+  ['def_equals', 'green'],
   ['equals', 'green'],
   ['times', 'green'],
   ['arrow', 'green'],
