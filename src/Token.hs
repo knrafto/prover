@@ -55,23 +55,6 @@ sc = L.space spaces (L.skipLineComment "--") (L.skipBlockComment "{-" "-}")
 symbolChars :: [Char]
 symbolChars = "(),."
 
-reservedWords :: [Text]
-reservedWords =
-    [ "_"
-    , ":"
-    , ":="
-    , "Σ"
-    , "Π"
-    , "λ"
-    , "="
-    , "×"
-    , "→"
-    , "Type"
-    , "define"
-    , "assume"
-    , "prove"
-    ]
-
 isWordChar :: Char -> Bool
 isWordChar c = c `notElem` (spaceChars ++ symbolChars)
 
