@@ -24,44 +24,59 @@ let binaryPath =
 
 
 let highlightStyles: Map<string, string> = new Map([
-  ['lparen', 'symbol'],
-  ['rparen', 'symbol'],
-  ['comma', 'symbol'],
-  ['dot', 'symbol'],
-  ['underscore', 'reserved_word'],
-  ['colon', 'reserved_word'],
-  ['colon_equals', 'reserved_word'],
-  ['sigma', 'reserved_word'],
-  ['pi', 'reserved_word'],
-  ['lambda', 'reserved_word'],
-  ['equals', 'reserved_word'],
-  ['times', 'reserved_word'],
-  ['arrow', 'reserved_word'],
-  ['type', 'reserved_word'],
-  ['define', 'reserved_word'],
-  ['assume', 'reserved_word'],
-  ['prove', 'reserved_word'],
-  ['local_name', 'local_name'],
-  ['defined_name', 'global_name'],
-  ['assumed_name', 'global_name'],
-  ['unbound_name', 'local_name'],
+  // Delimiters
+  ['lparen', 'red'],
+  ['rparen', 'red'],
+  ['comma', 'red'],
+  // Binders
+  ['sigma', 'yellow'],
+  ['pi', 'yellow'],
+  ['lambda', 'yellow'],
+  ['dot', 'yellow'],
+  // Operators
+  ['colon', 'green'],
+  ['colon_equals', 'green'],
+  ['equals', 'green'],
+  ['times', 'green'],
+  ['arrow', 'green'],
+  // Keywords
+  ['define', 'magenta'],
+  ['assume', 'magenta'],
+  ['prove', 'magenta'],
+  // Names
+  ['local_name', 'base1'],
+  ['unbound_name', 'base1'],
+  ['defined_name', 'blue'],
+  ['assumed_name', 'blue'],
+  ['type', 'blue'],
+  ['underscore', 'cyan'],
 ]);
 
-let styles: Map<string, vscode.TextEditorDecorationType> = new Map([
-  [
-    'local_name',
-    vscode.window.createTextEditorDecorationType({color: '#FFFFFF'})
-  ],
-  [
-    'global_name',
-    vscode.window.createTextEditorDecorationType({color: '#4EC9B0'})
-  ],
-  [
-    'reserved_word',
-    vscode.window.createTextEditorDecorationType({color: '#FF0000'})
-  ],
-  ['symbol', vscode.window.createTextEditorDecorationType({color: '#00FF00'})],
+// Colors from Solarized dark: https://ethanschoonover.com/solarized/
+let colors: Map<string, string> = new Map([
+  ['base03', '#002b36'],
+  ['base02', '#073642'],
+  ['base01', '#586e75'],
+  ['base00', '#657b83'],
+  ['base0', '#839496'],
+  ['base1', '#93a1a1'],
+  ['base2', '#eee8d5'],
+  ['base3', '#fdf6e3'],
+  ['yellow', '#b58900'],
+  ['orange', '#cb4b16'],
+  ['red', '#dc322f'],
+  ['magenta', '#d33682'],
+  ['violet', '#6c71c4'],
+  ['blue', '#268bd2'],
+  ['cyan', '#2aa198'],
+  ['green', '#859900'],
 ]);
+
+let styles: Map<string, vscode.TextEditorDecorationType> = new Map();
+for (let [name, color] of colors) {
+  styles.set(
+      name, vscode.window.createTextEditorDecorationType({color: color}));
+}
 
 let cache: Map<string, Response> = new Map();
 
