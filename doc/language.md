@@ -75,19 +75,17 @@ atom =
     name
     Type
     ( expr [, expr]* )
-    Π param . expr
-    λ param . expr
-    Σ param . expr
 
 apps = [ apps ] atom
-    atom
-    apps atom
-
 equals = apps [ = apps ]
 times = equals [ × times ]
 arrow = times [ → arrow ]
-
-expr = arrow
+binder =
+    arrow
+    Π param . binder
+    λ param . binder
+    Σ param . binder
+expr = binder
 ```
 
 # Type theory
