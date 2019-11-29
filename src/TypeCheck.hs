@@ -1,21 +1,21 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 module TypeCheck where
 
 import           Control.Monad.Except
 import           Control.Monad.State
+import           Data.IORef
 import           Data.List
-import           Data.Maybe
 import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict               as Map
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import           Data.Tree
+import           System.IO.Unsafe
 
 import qualified Flags
 import           Location
 import           Naming
-import           Search
 import           Syntax                         ( Id
                                                 , Ann
                                                 , ann
@@ -57,14 +57,30 @@ initialState = TcState { envDefinitions    = Map.empty
                        , unsolvedEquations = []
                        }
 
-type TcM a = SearchM TcState a
+newtype TcM a = TcM { unTcM :: StateT TcState (ExceptT String IO) a }
+    deriving (Functor, Applicative, Monad, MonadIO, MonadError String, MonadState TcState)
+
+{-# NOINLINE indentRef #-}
+indentRef :: IORef Int
+indentRef = unsafePerformIO (newIORef 0)
+
+trace :: String -> TcM a -> TcM a
+trace e m = do
+    liftIO $ do
+        level <- readIORef indentRef
+        writeIORef indentRef (level + 1)
+        let pad = replicate (2 * level) ' '
+        when Flags.print_trace $
+            putStrLn $ unlines $ map (pad ++) $ lines e
+    a <- m
+    liftIO $ do
+        level <- readIORef indentRef
+        writeIORef indentRef (level - 1)
+    return a
 
 -- Runs a search, reporting any failure
-runTcM :: TcM a -> IO (Maybe (a, TcState))
-runTcM m = do
-    let Result as bs = runSearch m initialState
-    when Flags.print_trace $ putStr (drawForest bs)
-    return (listToMaybe as)
+runTcM :: TcM a -> IO (Either String (a, TcState))
+runTcM (TcM m) = runExceptT (runStateT m initialState)
 
 -- Generate a metavar for the given context and type.
 freshMetavar :: Context -> Term -> TcM Term
@@ -98,7 +114,7 @@ assign i t = do
 
 unificationFailure :: Term -> Term -> TcM a
 unificationFailure t1 t2 =
-    throw
+    throwError
         $  "Failed to unify in context: "
         ++ show (context t1)
         ++ "\n"

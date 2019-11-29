@@ -99,5 +99,5 @@ main = do
         unless Flags.json $ do
             result <- runTcM (typeCheck stmts')
             case result of
-                Nothing           -> putStrLn "Terminated with error"
-                Just (stmts'', _) -> printStatements stmts''
+                Left  e            -> putStrLn $ "Terminated with error: " ++ e
+                Right (stmts'', _) -> printStatements stmts''
