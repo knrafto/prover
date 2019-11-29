@@ -2,10 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 module TypeCheck where
 
-import           Control.Applicative
 import           Control.Monad.Except
 import           Control.Monad.State
-import           Data.Foldable
 import           Data.List
 import           Data.Maybe
 import           Data.Map.Strict                ( Map )
@@ -224,59 +222,6 @@ reduce (  App _A _B f a) = do
     case f' of
         Lam _ b -> reduce $ Apply (SubstTerm a') b
         _       -> return $ App _A _B f' a'
-
--- Tries to unify something with the given term (which is most likely a metavar).
-search :: Term -> TcM ()
-search t = do
-    t' <- reduce t
-    case t' of
-        Metavar _ _ _ ->
-            trace ("Searching " ++ show t' ++ " : " ++ show (termType t'))
-                $   searchAssumptions t'
-                <|> searchLam t'
-        -- Assume term is solved.
-        -- TODO: check more carefully.
-        _ -> return ()
-
--- Try to unify an unknown term with a guess.
-accept :: Term -> Term -> TcM ()
-accept t guess = do
-    guessType <- reduce (termType guess)
-    -- Prune branches where the guess is too general (e.g. metavar applied to args).
-    guard (isWeakNormal guessType)
-    _A <- reduce (termType t)
-    trace ("Trying " ++ show guess ++ " for " ++ show _A) $ do
-        unify (termType t) (termType guess)
-        unify t            guess
-
-searchAssumptions :: Term -> TcM ()
-searchAssumptions t = do
-    assumptions <- gets envAssumptions
-    asum $ map (\(name, ty) -> try (weakenGlobal _Γ (Assume name Empty ty)))
-               (Map.toList assumptions)
-  where
-    _Γ = context t
-
-    try p = accept t p <|> tryApp p
-
-    tryApp p = do
-        ty <- reduce (termType p)
-        case ty of
-            Pi _A _B -> do
-                α <- freshMetavar _Γ _A
-                try (App _A _B p α)
-                search α
-            _ -> empty
-
-searchLam :: Term -> TcM ()
-searchLam t = do
-    let _Γ = context t
-    _A <- freshMetavar _Γ (Universe _Γ)
-    let _Γ' = Extend _A
-    _B <- freshMetavar _Γ' (Universe _Γ')
-    β  <- freshMetavar _Γ' _B
-    accept t (Lam _A β)
-    search β
 
 typeCheck :: [Statement N] -> TcM [Statement Tc]
 typeCheck = mapM typeCheckStatement
