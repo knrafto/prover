@@ -46,6 +46,11 @@ ctxVars = reverse . go 0
     go _ EmptyCtx = []
     go i (ExtendCtx ctx _) = Var i [] : go (i + 1) ctx
 
+ctxVarType :: Ctx -> Int -> Type
+ctxVarType EmptyCtx _ = error "ctxVarType: empty context"
+ctxVarType (ExtendCtx _ ty) 0 = weaken ty
+ctxVarType (ExtendCtx ctx _) i = weaken (ctxVarType ctx (i - 1))
+
 -- Substitutions.
 data Subst
     = SubstWeaken {-# UNPACK #-} !Int
