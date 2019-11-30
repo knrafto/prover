@@ -15,6 +15,7 @@ newtype MetaId = MetaId Int
 data Term
     = Var {-# UNPACK #-} !Int [Term]
     | Meta {-# UNPACK #-} !MetaId [Term]
+    | Assumption !Text [Term]
     | Lam !Term
     | Universe
     | Pi !Type !Type
