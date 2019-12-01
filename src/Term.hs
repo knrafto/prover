@@ -13,7 +13,7 @@ data Term
     | Lam !Term
     | Universe
     | Pi !Type !Type
-    deriving (Show)
+    deriving (Eq, Show)
 
 type Type = Term
 

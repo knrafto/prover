@@ -156,13 +156,13 @@ typeCheckParam ctx names (n, me) body = do
         Just e -> do
             e' <- typeCheckExpr ctx names e
             return (Just e', exprTypedTerm e')
-    body' <- typeCheckExpr (ExtendCtx ctx (snd tt)) (name : names) body
+    body' <- typeCheckExpr (ExtendCtx ctx (fst tt)) (name : names) body
     return ((n, me'), tt, body')
 
 typeCheckPi :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckPi ctx (_A, _Aty) (_B, _Bty) = do
     unify ctx _Aty Universe
-    unify (ExtendCtx ctx _Aty) _Bty Universe
+    unify (ExtendCtx ctx _A) _Bty Universe
     return (Pi _A _B, Universe)
 
 typeCheckLambda :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
@@ -180,7 +180,7 @@ typeCheckApp :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckApp ctx (f, fty) (arg, _A) = do
     _B <- freshMeta (ExtendCtx ctx _A) Universe
     unify ctx fty (Pi _A _B)
-    return (app f [arg], _B)
+    return (app f [arg], instantiate _B arg)
 
 typeCheckApps :: Ctx -> TypedTerm -> [TypedTerm] -> TcM TypedTerm
 typeCheckApps _   f []           = return f

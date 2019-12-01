@@ -123,7 +123,10 @@ unify ctx t1 t2 = do
 
 unify' :: Ctx -> Term -> Term -> TcM ()
 unify' ctx t1 t2 = case (t1, t2) of
-    -- TODO: metavars
+    -- TODO: flex-flex
+    (Meta _ _, Meta _ _) -> saveEquation ctx t1 t2
+    (Meta m args, t) -> unifyMeta ctx m args t
+    (t, Meta m args) -> unifyMeta ctx m args t
     (Var i1 args1, Var i2 args2)
         | i1 == i2 && length args1 == length args2 -> zipWithM_ (unify ctx) args1 args2
     (Assumption i1 args1, Assumption i2 args2)
@@ -134,6 +137,15 @@ unify' ctx t1 t2 = case (t1, t2) of
         unify ctx _A1 _A2
         unify (ExtendCtx ctx _A1) _B1 _B2
     _ -> unificationFailure ctx t1 t2
+
+unifyMeta :: Ctx -> MetaId -> [Term] -> Term -> TcM ()
+unifyMeta ctx m args t
+    -- e.g. ?m v₂ v₁ v₀ = t  =>  ?m = λ λ λ t
+    | args == ctxVars ctx = assign m (makeLam ctx t)
+    | otherwise = saveEquation ctx (Meta m args) t
+  where
+    makeLam EmptyCtx t' = t'
+    makeLam (ExtendCtx ctx' _) t' = makeLam ctx' (Lam t')
 
 -- Attempts to simplify a term to a weak head normal form.
 whnf :: Term -> TcM Term
