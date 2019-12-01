@@ -21,7 +21,13 @@ type Type = Term
 data Ctx
     = EmptyCtx
     | ExtendCtx !Ctx !Type
-    deriving (Show)
+
+instance Show Ctx where
+    showsPrec _ EmptyCtx = showString "()"
+    showsPrec _ (ExtendCtx ctx ty) = showChar '(' . go ctx . shows ty . showChar ')'
+      where
+        go EmptyCtx = id
+        go (ExtendCtx ctx' ty') = go ctx' . shows ty' . showString ", "
 
 -- Returns the number of variables in a context.
 ctxLength :: Ctx -> Int
