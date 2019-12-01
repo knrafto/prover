@@ -11,7 +11,7 @@ import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8    as B
 import           Data.Maybe
 import qualified Data.Text.IO                  as Text
-import           Text.Megaparsec    hiding (Token, tokens)
+import           Text.Megaparsec               hiding (Token, tokens)
 import           Text.Pretty.Simple
 
 import qualified Flags
@@ -56,7 +56,7 @@ tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
         Token.Dot         -> Just "dot"
         Token.Underscore  -> Just "underscore"
         Token.Colon       -> Just "colon"
-        Token.DefEquals -> Just "def_equals"
+        Token.DefEquals   -> Just "def_equals"
         Token.Sigma       -> Just "sigma"
         Token.Pi          -> Just "pi"
         Token.Lambda      -> Just "lambda"
