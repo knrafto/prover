@@ -1,6 +1,8 @@
+{-# LANGUAGE LambdaCase #-}
 module Term where
 
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 newtype MetaId = MetaId Int
     deriving (Eq, Ord, Show)
@@ -13,7 +15,45 @@ data Term
     | Lam !Term
     | Universe
     | Pi !Type !Type
-    deriving (Eq, Show)
+    deriving (Eq)
+
+showSubscript :: Int -> String
+showSubscript = map toSubscriptChar . show
+  where
+    toSubscriptChar = \case
+        '0' -> '₀'
+        '1' -> '₁'
+        '2' -> '₂'
+        '3' -> '₃'
+        '4' -> '₄'
+        '5' -> '₅'
+        '6' -> '₆'
+        '7' -> '₇'
+        '8' -> '₈'
+        '9' -> '₉'
+        _   -> error "showSubscript: not a digit"
+
+instance Show Term where
+    showsPrec d = \case
+        Meta (MetaId i) args -> showApp ("α" ++ showSubscript i) args
+        Var i args -> showApp ("v" ++ showSubscript i) args
+        Assumption t args -> showApp (Text.unpack t) args
+        Lam t -> showParen (d > appPrec) $
+            showString "λ " . showsPrec (appPrec + 1) t
+        Universe -> showString "Type"
+        Pi a b -> showParen (d > appPrec) $
+            showString "Π " . showsPrec (appPrec + 1) a .
+            showString " " . showsPrec (appPrec + 1) b
+      where
+        appPrec = 10
+
+        showApp f [] = showString f
+        showApp f args = showParen (d > appPrec) $
+            showString f . showArgs args
+
+        showArgs [] = id
+        showArgs (arg:args) =
+            showString " " . showsPrec (appPrec + 1) arg . showArgs args
 
 type Type = Term
 
