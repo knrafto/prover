@@ -4,19 +4,6 @@ module Term where
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-newtype MetaId = MetaId Int
-    deriving (Eq, Ord, Show)
-
--- Core term representation. Terms are always well-typed.
-data Term
-    = Meta {-# UNPACK #-} !MetaId [Term]
-    | Var {-# UNPACK #-} !Int [Term]
-    | Assumption !Text [Term]
-    | Lam !Term
-    | Universe
-    | Pi !Type !Type
-    deriving (Eq)
-
 showSubscript :: Int -> String
 showSubscript = map toSubscriptChar . show
   where
@@ -33,9 +20,25 @@ showSubscript = map toSubscriptChar . show
         '9' -> '₉'
         _   -> error "showSubscript: not a digit"
 
+newtype MetaId = MetaId Int
+    deriving (Eq, Ord)
+
+instance Show MetaId where
+    show (MetaId i) = "α" ++ showSubscript i
+
+-- Core term representation. Terms are always well-typed.
+data Term
+    = Meta {-# UNPACK #-} !MetaId [Term]
+    | Var {-# UNPACK #-} !Int [Term]
+    | Assumption !Text [Term]
+    | Lam !Term
+    | Universe
+    | Pi !Type !Type
+    deriving (Eq)
+
 instance Show Term where
     showsPrec d = \case
-        Meta (MetaId i) args -> showApp ("α" ++ showSubscript i) args
+        Meta m args -> showApp (show m) args
         Var i args -> showApp ("v" ++ showSubscript i) args
         Assumption t args -> showApp (Text.unpack t) args
         Lam t -> showParen (d > appPrec) $
@@ -107,7 +110,7 @@ data Subst
 applySubst :: Subst -> Term -> Term
 applySubst subst t = case t of
     Meta m args -> Meta m (map (applySubst subst) args)
-    Var i args -> app (applySubstToVar subst i) args
+    Var i args -> app (applySubstToVar subst i) (map (applySubst subst) args)
     Assumption n args -> Assumption n (map (applySubst subst) args)
     Lam b -> Lam (applySubst (SubstLift subst) b)
     Universe -> t

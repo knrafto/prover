@@ -80,6 +80,7 @@ saveEquation ctx t1 t2 =
 -- TODO: occurs check
 assign :: MetaId -> Term -> TcM ()
 assign i t = do
+    trace ("Assigning " ++ show i ++ " ↦ " ++ show t) $ return ()
     eqs <- gets tcUnsolvedEquations
     modify $ \s ->
         s { tcMetaValues = Map.insert i t (tcMetaValues s), tcUnsolvedEquations = [] }
@@ -109,8 +110,8 @@ checkSolved = do
 
 unify :: Ctx -> Term -> Term -> TcM ()
 unify ctx t1 t2 = do
-    t1' <- whnf t1
-    t2' <- whnf t2
+    t1' <- whnf ctx t1
+    t2' <- whnf ctx t2
     trace
             (  "Unifying in context: "
             ++ show ctx
@@ -148,12 +149,12 @@ unifyMeta ctx m args t
     makeLam (ExtendCtx ctx' _) t' = makeLam ctx' (Lam t')
 
 -- Attempts to simplify a term to a weak head normal form.
-whnf :: Term -> TcM Term
-whnf t = case t of
+whnf :: Ctx -> Term -> TcM Term
+whnf ctx t = case t of
     Meta m args -> do
         metaValues <- gets tcMetaValues
         -- TODO: path compression
         case Map.lookup m metaValues of
             Nothing -> return t
-            Just t' -> return (app t' args)
+            Just t' -> return (app (weakenGlobal ctx t') args)
     _ -> return t
