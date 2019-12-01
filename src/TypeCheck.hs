@@ -1,21 +1,19 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 module TypeCheck where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Data.IORef
 import           Data.List
-import           Data.Map.Strict                ( Map )
+
+import           Control.Monad.State
 import qualified Data.Map.Strict               as Map
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
-import           System.IO.Unsafe
 
-import qualified Flags
 import           Location
 import           Naming
+import           TcM
+import           Term
 import           Syntax                         ( Id
                                                 , Ann
                                                 , ann
@@ -24,220 +22,25 @@ import           Syntax                         ( Id
                                                 , Statement
                                                 )
 import qualified Syntax
-import           Term
 
-data TcAnn = TcAnn Range Term
+type TypedTerm = (Term, Type)
+data TcAnn = TcAnn !Range !TypedTerm
 
 data Tc
 type instance Id Tc = Name
 type instance Ann Tc = TcAnn
 
+exprTypedTerm :: Expr Tc -> TypedTerm
+exprTypedTerm e = case ann e of
+    TcAnn _ tt -> tt
+
 exprTerm :: Expr Tc -> Term
 exprTerm e = case ann e of
-    TcAnn _ t -> t
+    TcAnn _ (t, _) -> t
 
-data TcState = TcState
-    -- Global definitions, and their values.
-    { envDefinitions :: Map Text Term
-    -- Global assumptions, and their types.
-    , envAssumptions :: Map Text Term
-    -- Next metavar id.
-    , nextId :: !Int
-    -- Metavar substitution.
-    , subst :: Map VarId Term
-    -- Unsolved unification equations.
-    , unsolvedEquations :: [(Term, Term)]
-    }
-
-initialState :: TcState
-initialState = TcState { envDefinitions    = Map.empty
-                       , envAssumptions    = Map.empty
-                       , nextId            = 0
-                       , subst             = Map.empty
-                       , unsolvedEquations = []
-                       }
-
-newtype TcM a = TcM { unTcM :: StateT TcState (ExceptT String IO) a }
-    deriving (Functor, Applicative, Monad, MonadIO, MonadError String, MonadState TcState)
-
-{-# NOINLINE indentRef #-}
-indentRef :: IORef Int
-indentRef = unsafePerformIO (newIORef 0)
-
-trace :: String -> TcM a -> TcM a
-trace e m = do
-    liftIO $ do
-        level <- readIORef indentRef
-        writeIORef indentRef (level + 1)
-        let pad = replicate (2 * level) ' '
-        when Flags.print_trace $
-            putStrLn $ unlines $ map (pad ++) $ lines e
-    a <- m
-    liftIO $ do
-        level <- readIORef indentRef
-        writeIORef indentRef (level - 1)
-    return a
-
--- Runs a search, reporting any failure
-runTcM :: TcM a -> IO (Either String (a, TcState))
-runTcM (TcM m) = runExceptT (runStateT m initialState)
-
--- Generate a metavar for the given context and type.
-freshMetavar :: Context -> Term -> TcM Term
-freshMetavar _Γ _A = do
-    i <- gets nextId
-    modify $ \s -> s { nextId = i + 1 }
-    return $ Metavar (VarId i) _Γ _A
-
--- Generate an unknown term and type.
-hole :: Context -> TcM Term
-hole _Γ = do
-    -- We generate variables for both the hole itself, and its type. Luckily
-    -- for now we don't have to do this forever, since the type of any type is
-    -- the universe.
-    _A <- freshMetavar _Γ (Universe _Γ)
-    freshMetavar _Γ _A
-
-saveEquation :: Term -> Term -> TcM ()
-saveEquation t1 t2 =
-    modify $ \s -> s { unsolvedEquations = (t1, t2) : unsolvedEquations s }
-
--- TODO: occurs check
-assign :: VarId -> Term -> TcM ()
-assign i t = do
-    eqs <- gets unsolvedEquations
-    modify $ \s ->
-        s { subst = Map.insert i t (subst s), unsolvedEquations = [] }
-    unless (null eqs) $ trace "Retrying unsolved equations" $ forM_
-        eqs
-        (uncurry unify)
-
-unificationFailure :: Term -> Term -> TcM a
-unificationFailure t1 t2 =
-    throwError
-        $  "Failed to unify in context: "
-        ++ show (context t1)
-        ++ "\n"
-        ++ "  "
-        ++ show t1
-        ++ "\n"
-        ++ "  "
-        ++ show t2
-
-checkSolved :: TcM ()
-checkSolved = do
-    eqs <- gets unsolvedEquations
-    modify $ \s -> s { unsolvedEquations = [] }
-    case eqs of
-        []             -> return ()
-        ((t1, t2) : _) -> unificationFailure t1 t2
-
-unify :: Term -> Term -> TcM ()
-unify t1 t2 = do
-    t1' <- reduce t1
-    t2' <- reduce t2
-    trace
-            (  "Unifying in context: "
-            ++ show (context t1)
-            ++ "\n  "
-            ++ show t1'
-            ++ "\n  "
-            ++ show t2'
-            )
-        $ unify' t1' t2'
-
-unify' :: Term -> Term -> TcM ()
-unify' t1 t2 | t1 == t2                           = return ()
-unify' (Universe _) (Universe _)                  = return ()
-unify' (Universe _) (Apply σ t) = unify (Universe (substCodomain σ)) t
-unify' (Apply σ t) (Universe _) = unify (Universe (substCodomain σ)) t
-unify' (Assume n1 _ _) (Assume n2 _ _) | n1 == n2 = return ()
-unify' (Metavar i _ _)           t                           = assign i t
-unify' t                         (Metavar i _ _            ) = assign i t
-unify' (Var (VZ _   )          ) (Var (VZ _   )            ) = return ()
-unify' (Var (VS _ v1)) (Var (VS _ v2)) = unify (Var v1) (Var v2)
-unify' (Apply (SubstWeaken _) t) (Var (VS _ v )            ) = unify t (Var v)
-unify' (Var (VS _ v)           ) (Apply (SubstWeaken _) t  ) = unify t (Var v)
-unify' (Pi _A1 _B1             ) (Pi    _A2             _B2) = do
-    unify _A1 _A2
-    unify _B1 _B2
-unify' (Pi _A _B) (Apply σ t) = do
-    let _Γ = substCodomain σ
-    _A' <- freshMetavar _Γ (Universe _Γ)
-    _B' <- freshMetavar (Extend _A') (Universe (Extend _A'))
-    unify t  (Pi _A' _B')
-    unify _A (Apply σ _A')
-    unify _B (Apply (SubstExtend σ _A') _B')
-unify' t1@(Apply _ _ ) t2@(Pi  _ _ ) = unify t2 t1
-unify' (   Lam   _ b1) (   Lam _ b2) = unify b1 b2
-unify' (App _ _ f1 a1) (App _ _ f2 a2) | isWeakNormal f1 && isWeakNormal f2 = do
-    unify f1 f2
-    unify a1 a2
--- Eta rule says that lam(app(f[wk], v₀))) = f for any f. Thus, if we have
--- app(f[wk], v₀)) = e, then we know f = lam(e).
-unify' (App _A _ (Apply (SubstWeaken _) t1) (Var (VZ _))) t2 =
-    unify t1 (Lam _A t2)
-unify' t2 (App _A _ (Apply (SubstWeaken _) t1) (Var (VZ _))) =
-    unify t1 (Lam _A t2)
--- Two-level eta rule.
--- TODO: infer this from principles instead of hacking it in.
-unify' (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _))) t2
-    = unify t1 (Lam _A (Lam _B t2))
-unify' t2 (App _A _ (App _B _ (Apply (SubstWeaken _) (Apply (SubstWeaken _) t1)) (Var (VS _ (VZ _)))) (Var (VZ _)))
-    = unify t1 (Lam _A (Lam _B t2))
--- Eta for var.
-unify' t1@(Lam _A b) t2@(Var _   ) = unify' t1 (etaExpand _A (termType b) t2)
-unify' t1@(Var _   ) t2@(Lam _A b) = unify' (etaExpand _A (termType b) t1) t2
--- If two head-neutral terms don't unify, the terms are unequal; otherwise,
--- save it for later.
-unify' t1 t2 | isWeakNormal t1 && isWeakNormal t2 = unificationFailure t1 t2
-             | otherwise                          = saveEquation t1 t2
-
--- Attempts to simplify a term. If there are no metavars, the result will be
--- a normal form.
--- TODO: reduce contexts, types too?
-reduce :: Term -> TcM Term
-reduce t@(Universe _   ) = return t
-reduce t@(Assume  _ _ _) = return t
-reduce t@(Metavar i _ _) = do
-    currentSubst <- gets subst
-    -- TODO: path compression
-    case Map.lookup i currentSubst of
-        Nothing -> return t
-        Just t' -> reduce t'
-reduce (Apply σ t) = do
-    t' <- reduce t
-    case t' of
-        Universe _        -> return $ Universe (substDomain σ)
-        Assume  name _ _A -> return $ Assume name (substDomain σ) (Apply σ _A)
-        Metavar _    _ _  -> return $ Apply σ t'
-        Apply τ t''       -> case (σ, τ) of
-            (SubstTerm _, SubstWeaken _) -> return t''
-            (SubstExtend σ' _, SubstWeaken _A) ->
-                reduce $ Apply (SubstWeaken (Apply σ' _A)) (Apply σ' t'')
-            _ -> return $ Apply σ t'
-        Var v -> reduce $ case (σ, v) of
-            (SubstWeaken _A  , _      ) -> Var (VS _A v)
-            (SubstTerm   a   , VZ _   ) -> a
-            (SubstTerm   _   , VS _ v') -> Var v'
-            (SubstExtend σ' _, VZ _A  ) -> Var (VZ (Apply σ' _A))
-            (SubstExtend σ' _A, VS _ v') ->
-                Apply (SubstWeaken (Apply σ' _A)) (Apply σ' (Var v'))
-        Pi  _A _B     -> reduce $ Pi (Apply σ _A) (Apply (SubstExtend σ _A) _B)
-        Lam _A b      -> reduce $ Lam (Apply σ _A) (Apply (SubstExtend σ _A) b)
-        App _A _B f a -> reduce $ App (Apply σ _A)
-                                      (Apply (SubstExtend σ _A) _B)
-                                      (Apply σ f)
-                                      (Apply σ a)
-reduce t@(Var _        ) = return t
-reduce (  Pi  _A _B    ) = Pi <$> reduce _A <*> reduce _B
-reduce (  Lam _A b     ) = Lam _A <$> reduce b
-reduce (  App _A _B f a) = do
-    f' <- reduce f
-    a' <- reduce a
-    case f' of
-        Lam _ b -> reduce $ Apply (SubstTerm a') b
-        _       -> return $ App _A _B f' a'
+exprType :: Expr Tc -> Type
+exprType e = case ann e of
+    TcAnn _ (_, ty) -> ty
 
 typeCheck :: [Statement N] -> TcM [Statement Tc]
 typeCheck = mapM typeCheckStatement
@@ -246,159 +49,156 @@ typeCheckStatement :: Statement N -> TcM (Statement Tc)
 typeCheckStatement = \case
     Syntax.Define n mty body -> do
         let name = unLoc (nameUsage n)
-        body' <- typeCheckExpr Empty [] body
+        body' <- typeCheckExpr EmptyCtx [] body
         mty' <- case mty of
             Nothing -> return Nothing
             Just ty -> do
-                ty' <- typeCheckExpr Empty [] ty
-                unify (termType (exprTerm body')) (exprTerm ty')
+                ty' <- typeCheckExpr EmptyCtx [] ty
+                unify EmptyCtx (exprType body') (exprTerm ty')
                 return (Just ty')
         checkSolved
-        modify $ \s -> s { envDefinitions = Map.insert name (exprTerm body') (envDefinitions s) }
+        modify $ \s -> s { tcDefinitions = Map.insert name (exprTypedTerm body') (tcDefinitions s) }
         return (Syntax.Define n mty' body')
     Syntax.Assume n ty -> do
         let name = unLoc (nameUsage n)
-        ty' <- typeCheckExpr Empty [] ty
+        ty' <- typeCheckExpr EmptyCtx [] ty
         checkSolved
-        modify $ \s -> s { envAssumptions = Map.insert name (exprTerm ty') (envAssumptions s) }
+        modify $ \s -> s { tcAssumptions = Map.insert name (exprTerm ty') (tcAssumptions s) }
         return (Syntax.Assume n ty')
     Syntax.Prove _ _ -> fail "prove not implemented"
 
-typeCheckExpr :: Context -> [Text] -> Expr N -> TcM (Expr Tc)
-typeCheckExpr _Γ names = \case
+typeCheckExpr :: Ctx -> [Text] -> Expr N -> TcM (Expr Tc)
+typeCheckExpr ctx names = \case
     Syntax.Var l n -> do
         let name = unLoc (nameUsage n)
-        -- We assume that name resolution is correct and the map lookups cannot fail.
-        t <- case nameKind n of
+        -- We assume that name resolution is correct so that the map lookups cannot fail.
+        tt <- case nameKind n of
             Local -> do
                 let Just i = elemIndex name names
-                return (Var (fromDeBruijn _Γ i))
+                return (Var i [], ctxVarType ctx i)
             Defined -> do
-                definitions <- gets envDefinitions
-                let Just body = Map.lookup name definitions
-                return (weakenGlobal _Γ body)
-            Assumed -> do
-                assumptions <- gets envAssumptions
-                let Just _A = Map.lookup name assumptions
-                return (weakenGlobal _Γ (Assume name Empty _A))
-            Unbound ->
-                fail $ "unbound name: " ++ Text.unpack name
-        return (Syntax.Var (TcAnn l t) n)
+                definitions <- gets tcDefinitions
+                let Just (t, ty) = Map.lookup name definitions
+                return (weakenGlobal ctx t, weakenGlobal ctx ty)
+            Assumed -> assumption ctx name
+            Unbound -> fail $ "unbound name: " ++ Text.unpack name
+        return (Syntax.Var (TcAnn l tt) n)
     Syntax.Hole l -> do
-        t <- hole _Γ
-        return (Syntax.Hole (TcAnn l t))
-    Syntax.Type l       -> return (Syntax.Type (TcAnn l (Universe _Γ)))
+        tt <- hole ctx
+        return (Syntax.Hole (TcAnn l tt))
+    Syntax.Type l -> return (Syntax.Type (TcAnn l (Universe, Universe)))
     Syntax.App l f arg -> do
-        f'    <- typeCheckExpr _Γ names f
-        arg'  <- typeCheckExpr _Γ names arg
-        t     <- typeCheckApp (exprTerm f') (exprTerm arg')
-        return (Syntax.App (TcAnn l t) f' arg')
+        f'    <- typeCheckExpr ctx names f
+        arg'  <- typeCheckExpr ctx names arg
+        tt    <- typeCheckApp ctx (exprTypedTerm f') (exprTypedTerm arg')
+        return (Syntax.App (TcAnn l tt) f' arg')
     Syntax.Tuple l args -> do
-        args' <- mapM (typeCheckExpr _Γ names) args
-        t     <- typeCheckTuple (map exprTerm args')
-        return (Syntax.Tuple (TcAnn l t) args')
+        args' <- mapM (typeCheckExpr ctx names) args
+        tt    <- typeCheckTuple ctx (map exprTypedTerm args')
+        return (Syntax.Tuple (TcAnn l tt) args')
     Syntax.Pi l param body -> do
-        (param', paramTerm, body') <- typeCheckParam _Γ names param body
-        t <- typeCheckPi paramTerm (exprTerm body')
-        return (Syntax.Pi (TcAnn l t) param' body')
+        (param', paramTerm, body') <- typeCheckParam ctx names param body
+        tt <- typeCheckPi ctx paramTerm (exprTypedTerm body')
+        return (Syntax.Pi (TcAnn l tt) param' body')
     Syntax.Lambda l param body -> do
-        (param', paramTerm, body') <- typeCheckParam _Γ names param body
-        t <- typeCheckLambda paramTerm (exprTerm body')
-        return (Syntax.Lambda (TcAnn l t) param' body')
+        (param', paramTerm, body') <- typeCheckParam ctx names param body
+        tt <- typeCheckLambda ctx paramTerm (exprTypedTerm body')
+        return (Syntax.Lambda (TcAnn l tt) param' body')
     Syntax.Sigma  l param body -> do
-        (param', paramTerm, body') <- typeCheckParam _Γ names param body
-        t <- typeCheckSigma paramTerm (exprTerm body')
-        return (Syntax.Sigma (TcAnn l t) param' body')
+        (param', paramTerm, body') <- typeCheckParam ctx names param body
+        tt <- typeCheckSigma ctx paramTerm (exprTypedTerm body')
+        return (Syntax.Sigma (TcAnn l tt) param' body')
     Syntax.Equal  l a      b  -> do
-        f' <- builtin _Γ "Id"
-        _A <- hole _Γ
-        a' <- typeCheckExpr _Γ names a
-        b' <- typeCheckExpr _Γ names b
-        t  <- typeCheckApps f' [_A, exprTerm a', exprTerm b']
-        return (Syntax.Equal (TcAnn l t) a' b')
+        f <- assumption ctx "Id"
+        _A <- hole ctx
+        a' <- typeCheckExpr ctx names a
+        b' <- typeCheckExpr ctx names b
+        tt <- typeCheckApps ctx f [_A, exprTypedTerm a', exprTypedTerm b']
+        return (Syntax.Equal (TcAnn l tt) a' b')
     Syntax.Arrow l a b -> do
-        a' <- typeCheckExpr _Γ names a
-        b' <- typeCheckExpr _Γ names b
-        let _A = exprTerm a'
-        let _B = exprTerm b'
-        checkIsType _A
-        checkIsType _B
-        let t = Pi _A (Apply (SubstWeaken _A) _B)
-        return (Syntax.Arrow (TcAnn l t) a' b')
+        a' <- typeCheckExpr ctx names a
+        b' <- typeCheckExpr ctx names b
+        tt <- typeCheckPi ctx (exprTypedTerm a') (weakenTypedTerm (exprTypedTerm b'))
+        return (Syntax.Arrow (TcAnn l tt) a' b')
     Syntax.Times l a b -> do
-        a' <- typeCheckExpr _Γ names a
-        b' <- typeCheckExpr _Γ names b
-        let _A = exprTerm a'
-        let _B = exprTerm b'
-        f   <- builtin _Γ "Σ'"
-        t <- typeCheckApps f [_A, Lam _A (Apply (SubstWeaken _A) _B)]
-        return (Syntax.Times (TcAnn l t) a' b')
+        a' <- typeCheckExpr ctx names a
+        b' <- typeCheckExpr ctx names b
+        tt <- typeCheckSigma ctx (exprTypedTerm a') (weakenTypedTerm (exprTypedTerm b'))
+        return (Syntax.Times (TcAnn l tt) a' b')
 
-builtin :: Context -> String -> TcM Term
-builtin _Γ name = do
-    let name' = Text.pack name
-    assumptions <- gets envAssumptions
-    case Map.lookup name' assumptions of
-        Just _A -> return (weakenGlobal _Γ (Assume name' Empty _A))
-        _       -> fail $ "can't find built-in: " ++ name
+assumption :: Ctx -> Text -> TcM TypedTerm
+assumption ctx name = do
+    assumptions <- gets tcAssumptions
+    case Map.lookup name assumptions of
+        Just _A -> return (Assumption name [], weakenGlobal ctx _A)
+        _       -> fail $ "can't find built-in: " ++ Text.unpack name
 
-checkIsType :: Term -> TcM ()
-checkIsType t = unify (termType t) (Universe (context t))
+-- Generate an unknown term and type.
+hole :: Ctx -> TcM TypedTerm
+hole _Γ = do
+    -- We generate variables for both the hole itself, and its type. Luckily
+    -- for now we don't have to do this forever, since the type of any type is
+    -- the universe.
+    ty <- freshMeta _Γ Universe
+    t <- freshMeta _Γ ty
+    return (t, ty)
 
-typeCheckParam :: Context -> [Text] -> Param N -> Expr N -> TcM (Param Tc, Term, Expr Tc)
-typeCheckParam _Γ names (n, me) body = do
+weakenTypedTerm :: TypedTerm -> TypedTerm
+weakenTypedTerm (t, ty) = (weaken t, weaken ty)
+
+typeCheckParam :: Ctx -> [Text] -> Param N -> Expr N -> TcM (Param Tc, TypedTerm, Expr Tc)
+typeCheckParam ctx names (n, me) body = do
     let name = unLoc (nameUsage n)
-    (me', t) <- case me of
+    (me', tt) <- case me of
         Nothing -> do
-            t <- hole _Γ
-            return (Nothing, t)
+            tt <- hole ctx
+            return (Nothing, tt)
         Just e -> do
-            e' <- typeCheckExpr _Γ names e
-            return (Just e', exprTerm e')
-    body' <- typeCheckExpr (Extend t) (name : names) body
-    return ((n, me'), t, body')
+            e' <- typeCheckExpr ctx names e
+            return (Just e', exprTypedTerm e')
+    body' <- typeCheckExpr (ExtendCtx ctx (snd tt)) (name : names) body
+    return ((n, me'), tt, body')
 
-typeCheckPi :: Term -> Term -> TcM Term
-typeCheckPi _A _B = do
-    checkIsType _A
-    checkIsType _B
-    return (Pi _A _B)
+typeCheckPi :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
+typeCheckPi ctx (_A, _Aty) (_B, _Bty) = do
+    unify ctx _Aty Universe
+    unify (ExtendCtx ctx _Aty) _Bty Universe
+    return (Pi _A _B, Universe)
 
-typeCheckLambda :: Term -> Term -> TcM Term
-typeCheckLambda _A _B = do
-    checkIsType _A
-    return (Lam _A _B)
+typeCheckLambda :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
+typeCheckLambda ctx (_A, _Aty) (b, _B) = do
+    unify ctx _Aty Universe
+    return (Lam b, Pi _A _B)
 
-typeCheckSigma :: Term -> Term -> TcM Term
-typeCheckSigma _A _B = do
-    f <- builtin (context _A) "Σ'"
-    typeCheckApps f [_A, Lam _A _B]
+typeCheckSigma :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
+typeCheckSigma ctx a b = do
+    f  <- assumption ctx "Σ'"
+    b' <- typeCheckLambda ctx a b
+    typeCheckApps ctx f [a, b']
 
-typeCheckApp :: Term -> Term -> TcM Term
-typeCheckApp f arg = do
-    let _Γ = context f
-    let _A = termType arg
-    _B <- freshMetavar _Γ (Universe _Γ)
-    unify (termType f) (Pi _A _B)
-    return (App _A _B f arg)
+typeCheckApp :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
+typeCheckApp ctx (f, fty) (arg, _A) = do
+    _B <- freshMeta (ExtendCtx ctx _A) Universe
+    unify ctx fty (Pi _A _B)
+    return (app f [arg], _B)
 
-typeCheckApps :: Term -> [Term] -> TcM Term
-typeCheckApps f []           = return f
-typeCheckApps f (arg : args) = do
-    f' <- typeCheckApp f arg
-    typeCheckApps f' args
+typeCheckApps :: Ctx -> TypedTerm -> [TypedTerm] -> TcM TypedTerm
+typeCheckApps _   f []           = return f
+typeCheckApps ctx f (arg : args) = do
+    f' <- typeCheckApp ctx f arg
+    typeCheckApps ctx f' args
 
-typeCheckTuple :: [Term] -> TcM Term
-typeCheckTuple []       = error "typeCheckTuple: empty tuple"
-typeCheckTuple [t     ] = return t
-typeCheckTuple (a : ts) = do
-    let _Γ  = context a
-    let _A  = termType a
-    let _Γ' = Extend _A
-    _B   <- freshMetavar _Γ' (Universe _Γ')
-    b    <- typeCheckTuple ts
-    pair <- builtin _Γ "pair"
-    typeCheckApps pair [_A, Lam _A _B, a, b]
+typeCheckTuple :: Ctx -> [TypedTerm] -> TcM TypedTerm
+typeCheckTuple _   []         = error "typeCheckTuple: empty tuple"
+typeCheckTuple _   [t       ] = return t
+typeCheckTuple ctx (a : rest) = do
+    let ctx' = ExtendCtx ctx (snd a)
+    _A   <- hole ctx
+    _B   <- hole ctx'
+    f    <- typeCheckLambda ctx _A _B
+    b    <- typeCheckTuple ctx' rest
+    pair <- assumption ctx "pair"
+    typeCheckApps ctx pair [_A, f, a, b]
 
 printStatements :: [Statement Tc] -> IO ()
 printStatements = mapM_ printStatement

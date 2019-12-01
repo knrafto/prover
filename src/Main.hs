@@ -18,6 +18,7 @@ import qualified Flags
 import           Location
 import           Naming
 import           Syntax
+import           TcM
 import           Token (Token(..))
 import qualified Token
 import           TypeCheck
