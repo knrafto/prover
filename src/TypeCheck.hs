@@ -192,13 +192,11 @@ typeCheckTuple :: Ctx -> [TypedTerm] -> TcM TypedTerm
 typeCheckTuple _   []         = error "typeCheckTuple: empty tuple"
 typeCheckTuple _   [t       ] = return t
 typeCheckTuple ctx (a : rest) = do
-    let ctx' = ExtendCtx ctx (snd a)
     _A   <- hole ctx
-    _B   <- hole ctx'
-    f    <- typeCheckLambda ctx _A _B
-    b    <- typeCheckTuple ctx' rest
+    _B   <- hole ctx
+    b    <- typeCheckTuple ctx rest
     pair <- assumption ctx "pair"
-    typeCheckApps ctx pair [_A, f, a, b]
+    typeCheckApps ctx pair [_A, _B, a, b]
 
 printStatements :: [Statement Tc] -> IO ()
 printStatements = mapM_ printStatement
