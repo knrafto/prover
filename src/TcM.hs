@@ -138,8 +138,10 @@ unify' ctx ty t1 t2 = case (ty, t1, t2) of
             assumptions <- gets tcAssumptions
             let Just nty = Map.lookup n1 assumptions
             unifySpine ctx (weakenGlobal ctx nty) (zip args1 args2)
-    -- TODO: eta
     (Pi _A _B, Lam b1, Lam b2) -> unify (ExtendCtx ctx _A) _B b1 b2
+    -- η-expansion
+    (Pi _A _B, Lam b, t) -> unify (ExtendCtx ctx _A) _B b (app (weaken t) [Var 0 []])
+    (Pi _A _B, t, Lam b) -> unify (ExtendCtx ctx _A) _B (app (weaken t) [Var 0 []]) b
     (Universe, Universe, Universe) -> return ()
     (Universe, Pi _A1 _B1, Pi _A2 _B2) -> do
         unify ctx Universe _A1 _A2
