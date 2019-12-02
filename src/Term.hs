@@ -54,6 +54,7 @@ termType :: Term -> Type
 termType (Term _ _A _) = _A
 
 -- Core term representation. Terms are always well-typed.
+-- TODO: should contain Terms
 data TermView
     = Meta {-# UNPACK #-} !MetaId [TermView]
     | Var {-# UNPACK #-} !Int [TermView]
@@ -84,6 +85,25 @@ instance Show TermView where
         showArgs [] = id
         showArgs (arg:args) =
             showString " " . showsPrec (appPrec + 1) arg . showArgs args
+
+class MonadTerm m where
+    -- Term constructors, via unification.
+
+    -- Create a new meta.
+    freshMeta :: Ctx -> Type -> m Term
+    -- (Γ : Ctx) (n : Assumption) → Tm Γ (ty n)
+    assumption :: Ctx -> Text -> m Term
+    -- ∀ {A} (Γ : Ctx) → Var Γ A → Tm Γ A
+    var :: Ctx -> Int -> m Term
+    -- ∀ {Γ A B} → Tm (Γ, A) B → Tm Γ (Π A B)
+    lam :: Term -> m Term
+    -- ∀ {Γ} → U : Tm Γ U
+    universe :: m Term
+    -- ∀ {Γ} (A : Tm Γ U) → Tm (Γ, A) U → Tm Γ U
+    pi :: Term -> Term -> m Term
+
+    -- Reduce a term to weak head normal form.
+    whnf :: Term -> m TermView
 
 -- Returns the number of variables in a context.
 ctxLength :: Ctx -> Int

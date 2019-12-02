@@ -66,8 +66,8 @@ runTcM (TcM m) = runExceptT (runStateT m initialState)
 
 -- Generate a new metavariable for the given context Γ and type A. The new meta
 -- has type α : Γ → A and the returned term is α Γ.
-freshMeta :: Ctx -> Type -> TcM TermView
-freshMeta ctx _A = do
+freshMeta' :: Ctx -> Type -> TcM TermView
+freshMeta' ctx _A = do
     i <- gets tcNextId
     let m = MetaId i
     let ty = ctxPi ctx _A
@@ -111,9 +111,9 @@ checkSolved = do
 
 unify :: Ctx -> Type -> TermView -> TermView -> TcM ()
 unify ctx ty t1 t2 = do
-    ty' <- whnf ctx ty
-    t1' <- whnf ctx t1
-    t2' <- whnf ctx t2
+    ty' <- whnfView ctx ty
+    t1' <- whnfView ctx t1
+    t2' <- whnfView ctx t2
     trace
             (  "Unifying in context: "
             ++ show ctx
@@ -160,13 +160,13 @@ unifyMeta ctx ty m args t
 unifySpine :: Ctx -> Type -> [(TermView, TermView)] -> TcM ()
 unifySpine _ _ [] = return ()
 unifySpine ctx hty ((arg1, arg2) : args) = do
-    Pi _A _B <- whnf ctx hty
+    Pi _A _B <- whnfView ctx hty
     unify ctx _A arg1 arg2
     unifySpine ctx (instantiate _B arg1) args 
 
 -- Attempts to simplify a term to a weak head normal form.
-whnf :: Ctx -> TermView -> TcM TermView
-whnf ctx t = case t of
+whnfView :: Ctx -> TermView -> TcM TermView
+whnfView ctx t = case t of
     Meta m args -> do
         metaValues <- gets tcMetaValues
         -- TODO: path compression

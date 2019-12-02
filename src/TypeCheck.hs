@@ -80,7 +80,7 @@ typeCheckExpr ctx names = \case
                 definitions <- gets tcDefinitions
                 let Just (t, ty) = Map.lookup name definitions
                 return (weakenGlobal ctx t, weakenGlobal ctx ty)
-            Assumed -> assumption ctx name
+            Assumed -> assumption' ctx name
             Unbound -> fail $ "unbound name: " ++ Text.unpack name
         return (Syntax.Var (TcAnn l tt) n)
     Syntax.Hole l -> do
@@ -109,7 +109,7 @@ typeCheckExpr ctx names = \case
         tt <- typeCheckSigma ctx paramTerm (exprTypedTerm body')
         return (Syntax.Sigma (TcAnn l tt) param' body')
     Syntax.Equal  l a      b  -> do
-        f <- assumption ctx "Id"
+        f <- assumption' ctx "Id"
         _A <- hole ctx
         a' <- typeCheckExpr ctx names a
         b' <- typeCheckExpr ctx names b
@@ -126,8 +126,8 @@ typeCheckExpr ctx names = \case
         tt <- typeCheckSigma ctx (exprTypedTerm a') (weakenTypedTerm (exprTypedTerm b'))
         return (Syntax.Times (TcAnn l tt) a' b')
 
-assumption :: Ctx -> Text -> TcM TypedTerm
-assumption ctx name = do
+assumption' :: Ctx -> Text -> TcM TypedTerm
+assumption' ctx name = do
     assumptions <- gets tcAssumptions
     case Map.lookup name assumptions of
         Just _A -> return (Assumption name [], weakenGlobal ctx _A)
@@ -139,8 +139,8 @@ hole _Γ = do
     -- We generate variables for both the hole itself, and its type. Luckily
     -- for now we don't have to do this forever, since the type of any type is
     -- the universe.
-    ty <- freshMeta _Γ Universe
-    t <- freshMeta _Γ ty
+    ty <- freshMeta' _Γ Universe
+    t <- freshMeta' _Γ ty
     return (t, ty)
 
 weakenTypedTerm :: TypedTerm -> TypedTerm
@@ -172,13 +172,13 @@ typeCheckLambda ctx (_A, _Aty) (b, _B) = do
 
 typeCheckSigma :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckSigma ctx a b = do
-    f  <- assumption ctx "Σ'"
+    f  <- assumption' ctx "Σ'"
     b' <- typeCheckLambda ctx a b
     typeCheckApps ctx f [a, b']
 
 typeCheckApp :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckApp ctx (f, fty) (arg, _A) = do
-    _B <- freshMeta (ctx :> _A) Universe
+    _B <- freshMeta' (ctx :> _A) Universe
     unify ctx Universe fty (Pi _A _B)
     return (app f [arg], instantiate _B arg)
 
@@ -195,7 +195,7 @@ typeCheckTuple ctx (a : rest) = do
     _A   <- hole ctx
     _B   <- hole ctx
     b    <- typeCheckTuple ctx rest
-    pair <- assumption ctx "pair"
+    pair <- assumption' ctx "pair"
     typeCheckApps ctx pair [_A, _B, a, b]
 
 printStatements :: [Statement Tc] -> IO ()
