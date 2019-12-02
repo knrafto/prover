@@ -49,19 +49,19 @@ typeCheckStatement :: Statement N -> TcM (Statement Tc)
 typeCheckStatement = \case
     Syntax.Define n mty body -> do
         let name = unLoc (nameUsage n)
-        body' <- typeCheckExpr EmptyCtx [] body
+        body' <- typeCheckExpr C0 [] body
         mty' <- case mty of
             Nothing -> return Nothing
             Just ty -> do
-                ty' <- typeCheckExpr EmptyCtx [] ty
-                unify EmptyCtx Universe (exprType body') (exprTerm ty')
+                ty' <- typeCheckExpr C0 [] ty
+                unify C0 Universe (exprType body') (exprTerm ty')
                 return (Just ty')
         checkSolved
         modify $ \s -> s { tcDefinitions = Map.insert name (exprTypedTerm body') (tcDefinitions s) }
         return (Syntax.Define n mty' body')
     Syntax.Assume n ty -> do
         let name = unLoc (nameUsage n)
-        ty' <- typeCheckExpr EmptyCtx [] ty
+        ty' <- typeCheckExpr C0 [] ty
         checkSolved
         modify $ \s -> s { tcAssumptions = Map.insert name (exprTerm ty') (tcAssumptions s) }
         return (Syntax.Assume n ty')
@@ -156,13 +156,13 @@ typeCheckParam ctx names (n, me) body = do
         Just e -> do
             e' <- typeCheckExpr ctx names e
             return (Just e', exprTypedTerm e')
-    body' <- typeCheckExpr (ExtendCtx ctx (fst tt)) (name : names) body
+    body' <- typeCheckExpr (ctx :> (fst tt)) (name : names) body
     return ((n, me'), tt, body')
 
 typeCheckPi :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckPi ctx (_A, _Aty) (_B, _Bty) = do
     unify ctx Universe _Aty Universe
-    unify (ExtendCtx ctx _A) Universe _Bty Universe
+    unify (ctx :> _A) Universe _Bty Universe
     return (Pi _A _B, Universe)
 
 typeCheckLambda :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
@@ -178,7 +178,7 @@ typeCheckSigma ctx a b = do
 
 typeCheckApp :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckApp ctx (f, fty) (arg, _A) = do
-    _B <- freshMeta (ExtendCtx ctx _A) Universe
+    _B <- freshMeta (ctx :> _A) Universe
     unify ctx Universe fty (Pi _A _B)
     return (app f [arg], instantiate _B arg)
 

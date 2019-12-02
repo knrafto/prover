@@ -138,14 +138,14 @@ unify' ctx ty t1 t2 = case (ty, t1, t2) of
             assumptions <- gets tcAssumptions
             let Just nty = Map.lookup n1 assumptions
             unifySpine ctx (weakenGlobal ctx nty) (zip args1 args2)
-    (Pi _A _B, Lam b1, Lam b2) -> unify (ExtendCtx ctx _A) _B b1 b2
+    (Pi _A _B, Lam b1, Lam b2) -> unify (ctx :> _A) _B b1 b2
     -- η-expansion
-    (Pi _A _B, Lam b, t) -> unify (ExtendCtx ctx _A) _B b (app (weaken t) [Var 0 []])
-    (Pi _A _B, t, Lam b) -> unify (ExtendCtx ctx _A) _B (app (weaken t) [Var 0 []]) b
+    (Pi _A _B, Lam b, t) -> unify (ctx :> _A) _B b (app (weaken t) [Var 0 []])
+    (Pi _A _B, t, Lam b) -> unify (ctx :> _A) _B (app (weaken t) [Var 0 []]) b
     (Universe, Universe, Universe) -> return ()
     (Universe, Pi _A1 _B1, Pi _A2 _B2) -> do
         unify ctx Universe _A1 _A2
-        unify (ExtendCtx ctx _A1) Universe _B1 _B2
+        unify (ctx :> _A1) Universe _B1 _B2
     _ -> unificationFailure ctx ty t1 t2
 
 unifyMeta :: Ctx -> Type -> MetaId -> [Term] -> Term -> TcM ()
@@ -154,8 +154,8 @@ unifyMeta ctx ty m args t
     | args == ctxVars ctx = assign m (makeLam ctx t)
     | otherwise = saveEquation ctx ty (Meta m args) t
   where
-    makeLam EmptyCtx t' = t'
-    makeLam (ExtendCtx ctx' _) t' = makeLam ctx' (Lam t')
+    makeLam C0 t' = t'
+    makeLam (ctx' :> _) t' = makeLam ctx' (Lam t')
 
 unifySpine :: Ctx -> Type -> [(Term, Term)] -> TcM ()
 unifySpine _ _ [] = return ()

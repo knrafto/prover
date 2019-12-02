@@ -27,6 +27,23 @@ newtype MetaId = MetaId Int
 instance Show MetaId where
     show (MetaId i) = showSubscript "α" i
 
+-- Contexts.
+data Ctx
+    = C0
+    | !Ctx :> !Type
+
+instance Show Ctx where
+    showsPrec _ C0 = showString "()"
+    showsPrec _ (ctx :> ty) = showChar '(' . go ctx . shows ty . showChar ')'
+      where
+        go C0 = id
+        go (ctx' :> ty') = go ctx' . shows ty' . showString ", "
+
+-- Types.
+type Type = Term
+
+-- Terms.
+
 -- Core term representation. Terms are always well-typed.
 data Term
     = Meta {-# UNPACK #-} !MetaId [Term]
@@ -59,47 +76,33 @@ instance Show Term where
         showArgs (arg:args) =
             showString " " . showsPrec (appPrec + 1) arg . showArgs args
 
-type Type = Term
-
--- A context.
-data Ctx
-    = EmptyCtx
-    | ExtendCtx !Ctx !Type
-
-instance Show Ctx where
-    showsPrec _ EmptyCtx = showString "()"
-    showsPrec _ (ExtendCtx ctx ty) = showChar '(' . go ctx . shows ty . showChar ')'
-      where
-        go EmptyCtx = id
-        go (ExtendCtx ctx' ty') = go ctx' . shows ty' . showString ", "
-
 -- Returns the number of variables in a context.
 ctxLength :: Ctx -> Int
-ctxLength EmptyCtx = 0
-ctxLength (ExtendCtx ctx _) = 1 + ctxLength ctx
+ctxLength C0 = 0
+ctxLength (ctx :> _) = 1 + ctxLength ctx
 
 -- Construct a Π-type out of a context ending with the given type.
 ctxPi :: Ctx -> Type -> Type
-ctxPi EmptyCtx t = t
-ctxPi (ExtendCtx ctx ty) t = ctxPi ctx (Pi ty t)
+ctxPi C0 t = t
+ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
 
 -- Construct a lambda out of a context with the given body.
 ctxLam :: Ctx -> Term -> Term
-ctxLam EmptyCtx t = t
-ctxLam (ExtendCtx ctx _) t = ctxLam ctx (Lam t)
+ctxLam C0 t = t
+ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
 
 -- Returns all the bound variables of a context, in the same order as ctxPi
 -- e.g. v₃ v₂ v₁ v₀.
 ctxVars :: Ctx -> [Term]
 ctxVars = reverse . go 0
   where
-    go _ EmptyCtx = []
-    go i (ExtendCtx ctx _) = Var i [] : go (i + 1) ctx
+    go _ C0 = []
+    go i (ctx :> _) = Var i [] : go (i + 1) ctx
 
 ctxVarType :: Ctx -> Int -> Type
-ctxVarType EmptyCtx _ = error "ctxVarType: empty context"
-ctxVarType (ExtendCtx _ ty) 0 = weaken ty
-ctxVarType (ExtendCtx ctx _) i = weaken (ctxVarType ctx (i - 1))
+ctxVarType C0 _ = error "ctxVarType: empty context"
+ctxVarType (_ :> ty) 0 = weaken ty
+ctxVarType (ctx :> _) i = weaken (ctxVarType ctx (i - 1))
 
 -- Substitutions.
 data Subst
