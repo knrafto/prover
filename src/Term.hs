@@ -45,16 +45,14 @@ type Type = TermView
 
 -- Terms.
 -- TODO: replace TypedTerm with Term
-data Term = Term !Ctx !Type !TermView
-
-termCtx :: Term -> Ctx
-termCtx (Term _Γ _ _) = _Γ
+data Term = Term !Type !TermView
 
 termType :: Term -> Type
-termType (Term _ _A _) = _A
+termType (Term _A _) = _A
 
 -- Core term representation. Terms are always well-typed.
 -- TODO: should contain Terms
+-- TODO: make lists strict
 data TermView
     = Meta {-# UNPACK #-} !MetaId [TermView]
     | Var {-# UNPACK #-} !Int [TermView]
@@ -91,19 +89,22 @@ class MonadTerm m where
 
     -- Create a new meta.
     freshMeta :: Ctx -> Type -> m Term
-    -- (Γ : Ctx) (n : Assumption) → Tm Γ (ty n)
+    -- (Γ : Ctx) → (n : Assumption) → Tm Γ (ty n)
     assumption :: Ctx -> Text -> m Term
-    -- ∀ {A} (Γ : Ctx) → Var Γ A → Tm Γ A
+    -- (Γ : Ctx) → Var Γ A → Tm Γ A
     var :: Ctx -> Int -> m Term
-    -- ∀ {Γ A B} → Tm (Γ, A) B → Tm Γ (Π A B)
-    lam :: Term -> m Term
-    -- ∀ {Γ} → U : Tm Γ U
-    universe :: m Term
-    -- ∀ {Γ} (A : Tm Γ U) → Tm (Γ, A) U → Tm Γ U
-    pi :: Term -> Term -> m Term
+    -- (Γ : Ctx) → (A : Tm Γ U) → Tm (Γ, A) B → Tm Γ (Π A B)
+    lam :: Ctx -> Term -> Term -> m Term
+    -- (Γ : Ctx) → U : Tm Γ U
+    universe :: Ctx -> m Term
+    -- (Γ : Ctx) → (A : Tm Γ U) → Tm (Γ, A) U → Tm Γ U
+    pi :: Ctx -> Term -> Term -> m Term
+    -- (Γ : Ctx) → Tm Γ (Π A B) → (a : Tm Γ A) → Tm Γ B[⟨a⟩]
+    -- ... but generalized to multiple arguments
+    app' :: Ctx -> Term -> [Term] -> m Term
 
     -- Reduce a term to weak head normal form.
-    whnf :: Term -> m TermView
+    whnf :: Ctx -> Term -> m TermView
 
 -- Returns the number of variables in a context.
 ctxLength :: Ctx -> Int
