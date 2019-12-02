@@ -40,21 +40,30 @@ instance Show Ctx where
         go (ctx' :> ty') = go ctx' . shows ty' . showString ", "
 
 -- Types.
-type Type = Term
+-- TODO: change to Term
+type Type = TermView
 
 -- Terms.
+-- TODO: replace TypedTerm with Term
+data Term = Term !Ctx !Type !TermView
+
+termCtx :: Term -> Ctx
+termCtx (Term _Γ _ _) = _Γ
+
+termType :: Term -> Type
+termType (Term _ _A _) = _A
 
 -- Core term representation. Terms are always well-typed.
-data Term
-    = Meta {-# UNPACK #-} !MetaId [Term]
-    | Var {-# UNPACK #-} !Int [Term]
-    | Assumption !Text [Term]
-    | Lam !Term
+data TermView
+    = Meta {-# UNPACK #-} !MetaId [TermView]
+    | Var {-# UNPACK #-} !Int [TermView]
+    | Assumption !Text [TermView]
+    | Lam !TermView
     | Universe
     | Pi !Type !Type
     deriving (Eq)
 
-instance Show Term where
+instance Show TermView where
     showsPrec d = \case
         Meta m args -> showApp (show m) args
         Var i args -> showApp (showSubscript "v" i) args
@@ -87,13 +96,13 @@ ctxPi C0 t = t
 ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
 
 -- Construct a lambda out of a context with the given body.
-ctxLam :: Ctx -> Term -> Term
+ctxLam :: Ctx -> TermView -> TermView
 ctxLam C0 t = t
 ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
 
 -- Returns all the bound variables of a context, in the same order as ctxPi
 -- e.g. v₃ v₂ v₁ v₀.
-ctxVars :: Ctx -> [Term]
+ctxVars :: Ctx -> [TermView]
 ctxVars = reverse . go 0
   where
     go _ C0 = []
@@ -108,10 +117,10 @@ ctxVarType (ctx :> _) i = weaken (ctxVarType ctx (i - 1))
 data Subst
     = SubstWeaken {-# UNPACK #-} !Int
     | SubstLift !Subst
-    | SubstTerm !Term
+    | SubstTerm !TermView
 
 -- Perform a substitution.
-applySubst :: Subst -> Term -> Term
+applySubst :: Subst -> TermView -> TermView
 applySubst subst t = case t of
     Meta m args -> Meta m (map (applySubst subst) args)
     Var i args -> app (applySubstToVar subst i) (map (applySubst subst) args)
@@ -127,19 +136,19 @@ applySubst subst t = case t of
     applySubstToVar (SubstTerm _) i = Var (i - 1) []
 
 -- Weaken a term.
-weaken :: Term -> Term
+weaken :: TermView -> TermView
 weaken = applySubst (SubstWeaken 1)
 
 -- Weaken a closed term into a context.
-weakenGlobal :: Ctx -> Term -> Term
+weakenGlobal :: Ctx -> TermView -> TermView
 weakenGlobal ctx = applySubst (SubstWeaken (ctxLength ctx))
 
 -- Substitute for the first bound variable.
-instantiate :: Term -> Term -> Term
+instantiate :: TermView -> TermView -> TermView
 instantiate t a = applySubst (SubstTerm a) t
 
 -- Apply a term to args.
-app :: Term -> [Term] -> Term
+app :: TermView -> [TermView] -> TermView
 app t [] = t
 app t args@(arg : rest) = case t of
     Meta i args0 -> Meta i (args0 ++ args)

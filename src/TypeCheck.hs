@@ -23,7 +23,7 @@ import           Syntax                         ( Id
                                                 )
 import qualified Syntax
 
-type TypedTerm = (Term, Type)
+type TypedTerm = (TermView, Type)
 data TcAnn = TcAnn !Range !TypedTerm
 
 data Tc
@@ -34,7 +34,7 @@ exprTypedTerm :: Expr Tc -> TypedTerm
 exprTypedTerm e = case ann e of
     TcAnn _ tt -> tt
 
-exprTerm :: Expr Tc -> Term
+exprTerm :: Expr Tc -> TermView
 exprTerm e = case ann e of
     TcAnn _ (t, _) -> t
 
