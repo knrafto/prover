@@ -54,7 +54,7 @@ typeCheckStatement = \case
             Nothing -> return Nothing
             Just ty -> do
                 ty' <- typeCheckExpr EmptyCtx [] ty
-                unify EmptyCtx (exprType body') (exprTerm ty')
+                unify EmptyCtx Universe (exprType body') (exprTerm ty')
                 return (Just ty')
         checkSolved
         modify $ \s -> s { tcDefinitions = Map.insert name (exprTypedTerm body') (tcDefinitions s) }
@@ -161,13 +161,13 @@ typeCheckParam ctx names (n, me) body = do
 
 typeCheckPi :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckPi ctx (_A, _Aty) (_B, _Bty) = do
-    unify ctx _Aty Universe
-    unify (ExtendCtx ctx _A) _Bty Universe
+    unify ctx Universe _Aty Universe
+    unify (ExtendCtx ctx _A) Universe _Bty Universe
     return (Pi _A _B, Universe)
 
 typeCheckLambda :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckLambda ctx (_A, _Aty) (b, _B) = do
-    unify ctx _Aty Universe
+    unify ctx Universe _Aty Universe
     return (Lam b, Pi _A _B)
 
 typeCheckSigma :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
@@ -179,7 +179,7 @@ typeCheckSigma ctx a b = do
 typeCheckApp :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckApp ctx (f, fty) (arg, _A) = do
     _B <- freshMeta (ExtendCtx ctx _A) Universe
-    unify ctx fty (Pi _A _B)
+    unify ctx Universe fty (Pi _A _B)
     return (app f [arg], instantiate _B arg)
 
 typeCheckApps :: Ctx -> TypedTerm -> [TypedTerm] -> TcM TypedTerm
