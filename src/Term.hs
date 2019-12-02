@@ -4,8 +4,9 @@ module Term where
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-showSubscript :: Int -> String
-showSubscript = map toSubscriptChar . show
+-- TODO: move to util module
+showSubscript :: String -> Int -> String
+showSubscript name c = name ++ map toSubscriptChar (show c)
   where
     toSubscriptChar = \case
         '0' -> '₀'
@@ -24,7 +25,7 @@ newtype MetaId = MetaId Int
     deriving (Eq, Ord)
 
 instance Show MetaId where
-    show (MetaId i) = "α" ++ showSubscript i
+    show (MetaId i) = showSubscript "α" i
 
 -- Core term representation. Terms are always well-typed.
 data Term
@@ -39,7 +40,7 @@ data Term
 instance Show Term where
     showsPrec d = \case
         Meta m args -> showApp (show m) args
-        Var i args -> showApp ("v" ++ showSubscript i) args
+        Var i args -> showApp (showSubscript "v" i) args
         Assumption t args -> showApp (Text.unpack t) args
         Lam t -> showParen (d > appPrec) $
             showString "λ " . showsPrec (appPrec + 1) t
