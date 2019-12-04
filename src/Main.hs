@@ -18,11 +18,11 @@ import qualified Flags
 import           Location
 import           Naming
 import           Syntax
-import           TcM
 import           Token (Token(..))
 import qualified Token
 import           TypeCheck
 import           Parser
+import           Unify
 
 panic :: String -> IO a
 panic message = do

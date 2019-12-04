@@ -12,7 +12,6 @@ import qualified Data.Text                     as Text
 
 import           Location
 import           Naming
-import           TcM
 import           Term
 import           Syntax                         ( Id
                                                 , Ann
@@ -22,6 +21,7 @@ import           Syntax                         ( Id
                                                 , Statement
                                                 )
 import qualified Syntax
+import           Unify
 
 -- A term annotated with a type, used for type-checking and unification.
 type UTerm = (Term, Type)

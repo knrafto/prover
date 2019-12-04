@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module TcM where
+module Unify where
 
 import           Data.IORef
 import           System.IO.Unsafe
