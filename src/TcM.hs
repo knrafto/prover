@@ -111,9 +111,9 @@ checkSolved = do
 
 unify :: Ctx -> Type -> TermView -> TermView -> TcM ()
 unify ctx ty t1 t2 = do
-    ty' <- whnfView ctx ty
-    t1' <- whnfView ctx t1
-    t2' <- whnfView ctx t2
+    ty' <- whnfView ty
+    t1' <- whnfView t1
+    t2' <- whnfView t2
     trace
             (  "Unifying in context: "
             ++ show ctx
@@ -137,7 +137,7 @@ unify' ctx ty t1 t2 = case (ty, t1, t2) of
         | n1 == n2 && length args1 == length args2 -> do
             assumptions <- gets tcAssumptions
             let Just nty = Map.lookup n1 assumptions
-            unifySpine ctx (weakenGlobal ctx nty) (zip args1 args2)
+            unifySpine ctx nty (zip args1 args2)
     (Pi _A _B, Lam b1, Lam b2) -> unify (ctx :> _A) _B b1 b2
     -- η-expansion
     (Pi _A _B, Lam b, t) -> unify (ctx :> _A) _B b (app (weaken t) [Var 0 []])
@@ -160,17 +160,17 @@ unifyMeta ctx ty m args t
 unifySpine :: Ctx -> Type -> [(TermView, TermView)] -> TcM ()
 unifySpine _ _ [] = return ()
 unifySpine ctx hty ((arg1, arg2) : args) = do
-    Pi _A _B <- whnfView ctx hty
+    Pi _A _B <- whnfView hty
     unify ctx _A arg1 arg2
     unifySpine ctx (instantiate _B arg1) args 
 
 -- Attempts to simplify a term to a weak head normal form.
-whnfView :: Ctx -> TermView -> TcM TermView
-whnfView ctx t = case t of
+whnfView :: TermView -> TcM TermView
+whnfView t = case t of
     Meta m args -> do
         metaValues <- gets tcMetaValues
         -- TODO: path compression
         case Map.lookup m metaValues of
             Nothing -> return t
-            Just t' -> return (app (weakenGlobal ctx t') args)
+            Just t' -> return (app t' args)
     _ -> return t

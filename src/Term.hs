@@ -39,6 +39,34 @@ instance Show Ctx where
         go C0 = id
         go (ctx' :> ty') = go ctx' . shows ty' . showString ", "
 
+-- Returns the number of variables in a context.
+ctxLength :: Ctx -> Int
+ctxLength C0 = 0
+ctxLength (ctx :> _) = 1 + ctxLength ctx
+
+-- Construct a Π-type out of a context ending with the given type.
+ctxPi :: Ctx -> Type -> Type
+ctxPi C0 t = t
+ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
+
+-- Construct a lambda out of a context with the given body.
+ctxLam :: Ctx -> TermView -> TermView
+ctxLam C0 t = t
+ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
+
+-- Returns all the bound variables of a context, in the same order as ctxPi
+-- e.g. v₃ v₂ v₁ v₀.
+ctxVars :: Ctx -> [TermView]
+ctxVars = reverse . go 0
+  where
+    go _ C0 = []
+    go i (ctx :> _) = Var i [] : go (i + 1) ctx
+
+ctxVarType :: Ctx -> Int -> Type
+ctxVarType C0 _ = error "ctxVarType: empty context"
+ctxVarType (_ :> ty) 0 = weaken ty
+ctxVarType (ctx :> _) i = weaken (ctxVarType ctx (i - 1))
+
 -- Types.
 -- TODO: change to Term
 type Type = TermView
@@ -53,6 +81,8 @@ termType (Term _A _) = _A
 -- Core term representation. Terms are always well-typed.
 -- TODO: should contain Terms
 -- TODO: make lists strict
+-- Closed terms (i.e. terms in the empty context) can be lifted "for free":
+-- weakening them requires no changes to the term structure.
 data TermView
     = Meta {-# UNPACK #-} !MetaId [TermView]
     | Var {-# UNPACK #-} !Int [TermView]
@@ -84,56 +114,6 @@ instance Show TermView where
         showArgs (arg:args) =
             showString " " . showsPrec (appPrec + 1) arg . showArgs args
 
-class MonadTerm m where
-    -- Term constructors, via unification.
-
-    -- Create a new meta.
-    freshMeta :: Ctx -> Type -> m Term
-    -- (Γ : Ctx) → (n : Assumption) → Tm Γ (ty n)
-    assumption :: Ctx -> Text -> m Term
-    -- (Γ : Ctx) → Var Γ A → Tm Γ A
-    var :: Ctx -> Int -> m Term
-    -- (Γ : Ctx) → (A : Tm Γ U) → Tm (Γ, A) B → Tm Γ (Π A B)
-    lam :: Ctx -> Term -> Term -> m Term
-    -- (Γ : Ctx) → U : Tm Γ U
-    universe :: Ctx -> m Term
-    -- (Γ : Ctx) → (A : Tm Γ U) → Tm (Γ, A) U → Tm Γ U
-    pi :: Ctx -> Term -> Term -> m Term
-    -- (Γ : Ctx) → Tm Γ (Π A B) → (a : Tm Γ A) → Tm Γ B[⟨a⟩]
-    -- ... but generalized to multiple arguments
-    app' :: Ctx -> Term -> [Term] -> m Term
-
-    -- Reduce a term to weak head normal form.
-    whnf :: Ctx -> Term -> m TermView
-
--- Returns the number of variables in a context.
-ctxLength :: Ctx -> Int
-ctxLength C0 = 0
-ctxLength (ctx :> _) = 1 + ctxLength ctx
-
--- Construct a Π-type out of a context ending with the given type.
-ctxPi :: Ctx -> Type -> Type
-ctxPi C0 t = t
-ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
-
--- Construct a lambda out of a context with the given body.
-ctxLam :: Ctx -> TermView -> TermView
-ctxLam C0 t = t
-ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
-
--- Returns all the bound variables of a context, in the same order as ctxPi
--- e.g. v₃ v₂ v₁ v₀.
-ctxVars :: Ctx -> [TermView]
-ctxVars = reverse . go 0
-  where
-    go _ C0 = []
-    go i (ctx :> _) = Var i [] : go (i + 1) ctx
-
-ctxVarType :: Ctx -> Int -> Type
-ctxVarType C0 _ = error "ctxVarType: empty context"
-ctxVarType (_ :> ty) 0 = weaken ty
-ctxVarType (ctx :> _) i = weaken (ctxVarType ctx (i - 1))
-
 -- Substitutions.
 data Subst
     = SubstWeaken {-# UNPACK #-} !Int
@@ -159,10 +139,6 @@ applySubst subst t = case t of
 -- Weaken a term.
 weaken :: TermView -> TermView
 weaken = applySubst (SubstWeaken 1)
-
--- Weaken a closed term into a context.
-weakenGlobal :: Ctx -> TermView -> TermView
-weakenGlobal ctx = applySubst (SubstWeaken (ctxLength ctx))
 
 -- Substitute for the first bound variable.
 instantiate :: TermView -> TermView -> TermView

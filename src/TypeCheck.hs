@@ -79,8 +79,8 @@ typeCheckExpr ctx names = \case
             Defined -> do
                 definitions <- gets tcDefinitions
                 let Just (t, ty) = Map.lookup name definitions
-                return (weakenGlobal ctx t, weakenGlobal ctx ty)
-            Assumed -> assumption' ctx name
+                return (t, ty)
+            Assumed -> assumption name
             Unbound -> fail $ "unbound name: " ++ Text.unpack name
         return (Syntax.Var (TcAnn l tt) n)
     Syntax.Hole l -> do
@@ -109,7 +109,7 @@ typeCheckExpr ctx names = \case
         tt <- typeCheckSigma ctx paramTerm (exprTypedTerm body')
         return (Syntax.Sigma (TcAnn l tt) param' body')
     Syntax.Equal  l a      b  -> do
-        f <- assumption' ctx "Id"
+        f <- assumption "Id"
         _A <- hole ctx
         a' <- typeCheckExpr ctx names a
         b' <- typeCheckExpr ctx names b
@@ -126,11 +126,11 @@ typeCheckExpr ctx names = \case
         tt <- typeCheckSigma ctx (exprTypedTerm a') (weakenTypedTerm (exprTypedTerm b'))
         return (Syntax.Times (TcAnn l tt) a' b')
 
-assumption' :: Ctx -> Text -> TcM TypedTerm
-assumption' ctx name = do
+assumption :: Text -> TcM TypedTerm
+assumption name = do
     assumptions <- gets tcAssumptions
     case Map.lookup name assumptions of
-        Just _A -> return (Assumption name [], weakenGlobal ctx _A)
+        Just _A -> return (Assumption name [], _A)
         _       -> fail $ "can't find built-in: " ++ Text.unpack name
 
 -- Generate an unknown term and type.
@@ -172,7 +172,7 @@ typeCheckLambda ctx (_A, _Aty) (b, _B) = do
 
 typeCheckSigma :: Ctx -> TypedTerm -> TypedTerm -> TcM TypedTerm
 typeCheckSigma ctx a b = do
-    f  <- assumption' ctx "Σ'"
+    f  <- assumption "Σ'"
     b' <- typeCheckLambda ctx a b
     typeCheckApps ctx f [a, b']
 
@@ -195,7 +195,7 @@ typeCheckTuple ctx (a : rest) = do
     _A   <- hole ctx
     _B   <- hole ctx
     b    <- typeCheckTuple ctx rest
-    pair <- assumption' ctx "pair"
+    pair <- assumption "pair"
     typeCheckApps ctx pair [_A, _B, a, b]
 
 printStatements :: [Statement Tc] -> IO ()
