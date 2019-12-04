@@ -39,60 +39,20 @@ instance Show Ctx where
         go C0 = id
         go (ctx' :> ty') = go ctx' . shows ty' . showString ", "
 
--- Returns the number of variables in a context.
-ctxLength :: Ctx -> Int
-ctxLength C0 = 0
-ctxLength (ctx :> _) = 1 + ctxLength ctx
-
--- Construct a Π-type out of a context ending with the given type.
-ctxPi :: Ctx -> Type -> Type
-ctxPi C0 t = t
-ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
-
--- Construct a lambda out of a context with the given body.
-ctxLam :: Ctx -> TermView -> TermView
-ctxLam C0 t = t
-ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
-
--- Returns all the bound variables of a context, in the same order as ctxPi
--- e.g. v₃ v₂ v₁ v₀.
-ctxVars :: Ctx -> [TermView]
-ctxVars = reverse . go 0
-  where
-    go _ C0 = []
-    go i (ctx :> _) = Var i [] : go (i + 1) ctx
-
-ctxVarType :: Ctx -> Int -> Type
-ctxVarType C0 _ = error "ctxVarType: empty context"
-ctxVarType (_ :> ty) 0 = weaken ty
-ctxVarType (ctx :> _) i = weaken (ctxVarType ctx (i - 1))
-
--- Types.
--- TODO: change to Term
-type Type = TermView
-
--- Terms.
--- TODO: replace TypedTerm with Term
-data Term = Term !Type !TermView
-
-termType :: Term -> Type
-termType (Term _A _) = _A
-
 -- Core term representation. Terms are always well-typed.
--- TODO: should contain Terms
 -- TODO: make lists strict
 -- Closed terms (i.e. terms in the empty context) can be lifted "for free":
 -- weakening them requires no changes to the term structure.
-data TermView
-    = Meta {-# UNPACK #-} !MetaId [TermView]
-    | Var {-# UNPACK #-} !Int [TermView]
-    | Assumption !Text [TermView]
-    | Lam !TermView
+data Term
+    = Meta {-# UNPACK #-} !MetaId [Term]
+    | Var {-# UNPACK #-} !Int [Term]
+    | Assumption !Text [Term]
+    | Lam !Term
     | Universe
     | Pi !Type !Type
     deriving (Eq)
 
-instance Show TermView where
+instance Show Term where
     showsPrec d = \case
         Meta m args -> showApp (show m) args
         Var i args -> showApp (showSubscript "v" i) args
@@ -114,14 +74,45 @@ instance Show TermView where
         showArgs (arg:args) =
             showString " " . showsPrec (appPrec + 1) arg . showArgs args
 
+-- Types are terms of type Universe.
+type Type = Term
+
 -- Substitutions.
 data Subst
     = SubstWeaken {-# UNPACK #-} !Int
     | SubstLift !Subst
-    | SubstTerm !TermView
+    | SubstTerm !Term
+
+-- Returns the number of variables in a context.
+ctxLength :: Ctx -> Int
+ctxLength C0 = 0
+ctxLength (ctx :> _) = 1 + ctxLength ctx
+
+-- Construct a Π-type out of a context ending with the given type.
+ctxPi :: Ctx -> Type -> Type
+ctxPi C0 t = t
+ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
+
+-- Construct a lambda out of a context with the given body.
+ctxLam :: Ctx -> Term -> Term
+ctxLam C0 t = t
+ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
+
+-- Returns all the bound variables of a context, in the same order as ctxPi
+-- e.g. v₃ v₂ v₁ v₀.
+ctxVars :: Ctx -> [Term]
+ctxVars = reverse . go 0
+  where
+    go _ C0 = []
+    go i (ctx :> _) = Var i [] : go (i + 1) ctx
+
+ctxVarType :: Ctx -> Int -> Type
+ctxVarType C0 _ = error "ctxVarType: empty context"
+ctxVarType (_ :> ty) 0 = weaken ty
+ctxVarType (ctx :> _) i = weaken (ctxVarType ctx (i - 1))
 
 -- Perform a substitution.
-applySubst :: Subst -> TermView -> TermView
+applySubst :: Subst -> Term -> Term
 applySubst subst t = case t of
     Meta m args -> Meta m (map (applySubst subst) args)
     Var i args -> app (applySubstToVar subst i) (map (applySubst subst) args)
@@ -137,15 +128,15 @@ applySubst subst t = case t of
     applySubstToVar (SubstTerm _) i = Var (i - 1) []
 
 -- Weaken a term.
-weaken :: TermView -> TermView
+weaken :: Term -> Term
 weaken = applySubst (SubstWeaken 1)
 
 -- Substitute for the first bound variable.
-instantiate :: TermView -> TermView -> TermView
+instantiate :: Term -> Term -> Term
 instantiate t a = applySubst (SubstTerm a) t
 
 -- Apply a term to args.
-app :: TermView -> [TermView] -> TermView
+app :: Term -> [Term] -> Term
 app t [] = t
 app t args@(arg : rest) = case t of
     Meta i args0 -> Meta i (args0 ++ args)

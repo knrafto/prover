@@ -17,7 +17,7 @@ import Term
 -- TODO: use HashMap
 data TcState = TcState
     -- Global definitions, and their values.
-    { tcDefinitions :: Map Text (TermView, Type)
+    { tcDefinitions :: Map Text (Term, Type)
     -- Global assumptions, and their types.
     , tcAssumptions :: Map Text Type
     -- Next metavar id.
@@ -25,9 +25,9 @@ data TcState = TcState
     -- Metavar types.
     , tcMetaTypes :: Map MetaId Type
     -- Metavar substitution.
-    , tcMetaValues :: Map MetaId TermView
+    , tcMetaValues :: Map MetaId Term
     -- Unsolved unification equations.
-    , tcUnsolvedEquations :: [(Ctx, Type, TermView, TermView)]
+    , tcUnsolvedEquations :: [(Ctx, Type, Term, Term)]
     }
 
 initialState :: TcState
@@ -66,7 +66,7 @@ runTcM (TcM m) = runExceptT (runStateT m initialState)
 
 -- Generate a new metavariable for the given context Γ and type A. The new meta
 -- has type α : Γ → A and the returned term is α Γ.
-freshMeta' :: Ctx -> Type -> TcM TermView
+freshMeta' :: Ctx -> Type -> TcM Term
 freshMeta' ctx _A = do
     i <- gets tcNextId
     let m = MetaId i
@@ -74,12 +74,12 @@ freshMeta' ctx _A = do
     modify $ \s -> s { tcNextId = i + 1, tcMetaTypes = Map.insert m ty (tcMetaTypes s) }
     return (Meta m (ctxVars ctx))
 
-saveEquation :: Ctx -> Type -> TermView -> TermView -> TcM ()
+saveEquation :: Ctx -> Type -> Term -> Term -> TcM ()
 saveEquation ctx ty t1 t2 =
     modify $ \s -> s { tcUnsolvedEquations = (ctx, ty, t1, t2) : tcUnsolvedEquations s }
 
 -- TODO: occurs check
-assign :: MetaId -> TermView -> TcM ()
+assign :: MetaId -> Term -> TcM ()
 assign i t = do
     trace ("Assigning " ++ show i ++ " ↦ " ++ show t) $ return ()
     eqs <- gets tcUnsolvedEquations
@@ -89,7 +89,7 @@ assign i t = do
         eqs
         (\(ctx, ty, t1, t2) -> unify ctx ty t1 t2)
 
-unificationFailure :: Ctx -> Type -> TermView -> TermView -> TcM a
+unificationFailure :: Ctx -> Type -> Term -> Term -> TcM a
 unificationFailure ctx _ t1 t2 =
     throwError
         $  "Failed to unify in context: "
@@ -109,11 +109,11 @@ checkSolved = do
         []             -> return ()
         ((ctx, ty, t1, t2) : _) -> unificationFailure ctx ty t1 t2
 
-unify :: Ctx -> Type -> TermView -> TermView -> TcM ()
+unify :: Ctx -> Type -> Term -> Term -> TcM ()
 unify ctx ty t1 t2 = do
-    ty' <- whnfView ty
-    t1' <- whnfView t1
-    t2' <- whnfView t2
+    ty' <- whnf ty
+    t1' <- whnf t1
+    t2' <- whnf t2
     trace
             (  "Unifying in context: "
             ++ show ctx
@@ -124,7 +124,7 @@ unify ctx ty t1 t2 = do
             )
         $ unify' ctx ty' t1' t2'
 
-unify' :: Ctx -> Type -> TermView -> TermView -> TcM ()
+unify' :: Ctx -> Type -> Term -> Term -> TcM ()
 unify' ctx ty t1 t2 = case (ty, t1, t2) of
     -- TODO: flex-flex
     (_, Meta _ _, Meta _ _) -> saveEquation ctx ty t1 t2
@@ -148,7 +148,7 @@ unify' ctx ty t1 t2 = case (ty, t1, t2) of
         unify (ctx :> _A1) Universe _B1 _B2
     _ -> unificationFailure ctx ty t1 t2
 
-unifyMeta :: Ctx -> Type -> MetaId -> [TermView] -> TermView -> TcM ()
+unifyMeta :: Ctx -> Type -> MetaId -> [Term] -> Term -> TcM ()
 unifyMeta ctx ty m args t
     -- e.g. ?m v₂ v₁ v₀ = t  =>  ?m = λ λ λ t
     | args == ctxVars ctx = assign m (makeLam ctx t)
@@ -157,16 +157,16 @@ unifyMeta ctx ty m args t
     makeLam C0 t' = t'
     makeLam (ctx' :> _) t' = makeLam ctx' (Lam t')
 
-unifySpine :: Ctx -> Type -> [(TermView, TermView)] -> TcM ()
+unifySpine :: Ctx -> Type -> [(Term, Term)] -> TcM ()
 unifySpine _ _ [] = return ()
 unifySpine ctx hty ((arg1, arg2) : args) = do
-    Pi _A _B <- whnfView hty
+    Pi _A _B <- whnf hty
     unify ctx _A arg1 arg2
     unifySpine ctx (instantiate _B arg1) args 
 
 -- Attempts to simplify a term to a weak head normal form.
-whnfView :: TermView -> TcM TermView
-whnfView t = case t of
+whnf :: Term -> TcM Term
+whnf t = case t of
     Meta m args -> do
         metaValues <- gets tcMetaValues
         -- TODO: path compression
