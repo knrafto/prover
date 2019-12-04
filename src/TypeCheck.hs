@@ -23,8 +23,6 @@ import           Syntax                         ( Id
 import qualified Syntax
 import           Unify
 
--- A term annotated with a type, used for type-checking and unification.
-type UTerm = (Term, Type)
 data TcAnn = TcAnn !Range !UTerm
 
 data Tc

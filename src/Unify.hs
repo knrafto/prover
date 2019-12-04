@@ -14,10 +14,13 @@ import           Data.Text                      ( Text )
 import Flags
 import Term
 
+-- A term annotated with a type, used for type-checking and unification.
+type UTerm = (Term, Type)
+
 -- TODO: use HashMap
 data TcState = TcState
     -- Global definitions, and their values.
-    { tcDefinitions :: Map Text (Term, Type)
+    { tcDefinitions :: Map Text UTerm
     -- Global assumptions, and their types.
     , tcAssumptions :: Map Text Type
     -- Next metavar id.
