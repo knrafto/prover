@@ -14,8 +14,14 @@ type HighlightedRange = {
   kind: string,
 };
 
+type Diagnostic = {
+  range: Range,
+  message: string,
+};
+
 type Response = {
   highlighting: HighlightedRange[],
+  diagnostics: Diagnostic[],
 };
 
 // TODO: configure
@@ -82,10 +88,19 @@ for (let [name, color] of colors) {
 
 let cache: Map<string, Response> = new Map();
 
+let diagnosticCollection =
+    vscode.languages.createDiagnosticCollection('prover');
+
 function convertRange(
     document: vscode.TextDocument, range: Range): vscode.Range {
   return new vscode.Range(
       document.positionAt(range.start), document.positionAt(range.end));
+}
+
+function convertDiagnostic(
+    document: vscode.TextDocument, diagnostic: Diagnostic): vscode.Diagnostic {
+  return new vscode.Diagnostic(
+      convertRange(document, diagnostic.range), diagnostic.message);
 }
 
 // Run a command to completion, reporting its output and exit code.
@@ -125,6 +140,7 @@ function onChange(path: string) {
 
     var resp: Response = {
       highlighting: [],
+      diagnostics: [],
     };
     try {
       resp = JSON.parse(stdout);
@@ -167,6 +183,11 @@ function updateEditors() {
       textEditor.setDecorations(
           decorationType, decorations.get(styleName) || []);
     }
+
+    diagnosticCollection.set(
+        textEditor.document.uri,
+        resp.diagnostics.map(
+            (diag) => convertDiagnostic(textEditor.document, diag)));
   }
 }
 
