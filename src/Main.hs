@@ -97,13 +97,18 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = resolveNames stmts
-        let r      = Response
+        result <- runTcM (typeCheck stmts')
+        ds <- case result of
+            Left  d            -> do
+                unless Flags.json $ do
+                    putStrLn $ "Error at " ++ show (diagnosticRange d)
+                    putStrLn (diagnosticMessage d)
+                return [d]
+            Right (stmts'', _) -> do
+                unless Flags.json $ printStatements stmts''
+                return []
+        let r = Response
                 { highlighting = tokenHighlighting tokens ++ nameHighlighting (extractNames stmts')
-                , diagnostics  = []
+                , diagnostics  = ds
                 }
         when Flags.json $ B.putStrLn (encode r)
-        unless Flags.json $ do
-            result <- runTcM (typeCheck stmts')
-            case result of
-                Left  e            -> putStrLn $ "Terminated with error: " ++ e
-                Right (stmts'', _) -> printStatements stmts''

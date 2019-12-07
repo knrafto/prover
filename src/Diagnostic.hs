@@ -2,11 +2,13 @@
 module Diagnostic where
 
 import Data.Aeson
-import Data.Text (Text)
 
 import Location
 
-data Diagnostic = Diagnostic !Range !Text
+data Diagnostic = Diagnostic
+    { diagnosticRange :: !Range
+    , diagnosticMessage :: String
+    }
     deriving (Show)
 
 instance ToJSON Diagnostic where

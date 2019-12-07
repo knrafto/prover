@@ -11,6 +11,7 @@ import           Data.HashMap.Strict            ( HashMap )
 import qualified Data.HashMap.Strict           as HashMap
 import           Data.Text                      ( Text )
 
+import Diagnostic
 import Flags
 import Location
 import Term
@@ -42,8 +43,8 @@ initialState = TcState { tcDefinitions       = HashMap.empty
                        , tcUnsolvedEquations = []
                        }
 
-newtype TcM a = TcM { unTcM :: StateT TcState (ExceptT String IO) a }
-    deriving (Functor, Applicative, Monad, MonadFail, MonadIO, MonadError String, MonadState TcState)
+newtype TcM a = TcM { unTcM :: StateT TcState (ExceptT Diagnostic IO) a }
+    deriving (Functor, Applicative, Monad, MonadFail, MonadIO, MonadError Diagnostic, MonadState TcState)
 
 {-# NOINLINE indentRef #-}
 indentRef :: IORef Int
@@ -63,8 +64,11 @@ trace e m = do
         writeIORef indentRef (level - 1)
     return a
 
+throwDiagnostic :: Range -> String -> TcM a
+throwDiagnostic r s = throwError (Diagnostic r s)
+
 -- Runs a search, reporting any failure
-runTcM :: TcM a -> IO (Either String (a, TcState))
+runTcM :: TcM a -> IO (Either Diagnostic (a, TcState))
 runTcM (TcM m) = runExceptT (runStateT m initialState)
 
 -- Generate a new metavariable for the given context Γ and type A. The new meta
@@ -93,8 +97,8 @@ assign i t = do
         (\(l, ctx, ty, t1, t2) -> unify l ctx ty t1 t2)
 
 unificationFailure :: Range -> Ctx -> Type -> Term -> Term -> TcM a
-unificationFailure _ ctx _ t1 t2 =
-    throwError
+unificationFailure l ctx _ t1 t2 =
+    throwDiagnostic l
         $  "Failed to unify in context: "
         ++ show ctx
         ++ "\n"
