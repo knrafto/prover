@@ -7,8 +7,8 @@ import           System.IO.Unsafe
 import           Control.Monad.Except
 import           Control.Monad.Fail
 import           Control.Monad.State
-import           Data.Map.Strict                ( Map )
-import qualified Data.Map.Strict               as Map
+import           Data.HashMap.Strict            ( HashMap )
+import qualified Data.HashMap.Strict           as HashMap
 import           Data.Text                      ( Text )
 
 import Flags
@@ -17,28 +17,27 @@ import Term
 -- A term annotated with a type, used for type-checking and unification.
 type UTerm = (Term, Type)
 
--- TODO: use HashMap
 data TcState = TcState
     -- Global definitions, and their values.
-    { tcDefinitions :: Map Text UTerm
+    { tcDefinitions :: HashMap Text UTerm
     -- Global assumptions, and their types.
-    , tcAssumptions :: Map Text Type
+    , tcAssumptions :: HashMap Text Type
     -- Next metavar id.
     , tcNextId :: !Int
     -- Metavar types.
-    , tcMetaTypes :: Map MetaId Type
+    , tcMetaTypes :: HashMap MetaId Type
     -- Metavar substitution.
-    , tcMetaValues :: Map MetaId Term
+    , tcMetaValues :: HashMap MetaId Term
     -- Unsolved unification equations.
     , tcUnsolvedEquations :: [(Ctx, Type, Term, Term)]
     }
 
 initialState :: TcState
-initialState = TcState { tcDefinitions       = Map.empty
-                       , tcAssumptions       = Map.empty
+initialState = TcState { tcDefinitions       = HashMap.empty
+                       , tcAssumptions       = HashMap.empty
                        , tcNextId            = 0
-                       , tcMetaTypes         = Map.empty
-                       , tcMetaValues        = Map.empty
+                       , tcMetaTypes         = HashMap.empty
+                       , tcMetaValues        = HashMap.empty
                        , tcUnsolvedEquations = []
                        }
 
@@ -74,7 +73,7 @@ freshMeta' ctx _A = do
     i <- gets tcNextId
     let m = MetaId i
     let ty = ctxPi ctx _A
-    modify $ \s -> s { tcNextId = i + 1, tcMetaTypes = Map.insert m ty (tcMetaTypes s) }
+    modify $ \s -> s { tcNextId = i + 1, tcMetaTypes = HashMap.insert m ty (tcMetaTypes s) }
     return (Meta m (ctxVars ctx))
 
 saveEquation :: Ctx -> Type -> Term -> Term -> TcM ()
@@ -87,7 +86,7 @@ assign i t = do
     trace ("Assigning " ++ show i ++ " ↦ " ++ show t) $ return ()
     eqs <- gets tcUnsolvedEquations
     modify $ \s ->
-        s { tcMetaValues = Map.insert i t (tcMetaValues s), tcUnsolvedEquations = [] }
+        s { tcMetaValues = HashMap.insert i t (tcMetaValues s), tcUnsolvedEquations = [] }
     unless (null eqs) $ trace "Retrying unsolved equations" $ forM_
         eqs
         (\(ctx, ty, t1, t2) -> unify ctx ty t1 t2)
@@ -139,7 +138,7 @@ unify' ctx ty t1 t2 = case (ty, t1, t2) of
     (_, Assumption n1 args1, Assumption n2 args2)
         | n1 == n2 && length args1 == length args2 -> do
             assumptions <- gets tcAssumptions
-            let Just nty = Map.lookup n1 assumptions
+            let Just nty = HashMap.lookup n1 assumptions
             unifySpine ctx nty (zip args1 args2)
     (Pi _A _B, Lam b1, Lam b2) -> unify (ctx :> _A) _B b1 b2
     -- η-expansion
@@ -173,7 +172,7 @@ whnf t = case t of
     Meta m args -> do
         metaValues <- gets tcMetaValues
         -- TODO: path compression
-        case Map.lookup m metaValues of
+        case HashMap.lookup m metaValues of
             Nothing -> return t
             Just t' -> return (app t' args)
     _ -> return t

@@ -12,8 +12,8 @@ where
 import           Data.Foldable
 import           Data.Maybe
 import           Data.Text                      ( Text )
-import           Data.Map.Strict                ( Map )
-import qualified Data.Map.Strict               as Map
+import           Data.HashMap.Strict            ( HashMap )
+import qualified Data.HashMap.Strict           as HashMap
 
 import           Location
 import           Parser
@@ -43,25 +43,25 @@ type instance Id N = Name
 type instance Ann N = Range
 
 data Env = Env
-    { envLocalNames :: Map Text Ident
-    , envDefinitions :: Map Text Ident
-    , envAssumptions :: Map Text Ident
+    { envLocalNames :: HashMap Text Ident
+    , envDefinitions :: HashMap Text Ident
+    , envAssumptions :: HashMap Text Ident
     }
 
 emptyEnv :: Env
-emptyEnv = Env { envLocalNames  = Map.empty
-               , envDefinitions = Map.empty
-               , envAssumptions = Map.empty
+emptyEnv = Env { envLocalNames  = HashMap.empty
+               , envDefinitions = HashMap.empty
+               , envAssumptions = HashMap.empty
                }
 
-insertIdent :: Ident -> Map Text Ident -> Map Text Ident
-insertIdent ident = Map.insert (unLoc ident) ident
+insertIdent :: Ident -> HashMap Text Ident -> HashMap Text Ident
+insertIdent ident = HashMap.insert (unLoc ident) ident
 
 lookupIdent :: Env -> Ident -> Name
 lookupIdent env ident = fromMaybe (Name Unbound ident ident) $ asum
-    [ Name Local ident <$> Map.lookup name (envLocalNames env)
-    , Name Defined ident <$> Map.lookup name (envDefinitions env)
-    , Name Assumed ident <$> Map.lookup name (envAssumptions env)
+    [ Name Local ident <$> HashMap.lookup name (envLocalNames env)
+    , Name Defined ident <$> HashMap.lookup name (envDefinitions env)
+    , Name Assumed ident <$> HashMap.lookup name (envAssumptions env)
     ]
     where name = unLoc ident
 

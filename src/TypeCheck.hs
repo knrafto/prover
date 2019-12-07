@@ -7,7 +7,7 @@ import           Data.List
 
 import           Control.Monad.Except
 import           Control.Monad.State
-import qualified Data.Map.Strict               as Map
+import qualified Data.HashMap.Strict           as HashMap
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 
@@ -57,13 +57,13 @@ typeCheckStatement = \case
                 unify C0 Universe (exprType body') (exprTerm ty')
                 return (Just ty')
         checkSolved
-        modify $ \s -> s { tcDefinitions = Map.insert name (exprUTerm body') (tcDefinitions s) }
+        modify $ \s -> s { tcDefinitions = HashMap.insert name (exprUTerm body') (tcDefinitions s) }
         return (Syntax.Define n mty' body')
     Syntax.Assume n ty -> do
         let name = unLoc (nameUsage n)
         ty' <- typeCheckExpr C0 [] ty
         checkSolved
-        modify $ \s -> s { tcAssumptions = Map.insert name (exprTerm ty') (tcAssumptions s) }
+        modify $ \s -> s { tcAssumptions = HashMap.insert name (exprTerm ty') (tcAssumptions s) }
         return (Syntax.Assume n ty')
     Syntax.Prove _ _ -> fail "prove not implemented"
 
@@ -78,7 +78,7 @@ typeCheckExpr ctx names = \case
                 return (Var i [], ctxVarType ctx i)
             Defined -> do
                 definitions <- gets tcDefinitions
-                let Just (t, ty) = Map.lookup name definitions
+                let Just (t, ty) = HashMap.lookup name definitions
                 return (t, ty)
             Assumed -> assumption name
             Unbound -> throwError ("unbound name: " ++ Text.unpack name)
@@ -129,7 +129,7 @@ typeCheckExpr ctx names = \case
 assumption :: Text -> TcM UTerm
 assumption name = do
     assumptions <- gets tcAssumptions
-    case Map.lookup name assumptions of
+    case HashMap.lookup name assumptions of
         Just _A -> return (Assumption name [], _A)
         _       -> fail $ "can't find built-in: " ++ Text.unpack name
 

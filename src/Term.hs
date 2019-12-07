@@ -1,6 +1,8 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 module Term where
 
+import Data.Hashable
 import Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -22,7 +24,7 @@ subscript name c = name ++ map toSubscriptChar (show c)
         _   -> error "subscript: not a digit"
 
 newtype MetaId = MetaId Int
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Hashable)
 
 instance Show MetaId where
     show (MetaId i) = subscript "α" i
