@@ -12,6 +12,7 @@ import qualified Data.HashMap.Strict           as HashMap
 import           Data.Text                      ( Text )
 
 import Flags
+import Location
 import Term
 
 -- A term annotated with a type, used for type-checking and unification.
@@ -29,7 +30,7 @@ data TcState = TcState
     -- Metavar substitution.
     , tcMetaValues :: HashMap MetaId Term
     -- Unsolved unification equations.
-    , tcUnsolvedEquations :: [(Ctx, Type, Term, Term)]
+    , tcUnsolvedEquations :: [(Range, Ctx, Type, Term, Term)]
     }
 
 initialState :: TcState
@@ -76,9 +77,9 @@ freshMeta' ctx _A = do
     modify $ \s -> s { tcNextId = i + 1, tcMetaTypes = HashMap.insert m ty (tcMetaTypes s) }
     return (Meta m (ctxVars ctx))
 
-saveEquation :: Ctx -> Type -> Term -> Term -> TcM ()
-saveEquation ctx ty t1 t2 =
-    modify $ \s -> s { tcUnsolvedEquations = (ctx, ty, t1, t2) : tcUnsolvedEquations s }
+saveEquation :: Range -> Ctx -> Type -> Term -> Term -> TcM ()
+saveEquation l ctx ty t1 t2 =
+    modify $ \s -> s { tcUnsolvedEquations = (l, ctx, ty, t1, t2) : tcUnsolvedEquations s }
 
 -- TODO: occurs check
 assign :: MetaId -> Term -> TcM ()
@@ -89,10 +90,10 @@ assign i t = do
         s { tcMetaValues = HashMap.insert i t (tcMetaValues s), tcUnsolvedEquations = [] }
     unless (null eqs) $ trace "Retrying unsolved equations" $ forM_
         eqs
-        (\(ctx, ty, t1, t2) -> unify ctx ty t1 t2)
+        (\(l, ctx, ty, t1, t2) -> unify l ctx ty t1 t2)
 
-unificationFailure :: Ctx -> Type -> Term -> Term -> TcM a
-unificationFailure ctx _ t1 t2 =
+unificationFailure :: Range -> Ctx -> Type -> Term -> Term -> TcM a
+unificationFailure _ ctx _ t1 t2 =
     throwError
         $  "Failed to unify in context: "
         ++ show ctx
@@ -108,14 +109,15 @@ checkSolved = do
     eqs <- gets tcUnsolvedEquations
     modify $ \s -> s { tcUnsolvedEquations = [] }
     case eqs of
-        []             -> return ()
-        ((ctx, ty, t1, t2) : _) -> unificationFailure ctx ty t1 t2
+        [] -> return ()
+        ((l, ctx, ty, t1, t2) : _) -> unificationFailure l ctx ty t1 t2
 
-unify :: Ctx -> Type -> Term -> Term -> TcM ()
-unify ctx ty t1 t2 = do
+unify :: Range -> Ctx -> Type -> Term -> Term -> TcM ()
+unify l ctx ty t1 t2 = do
     ty' <- whnf ty
     t1' <- whnf t1
     t2' <- whnf t2
+    -- TODO: include Range in trace
     trace
             (  "Unifying in context: "
             ++ show ctx
@@ -124,47 +126,47 @@ unify ctx ty t1 t2 = do
             ++ "\n  "
             ++ show t2'
             )
-        $ unify' ctx ty' t1' t2'
+        $ unify' l ctx ty' t1' t2'
 
-unify' :: Ctx -> Type -> Term -> Term -> TcM ()
-unify' ctx ty t1 t2 = case (ty, t1, t2) of
+unify' :: Range -> Ctx -> Type -> Term -> Term -> TcM ()
+unify' l ctx ty t1 t2 = case (ty, t1, t2) of
     -- TODO: flex-flex
-    (_, Meta _ _, Meta _ _) -> saveEquation ctx ty t1 t2
-    (_, Meta m args, t) -> unifyMeta ctx ty m args t
-    (_, t, Meta m args) -> unifyMeta ctx ty m args t
+    (_, Meta _ _, Meta _ _) -> saveEquation l ctx ty t1 t2
+    (_, Meta m args, t) -> unifyMeta l ctx ty m args t
+    (_, t, Meta m args) -> unifyMeta l ctx ty m args t
     (_, Var i1 args1, Var i2 args2)
         | i1 == i2 && length args1 == length args2 ->
-            unifySpine ctx (ctxVarType ctx i1) (zip args1 args2)
+            unifySpine l ctx (ctxVarType ctx i1) (zip args1 args2)
     (_, Assumption n1 args1, Assumption n2 args2)
         | n1 == n2 && length args1 == length args2 -> do
             assumptions <- gets tcAssumptions
             let Just nty = HashMap.lookup n1 assumptions
-            unifySpine ctx nty (zip args1 args2)
-    (Pi _A _B, Lam b1, Lam b2) -> unify (ctx :> _A) _B b1 b2
+            unifySpine l ctx nty (zip args1 args2)
+    (Pi _A _B, Lam b1, Lam b2) -> unify l (ctx :> _A) _B b1 b2
     -- η-expansion
-    (Pi _A _B, Lam b, t) -> unify (ctx :> _A) _B b (app (weaken t) [Var 0 []])
-    (Pi _A _B, t, Lam b) -> unify (ctx :> _A) _B (app (weaken t) [Var 0 []]) b
+    (Pi _A _B, Lam b, t) -> unify l (ctx :> _A) _B b (app (weaken t) [Var 0 []])
+    (Pi _A _B, t, Lam b) -> unify l (ctx :> _A) _B (app (weaken t) [Var 0 []]) b
     (Universe, Universe, Universe) -> return ()
     (Universe, Pi _A1 _B1, Pi _A2 _B2) -> do
-        unify ctx Universe _A1 _A2
-        unify (ctx :> _A1) Universe _B1 _B2
-    _ -> unificationFailure ctx ty t1 t2
+        unify l ctx Universe _A1 _A2
+        unify l (ctx :> _A1) Universe _B1 _B2
+    _ -> unificationFailure l ctx ty t1 t2
 
-unifyMeta :: Ctx -> Type -> MetaId -> [Term] -> Term -> TcM ()
-unifyMeta ctx ty m args t
+unifyMeta :: Range -> Ctx -> Type -> MetaId -> [Term] -> Term -> TcM ()
+unifyMeta l ctx ty m args t
     -- e.g. ?m v₂ v₁ v₀ = t  =>  ?m = λ λ λ t
     | args == ctxVars ctx = assign m (makeLam ctx t)
-    | otherwise = saveEquation ctx ty (Meta m args) t
+    | otherwise = saveEquation l ctx ty (Meta m args) t
   where
     makeLam C0 t' = t'
     makeLam (ctx' :> _) t' = makeLam ctx' (Lam t')
 
-unifySpine :: Ctx -> Type -> [(Term, Term)] -> TcM ()
-unifySpine _ _ [] = return ()
-unifySpine ctx hty ((arg1, arg2) : args) = do
+unifySpine :: Range -> Ctx -> Type -> [(Term, Term)] -> TcM ()
+unifySpine _ _ _ [] = return ()
+unifySpine l ctx hty ((arg1, arg2) : args) = do
     Pi _A _B <- whnf hty
-    unify ctx _A arg1 arg2
-    unifySpine ctx (instantiate _B arg1) args 
+    unify l ctx _A arg1 arg2
+    unifySpine l ctx (instantiate _B arg1) args 
 
 -- Attempts to simplify a term to a weak head normal form.
 whnf :: Term -> TcM Term

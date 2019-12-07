@@ -30,6 +30,10 @@ data Tc
 type instance Id Tc = Name
 type instance Ann Tc = TcAnn
 
+exprRange :: Expr Tc -> Range
+exprRange e = case ann e of
+    TcAnn l _ -> l
+
 exprUTerm :: Expr Tc -> UTerm
 exprUTerm e = case ann e of
     TcAnn _ tt -> tt
@@ -54,7 +58,7 @@ typeCheckStatement = \case
             Nothing -> return Nothing
             Just ty -> do
                 ty' <- typeCheckExpr C0 [] ty
-                unify C0 Universe (exprType body') (exprTerm ty')
+                unify (exprRange body') C0 Universe (exprType body') (exprTerm ty')
                 return (Just ty')
         checkSolved
         modify $ \s -> s { tcDefinitions = HashMap.insert name (exprUTerm body') (tcDefinitions s) }
@@ -90,40 +94,40 @@ typeCheckExpr ctx names = \case
     Syntax.App l f arg -> do
         f'    <- typeCheckExpr ctx names f
         arg'  <- typeCheckExpr ctx names arg
-        tt    <- typeCheckApp ctx (exprUTerm f') (exprUTerm arg')
+        tt    <- typeCheckApp l ctx (exprUTerm f') (exprUTerm arg')
         return (Syntax.App (TcAnn l tt) f' arg')
     Syntax.Tuple l args -> do
         args' <- mapM (typeCheckExpr ctx names) args
-        tt    <- typeCheckTuple ctx (map exprUTerm args')
+        tt    <- typeCheckTuple l ctx (map exprUTerm args')
         return (Syntax.Tuple (TcAnn l tt) args')
     Syntax.Pi l param body -> do
         (param', paramTerm, body') <- typeCheckParam ctx names param body
-        tt <- typeCheckPi ctx paramTerm (exprUTerm body')
+        tt <- typeCheckPi l ctx paramTerm (exprUTerm body')
         return (Syntax.Pi (TcAnn l tt) param' body')
     Syntax.Lambda l param body -> do
         (param', paramTerm, body') <- typeCheckParam ctx names param body
-        tt <- typeCheckLambda ctx paramTerm (exprUTerm body')
+        tt <- typeCheckLambda l ctx paramTerm (exprUTerm body')
         return (Syntax.Lambda (TcAnn l tt) param' body')
     Syntax.Sigma  l param body -> do
         (param', paramTerm, body') <- typeCheckParam ctx names param body
-        tt <- typeCheckSigma ctx paramTerm (exprUTerm body')
+        tt <- typeCheckSigma l ctx paramTerm (exprUTerm body')
         return (Syntax.Sigma (TcAnn l tt) param' body')
     Syntax.Equal  l a      b  -> do
         f <- assumption "Id"
         _A <- hole ctx
         a' <- typeCheckExpr ctx names a
         b' <- typeCheckExpr ctx names b
-        tt <- typeCheckApps ctx f [_A, exprUTerm a', exprUTerm b']
+        tt <- typeCheckApps l ctx f [_A, exprUTerm a', exprUTerm b']
         return (Syntax.Equal (TcAnn l tt) a' b')
     Syntax.Arrow l a b -> do
         a' <- typeCheckExpr ctx names a
         b' <- typeCheckExpr ctx names b
-        tt <- typeCheckPi ctx (exprUTerm a') (weakenUTerm (exprUTerm b'))
+        tt <- typeCheckPi l ctx (exprUTerm a') (weakenUTerm (exprUTerm b'))
         return (Syntax.Arrow (TcAnn l tt) a' b')
     Syntax.Times l a b -> do
         a' <- typeCheckExpr ctx names a
         b' <- typeCheckExpr ctx names b
-        tt <- typeCheckSigma ctx (exprUTerm a') (weakenUTerm (exprUTerm b'))
+        tt <- typeCheckSigma l ctx (exprUTerm a') (weakenUTerm (exprUTerm b'))
         return (Syntax.Times (TcAnn l tt) a' b')
 
 assumption :: Text -> TcM UTerm
@@ -159,44 +163,44 @@ typeCheckParam ctx names (n, me) body = do
     body' <- typeCheckExpr (ctx :> (fst tt)) (name : names) body
     return ((n, me'), tt, body')
 
-typeCheckPi :: Ctx -> UTerm -> UTerm -> TcM UTerm
-typeCheckPi ctx (_A, _Aty) (_B, _Bty) = do
-    unify ctx Universe _Aty Universe
-    unify (ctx :> _A) Universe _Bty Universe
+typeCheckPi :: Range -> Ctx -> UTerm -> UTerm -> TcM UTerm
+typeCheckPi l ctx (_A, _Aty) (_B, _Bty) = do
+    unify l ctx Universe _Aty Universe
+    unify l (ctx :> _A) Universe _Bty Universe
     return (Pi _A _B, Universe)
 
-typeCheckLambda :: Ctx -> UTerm -> UTerm -> TcM UTerm
-typeCheckLambda ctx (_A, _Aty) (b, _B) = do
-    unify ctx Universe _Aty Universe
+typeCheckLambda :: Range -> Ctx -> UTerm -> UTerm -> TcM UTerm
+typeCheckLambda l ctx (_A, _Aty) (b, _B) = do
+    unify l ctx Universe _Aty Universe
     return (Lam b, Pi _A _B)
 
-typeCheckSigma :: Ctx -> UTerm -> UTerm -> TcM UTerm
-typeCheckSigma ctx a b = do
+typeCheckSigma :: Range -> Ctx -> UTerm -> UTerm -> TcM UTerm
+typeCheckSigma l ctx a b = do
     f  <- assumption "Σ'"
-    b' <- typeCheckLambda ctx a b
-    typeCheckApps ctx f [a, b']
+    b' <- typeCheckLambda l ctx a b
+    typeCheckApps l ctx f [a, b']
 
-typeCheckApp :: Ctx -> UTerm -> UTerm -> TcM UTerm
-typeCheckApp ctx (f, fty) (arg, _A) = do
+typeCheckApp :: Range -> Ctx -> UTerm -> UTerm -> TcM UTerm
+typeCheckApp l ctx (f, fty) (arg, _A) = do
     _B <- freshMeta' (ctx :> _A) Universe
-    unify ctx Universe fty (Pi _A _B)
+    unify l ctx Universe fty (Pi _A _B)
     return (app f [arg], instantiate _B arg)
 
-typeCheckApps :: Ctx -> UTerm -> [UTerm] -> TcM UTerm
-typeCheckApps _   f []           = return f
-typeCheckApps ctx f (arg : args) = do
-    f' <- typeCheckApp ctx f arg
-    typeCheckApps ctx f' args
+typeCheckApps :: Range ->  Ctx -> UTerm -> [UTerm] -> TcM UTerm
+typeCheckApps _ _   f []           = return f
+typeCheckApps l ctx f (arg : args) = do
+    f' <- typeCheckApp l ctx f arg
+    typeCheckApps l ctx f' args
 
-typeCheckTuple :: Ctx -> [UTerm] -> TcM UTerm
-typeCheckTuple _   []         = error "typeCheckTuple: empty tuple"
-typeCheckTuple _   [t       ] = return t
-typeCheckTuple ctx (a : rest) = do
+typeCheckTuple :: Range -> Ctx -> [UTerm] -> TcM UTerm
+typeCheckTuple _ _   []         = error "typeCheckTuple: empty tuple"
+typeCheckTuple _ _   [t       ] = return t
+typeCheckTuple l ctx (a : rest) = do
     _A   <- hole ctx
     _B   <- hole ctx
-    b    <- typeCheckTuple ctx rest
+    b    <- typeCheckTuple l ctx rest
     pair <- assumption "pair"
-    typeCheckApps ctx pair [_A, _B, a, b]
+    typeCheckApps l ctx pair [_A, _B, a, b]
 
 printStatements :: [Statement Tc] -> IO ()
 printStatements = mapM_ printStatement
