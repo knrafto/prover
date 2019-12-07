@@ -14,6 +14,7 @@ import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec               hiding (Token, tokens)
 import           Text.Pretty.Simple
 
+import           Diagnostic
 import qualified Flags
 import           Location
 import           Naming
@@ -37,11 +38,12 @@ instance ToJSON HighlightedRange where
 
 data Response = Response
     { highlighting :: [HighlightedRange]
+    , diagnostics  :: [Diagnostic]
     }
     deriving (Show)
 
 instance ToJSON Response where
-    toJSON r = object ["highlighting" .= highlighting r]
+    toJSON r = object ["highlighting" .= highlighting r, "diagnostics" .= diagnostics r]
 
 tokenHighlighting :: [Token] -> [HighlightedRange]
 tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
@@ -95,7 +97,10 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = resolveNames stmts
-        let r      = Response { highlighting = tokenHighlighting tokens ++ nameHighlighting (extractNames stmts') }
+        let r      = Response
+                { highlighting = tokenHighlighting tokens ++ nameHighlighting (extractNames stmts')
+                , diagnostics  = []
+                }
         when Flags.json $ B.putStrLn (encode r)
         unless Flags.json $ do
             result <- runTcM (typeCheck stmts')

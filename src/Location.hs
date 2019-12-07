@@ -18,7 +18,7 @@ instance ToJSON Range where
 spanRange :: Range -> Range -> Range
 spanRange (Range s _) (Range _ e) = Range s e
 
-data Located e = L Range e
+data Located e = L !Range !e
     deriving (Eq, Show)
 
 location :: Located e -> Range
