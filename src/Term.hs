@@ -5,8 +5,8 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 
 -- TODO: move to util module
-showSubscript :: String -> Int -> String
-showSubscript name c = name ++ map toSubscriptChar (show c)
+subscript :: String -> Int -> String
+subscript name c = name ++ map toSubscriptChar (show c)
   where
     toSubscriptChar = \case
         '0' -> '₀'
@@ -19,13 +19,13 @@ showSubscript name c = name ++ map toSubscriptChar (show c)
         '7' -> '₇'
         '8' -> '₈'
         '9' -> '₉'
-        _   -> error "showSubscript: not a digit"
+        _   -> error "subscript: not a digit"
 
 newtype MetaId = MetaId Int
     deriving (Eq, Ord)
 
 instance Show MetaId where
-    show (MetaId i) = showSubscript "α" i
+    show (MetaId i) = subscript "α" i
 
 -- Contexts.
 data Ctx
@@ -55,7 +55,7 @@ data Term
 instance Show Term where
     showsPrec d = \case
         Meta m args -> showApp (show m) args
-        Var i args -> showApp (showSubscript "v" i) args
+        Var i args -> showApp (subscript "v" i) args
         Assumption t args -> showApp (Text.unpack t) args
         Lam t -> showParen (d > appPrec) $
             showString "λ " . showsPrec (appPrec + 1) t
@@ -143,4 +143,4 @@ app t args@(arg : rest) = case t of
     Var i args0 -> Var i (args0 ++ args)
     Assumption i args0 -> Assumption i (args0 ++ args)
     Lam b -> app (instantiate b arg) rest
-    _ -> error "app: cannot apply type of arguments"
+    _ -> error ("app: cannot apply " ++ show t)
