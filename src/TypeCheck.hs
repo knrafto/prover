@@ -5,6 +5,7 @@ module TypeCheck where
 
 import           Data.List
 
+import           Control.Monad.Except
 import           Control.Monad.State
 import qualified Data.Map.Strict               as Map
 import           Data.Text                      ( Text )
@@ -80,7 +81,7 @@ typeCheckExpr ctx names = \case
                 let Just (t, ty) = Map.lookup name definitions
                 return (t, ty)
             Assumed -> assumption name
-            Unbound -> fail $ "unbound name: " ++ Text.unpack name
+            Unbound -> throwError ("unbound name: " ++ Text.unpack name)
         return (Syntax.Var (TcAnn l tt) n)
     Syntax.Hole l -> do
         tt <- hole ctx
