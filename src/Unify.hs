@@ -137,8 +137,11 @@ unify l ctx ty t1 t2 = do
 
 unify' :: Range -> Ctx -> Type -> Term -> Term -> TcM ()
 unify' l ctx ty t1 t2 = case (ty, t1, t2) of
-    -- TODO: flex-flex
-    (_, Meta _ _, Meta _ _) -> saveEquation l ctx ty t1 t2
+    (_, Meta m1 args1, Meta m2 args2)
+        | m1 == m2 && length args1 == length args2 -> do
+            metaTypes <- gets tcMetaTypes
+            let Just mty = HashMap.lookup m1 metaTypes
+            unifySpine l ctx mty (zip args1 args2)
     (_, Meta m args, t) -> unifyMeta l ctx ty m args t
     (_, t, Meta m args) -> unifyMeta l ctx ty m args t
     (_, Var i1 args1, Var i2 args2)
@@ -175,6 +178,7 @@ unifyMeta l ctx ty m args t = do
 unifySpine :: Range -> Ctx -> Type -> [(Term, Term)] -> TcM ()
 unifySpine _ _ _ [] = return ()
 unifySpine l ctx hty ((arg1, arg2) : args) = do
+    -- TODO: could this be blocked?
     Pi _A _B <- whnf hty
     unify l ctx _A arg1 arg2
     unifySpine l ctx (instantiate _B arg1) args 
