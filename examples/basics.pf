@@ -1,14 +1,15 @@
 -- Identity types, with based path induction.
 assume Id : Π A. A → A → Type
 assume refl : Π A. Π a : A. a = a
-assume Id-ind : Π A. Π a : A.
-    Π C : (Π b. a = b → Type).
-    C a (refl A a) →
-    Π b. Π p. C b p
-assume Id-ind-refl : Π A. Π a : A.
-    Π C : (Π b : A. a = b → Type).
-    Π c : C a (refl A a).
-    Id-ind A a C c a (refl A a) = c
+assume Id-ind : Π A.
+    Π C : (Π a : A. Π b : A. a = b → Type).
+    (Π a. C a a (refl A a)) →
+    Π a. Π b. Π p. C a b p
+assume Id-ind-refl : Π A.
+    Π C : (Π a : A. Π b : A. a = b → Type).
+    Π c : Π a. C a a (refl A a).
+    Π a.
+    Id-ind A C c a a (refl A a) = c a
 
 -- Dependent sum type.
 assume Σ' : Π A : Type. Π B : A → Type. Type
@@ -52,22 +53,22 @@ assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n. C n
 -- Structure of identity types.
 define ap
     : Π A : Type. Π B : Type. Π f : A → B. Π x : A. Π y : A. x = y → f x = f y
-    ≡ λ A : Type. λ B : Type. λ f : A → B. λ x : A. Id-ind A x _ (refl _ _)
+    ≡ λ A : Type. λ B : Type. λ f : A → B. Id-ind A _ (λ x. refl B (f x))
 define subst
     : Π A : Type. Π B : A → Type. Π x : A. Π y : A. x = y → B x → B y
-    ≡ λ A : Type. λ B : A → Type. λ x : A. Id-ind A x _ λ b : _. b
+    ≡ λ A : Type. λ B : A → Type. Id-ind A _ (λ x. λ b. b)
 define sym
     : Π A : Type. Π x : A. Π y : A. x = y → y = x
-    ≡ λ A : Type. λ x : A. Id-ind A x _ (refl A x)
+    ≡ λ A : Type. Id-ind A _ (λ x. refl A x)
 define trans
     : Π A : Type. Π x : A. Π y : A. Π z : A. x = y → y = z → x = z
     ≡ λ A : Type. λ x : A. λ y : A. λ z : A. λ p : x = y. λ q : y = z.
-        Id-ind A x (λ y : A. λ p : x = y. Π z : A. y = z → x = z) (Id-ind A x _ (refl A x)) y p z q
+        Id-ind A (λ x. λ y : A. λ p : x = y. Π z : A. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
 
 -- Function types.
 define happly
     : Π A : Type. Π B : Type. Π f : A → B. Π g : A → B. f = g → Π x : A. f x = g x
-    ≡ λ A : Type. λ B : Type. λ f : A → B. Id-ind (A → B) f _ λ x : A. refl B (f x)
+    ≡ λ A : Type. λ B : Type. Id-ind (A → B) _ (λ f. λ x. refl B (f x))
 
 -- Sigma types.
 define π₁
