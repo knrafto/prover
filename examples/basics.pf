@@ -1,11 +1,11 @@
 -- Identity types, with based path induction.
 assume Id : Π A. A → A → Type
-assume refl : Π A : Type. Π a : A. a = a
-assume Id-ind : Π A : Type. Π a : A.
-    Π C : (Π b : A. a = b → Type).
+assume refl : Π A. Π a : A. a = a
+assume Id-ind : Π A. Π a : A.
+    Π C : (Π b. a = b → Type).
     C a (refl A a) →
-    Π b : A. Π p : a = b. C b p
-assume Id-ind-refl : Π A : Type. Π a : A.
+    Π b. Π p. C b p
+assume Id-ind-refl : Π A. Π a : A.
     Π C : (Π b : A. a = b → Type).
     Π c : C a (refl A a).
     Id-ind A a C c a (refl A a) = c
