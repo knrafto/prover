@@ -2,10 +2,12 @@
 module Unify where
 
 import           Data.IORef
+import           Data.List
 import           System.IO.Unsafe
 
 import           Control.Monad.Except
 import           Control.Monad.Fail
+import           Control.Monad.Trans.Maybe
 import           Control.Monad.State
 import           Data.HashMap.Strict            ( HashMap )
 import qualified Data.HashMap.Strict           as HashMap
@@ -79,7 +81,8 @@ freshMeta' ctx _A = do
     let m = MetaId i
     let ty = ctxPi ctx _A
     modify $ \s -> s { tcNextId = i + 1, tcMetaTypes = HashMap.insert m ty (tcMetaTypes s) }
-    return (Meta m (ctxVars ctx))
+    let t = Meta m (ctxVars ctx)
+    trace ("Creating meta " ++ show t) $ return t
 
 saveEquation :: Range -> Ctx -> Type -> Term -> Term -> TcM ()
 saveEquation l ctx ty t1 t2 =
@@ -156,14 +159,18 @@ unify' l ctx ty t1 t2 = case (ty, t1, t2) of
         unify l (ctx :> _A1) Universe _B1 _B2
     _ -> unificationFailure l ctx ty t1 t2
 
+-- TODO: pruning
 unifyMeta :: Range -> Ctx -> Type -> MetaId -> [Term] -> Term -> TcM ()
-unifyMeta l ctx ty m args t
-    -- e.g. ?m v₂ v₁ v₀ = t  =>  ?m = λ λ λ t
-    | args == ctxVars ctx = assign m (makeLam ctx t)
-    | otherwise = saveEquation l ctx ty (Meta m args) t
+unifyMeta l ctx ty m args t = do
+    result <- runMaybeT $ do
+        σ <- convertMetaArgs args
+        invertVarSubst σ t
+    case result of
+        Nothing -> saveEquation l ctx ty (Meta m args) t
+        Just t' -> assign m (makeLam (length args) t')
   where
-    makeLam C0 t' = t'
-    makeLam (ctx' :> _) t' = makeLam ctx' (Lam t')
+    makeLam 0 t' = t'
+    makeLam n t' = makeLam (n - 1) (Lam t')
 
 unifySpine :: Range -> Ctx -> Type -> [(Term, Term)] -> TcM ()
 unifySpine _ _ _ [] = return ()
@@ -182,3 +189,38 @@ whnf t = case t of
             Nothing -> return t
             Just t' -> return (app t' args)
     _ -> return t
+
+-- A variable substitution, represented as a list of de Bruijn indices. Note
+-- that this may seem reversed, since index zero is written on the left for
+-- lists but on the right in contexts.
+-- TODO: use strict list
+type VarSubst = [Int]
+
+-- An analogue of SubstLift. liftVarSubst σ acts like the identity on var 0,
+-- and like σ on other vars.
+liftVarSubst :: VarSubst -> VarSubst
+liftVarSubst σ = 0 : map (+ 1) σ
+
+-- Determine if a series of arguments (to a meta) is a variable substitution.
+convertMetaArgs :: [Term] -> MaybeT TcM VarSubst
+convertMetaArgs args = mapM convertMetaArg (reverse args)
+  where
+    convertMetaArg t = do
+        t' <- lift $ whnf t
+        case t' of
+            Var i [] -> return i
+            _ -> mzero
+
+-- invertVarSubst σ t tries to find a unique term u such that u[σ] = t.
+invertVarSubst :: VarSubst -> Term -> MaybeT TcM Term
+invertVarSubst σ t = do
+    t' <- lift $ whnf t
+    case t' of
+        Meta m args -> Meta m <$> mapM (invertVarSubst σ) args
+        Var i args -> case elemIndices i σ of
+            [i'] -> Var i' <$> mapM (invertVarSubst σ) args
+            _ -> mzero
+        Assumption n args -> Assumption n <$> mapM (invertVarSubst σ) args
+        Lam b -> Lam <$> invertVarSubst (liftVarSubst σ) b
+        Universe -> return Universe
+        Pi a b -> Pi <$> invertVarSubst σ a <*> invertVarSubst (liftVarSubst σ) b
