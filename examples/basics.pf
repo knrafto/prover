@@ -1,5 +1,5 @@
 -- Identity types, with based path induction.
-assume Id : Π A : Type. A → A → Type
+assume Id : Π A. A → A → Type
 assume refl : Π A : Type. Π a : A. a = a
 assume Id-ind : Π A : Type. Π a : A.
     Π C : (Π b : A. a = b → Type).
@@ -25,19 +25,19 @@ assume Σ-ind-pair : Π A : Type. Π B : A → Type.
 
 -- Empty type.
 assume 0 : Type
-assume 0-ind : Π C : 0 → Type. Π a : 0. C a
+assume 0-ind : Π C : 0 → Type. Π a. C a
 
 -- Unit type.
 assume 1 : Type
 assume tt : 1
-assume 1-ind : Π C : 1 → Type. C tt → Π a : 1. C a
+assume 1-ind : Π C : 1 → Type. C tt → Π a. C a
 assume 1-ind-tt : Π C : 1 → Type. Π c : C tt. 1-ind C c tt = c
 
 -- Boolean type.
 assume 2 : Type
 assume 0₂ : 2
 assume 1₂ : 2
-assume 2-ind : Π C : 2 → Type. C 0₂ → C 1₂ → Π a : 2. C a
+assume 2-ind : Π C : 2 → Type. C 0₂ → C 1₂ → Π a. C a
 assume 2-ind-0₂ : Π C : 2 → Type. Π c₀ : C 0₂. Π c₁ : C 1₂. 2-ind C c₀ c₁ 0₂ = c₀
 assume 2-ind-1₂ : Π C : 2 → Type. Π c₀ : C 0₂. Π c₁ : C 1₂. 2-ind C c₀ c₁ 1₂ = c₁
 
@@ -45,9 +45,9 @@ assume 2-ind-1₂ : Π C : 2 → Type. Π c₀ : C 0₂. Π c₁ : C 1₂. 2-ind
 assume ℕ : Type
 assume zero : ℕ
 assume suc : ℕ → ℕ
-assume ℕ-ind : Π C : ℕ → Type. C zero → (Π n : ℕ. C n → C (suc n)) → Π n : ℕ. C n
-assume ℕ-ind-zero : Π C : ℕ → Type. Π base : C zero. Π step : (Π n : ℕ. C n → C (suc n)). ℕ-ind C base step zero = base
-assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n : ℕ. C n → C (suc n)). Π n : ℕ. ℕ-ind C base step (suc n) = step n (ℕ-ind C base step n)
+assume ℕ-ind : Π C : ℕ → Type. C zero → (Π n. C n → C (suc n)) → Π n. C n
+assume ℕ-ind-zero : Π C : ℕ → Type. Π base : C zero. Π step : (Π n. C n → C (suc n)). ℕ-ind C base step zero = base
+assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n. C n → C (suc n)). Π n. ℕ-ind C base step (suc n) = step n (ℕ-ind C base step n)
 
 -- Structure of identity types.
 define ap
