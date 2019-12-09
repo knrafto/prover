@@ -75,8 +75,8 @@ runTcM (TcM m) = runExceptT (runStateT m initialState)
 
 -- Generate a new metavariable for the given context Γ and type A. The new meta
 -- has type α : Γ → A and the returned term is α Γ.
-freshMeta' :: Ctx -> Type -> TcM Term
-freshMeta' ctx _A = do
+freshMeta :: Ctx -> Type -> TcM Term
+freshMeta ctx _A = do
     i <- gets tcNextId
     let m = MetaId i
     let ty = ctxPi ctx _A

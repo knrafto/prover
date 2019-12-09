@@ -142,8 +142,8 @@ hole _Γ = do
     -- We generate variables for both the hole itself, and its type. Luckily
     -- for now we don't have to do this forever, since the type of any type is
     -- the universe.
-    ty <- freshMeta' _Γ Universe
-    t <- freshMeta' _Γ ty
+    ty <- freshMeta _Γ Universe
+    t <- freshMeta _Γ ty
     return (t, ty)
 
 weakenUTerm :: UTerm -> UTerm
@@ -181,7 +181,7 @@ typeCheckSigma l ctx a b = do
 
 typeCheckApp :: Range -> Ctx -> UTerm -> UTerm -> TcM UTerm
 typeCheckApp l ctx (f, fty) (arg, _A) = do
-    _B <- freshMeta' (ctx :> _A) Universe
+    _B <- freshMeta (ctx :> _A) Universe
     unify l ctx Universe fty (Pi _A _B)
     return (app f [arg], instantiate _B arg)
 
