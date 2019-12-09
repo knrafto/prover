@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -5,11 +6,16 @@ module TypeCheck where
 
 import           Data.List
 
+import           Control.Monad.Except
+import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.State
+import           Control.Monad.Writer
+import           Data.DList (DList)
 import qualified Data.HashMap.Strict           as HashMap
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 
+import           Diagnostic
 import           Location
 import           Monad
 import           Naming
@@ -45,6 +51,12 @@ exprTerm e = case ann e of
 exprType :: Expr Tc -> Type
 exprType e = case ann e of
     TcAnn _ (_, ty) -> ty
+
+newtype ElabM a = ElabM { runElabM :: WriterT (DList Constraint) TcM a }
+    deriving
+        ( Functor, Applicative, Monad, MonadFail, MonadIO
+        , MonadError Diagnostic, MonadState TcState, MonadWriter (DList Constraint)
+        )
 
 typeCheck :: [Statement N] -> TcM [Statement Tc]
 typeCheck = mapM typeCheckStatement

@@ -32,6 +32,7 @@ data TcState = TcState
     -- Metavar substitution.
     , tcMetaValues :: HashMap MetaId Term
     -- Unsolved unification equations.
+    -- TODO: remove this field.
     , tcUnsolvedEquations :: [(Range, Ctx, Type, Term, Term)]
     }
 

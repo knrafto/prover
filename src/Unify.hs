@@ -12,6 +12,16 @@ import Location
 import Monad
 import Term
 
+-- A unification constraint.
+data Constraint
+    -- Asserts equality of two terms.
+    = Unify !Range !Ctx !Type !Term !Term
+    -- An "and" constraint.
+    | Conj [Constraint]
+    -- Asserts that the first constraint must be solved before the second
+    -- constraint is well-typed.
+    | Guard Constraint Constraint
+
 saveEquation :: Range -> Ctx -> Type -> Term -> Term -> TcM ()
 saveEquation l ctx ty t1 t2 =
     modify $ \s -> s { tcUnsolvedEquations = (l, ctx, ty, t1, t2) : tcUnsolvedEquations s }
