@@ -17,13 +17,13 @@ import           Text.Pretty.Simple
 import           Diagnostic
 import qualified Flags
 import           Location
+import           Monad
 import           Naming
 import           Syntax
 import           Token (Token(..))
 import qualified Token
 import           TypeCheck
 import           Parser
-import           Unify
 
 panic :: String -> IO a
 panic message = do

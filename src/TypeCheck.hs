@@ -11,6 +11,7 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
 
 import           Location
+import           Monad
 import           Naming
 import           Term
 import           Syntax                         ( Id
