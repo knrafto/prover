@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- Source locations.
-module Location where
+module Location
+    ( Range(..)
+    , spanRange
+    , Ident(..)
+    ) where
 
 import           Data.Aeson
 import           Data.Text                      ( Text )

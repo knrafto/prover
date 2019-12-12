@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- Compiler diagnostics, e.g. error messages and warnings.
-module Diagnostic where
+module Diagnostic 
+    ( Diagnostic(..)
+    ) where
 
 import Data.Aeson
 

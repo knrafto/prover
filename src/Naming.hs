@@ -74,9 +74,9 @@ resolveExpr env = \case
     Tuple l xs  -> Tuple l (map (resolveExpr env) xs)
     Pi l p e ->
         let (p', env') = resolveParam env p in Pi l p' (resolveExpr env' e)
-    Lambda l p e ->
+    Lam l p e ->
         let (p', env') = resolveParam env p
-        in  Lambda l p' (resolveExpr env' e)
+        in  Lam l p' (resolveExpr env' e)
     Sigma l p e ->
         let (p', env') = resolveParam env p
         in  Sigma l p' (resolveExpr env' e)

@@ -1,5 +1,12 @@
--- Easy command-line flags as global constants.
-module Flags where
+-- Easy command-line flags as global constants. This module is intended to be
+-- imported qualified.
+module Flags
+    ( positionalArgs
+    , print_tokens
+    , print_parse
+    , print_trace
+    , json
+    ) where
 
 import           Data.List
 

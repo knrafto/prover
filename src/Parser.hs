@@ -110,7 +110,7 @@ atom = var <|> hole <|> type_ <|> tuple <|> sigma <|> pi_ <|> lam
         p <- param
         _ <- symbol '.'
         e <- expr
-        return (Lambda (spanRange s (ann e)) p e)
+        return (Lam (spanRange s (ann e)) p e)
 
 apps :: Parser (Expr P)
 apps = do

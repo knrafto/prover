@@ -126,10 +126,10 @@ typeCheckExpr ctx names = \case
         (param', paramTerm, body') <- typeCheckParam ctx names param body
         tt <- typeCheckPi l ctx paramTerm (exprUTerm body')
         return (Syntax.Pi (TcAnn l tt) param' body')
-    Syntax.Lambda l param body -> do
+    Syntax.Lam l param body -> do
         (param', paramTerm, body') <- typeCheckParam ctx names param body
-        tt <- typeCheckLambda l ctx paramTerm (exprUTerm body')
-        return (Syntax.Lambda (TcAnn l tt) param' body')
+        tt <- typeCheckLam l ctx paramTerm (exprUTerm body')
+        return (Syntax.Lam (TcAnn l tt) param' body')
     Syntax.Sigma  l param body -> do
         (param', paramTerm, body') <- typeCheckParam ctx names param body
         tt <- typeCheckSigma l ctx paramTerm (exprUTerm body')
@@ -191,15 +191,15 @@ typeCheckPi l ctx (_A, _Aty) (_B, _Bty) = do
     checkEqual l (ctx :> _A) Universe _Bty Universe
     return (Pi _A _B, Universe)
 
-typeCheckLambda :: Range -> Ctx -> UTerm -> UTerm -> ElabM UTerm
-typeCheckLambda l ctx (_A, _Aty) (b, _B) = do
+typeCheckLam :: Range -> Ctx -> UTerm -> UTerm -> ElabM UTerm
+typeCheckLam l ctx (_A, _Aty) (b, _B) = do
     checkEqual l ctx Universe _Aty Universe
     return (Lam b, Pi _A _B)
 
 typeCheckSigma :: Range -> Ctx -> UTerm -> UTerm -> ElabM UTerm
 typeCheckSigma l ctx a b = do
     f  <- assumption "Σ'"
-    b' <- typeCheckLambda l ctx a b
+    b' <- typeCheckLam l ctx a b
     typeCheckApps l ctx f [a, b']
 
 typeCheckApp :: Range -> Ctx -> UTerm -> UTerm -> ElabM UTerm

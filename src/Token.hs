@@ -1,7 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- Tokenization.
-module Token where
+module Token
+    ( TokenType(..)
+    , Token(..)
+    , tokenize
+    ) where
 
 import           Control.Monad
 
@@ -96,7 +100,9 @@ token = choice
     , Token Identifier  <$> identifier
     ]
 
+-- Split a source file into tokens.
 tokenize :: Text -> [Token]
 tokenize input = case parse (sc *> many (token <* sc) <* eof) "" input of
+    -- Tokenization should never fail.
     Left  e  -> error ("parse error when tokenizing:\n" ++ errorBundlePretty e)
     Right xs -> xs
