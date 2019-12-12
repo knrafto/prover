@@ -11,6 +11,7 @@ import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Data.DList (DList)
+import qualified Data.DList as DList
 import qualified Data.HashMap.Strict           as HashMap
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as Text
@@ -60,12 +61,12 @@ newtype ElabM a = ElabM { unElabM :: WriterT (DList Constraint) TcM a }
 
 runElabM :: ElabM a -> TcM a
 runElabM m = do
-    (a, _) <- runWriterT (unElabM m)
-    checkSolved
+    (a, constraints) <- runWriterT (unElabM m)
+    solveConstraints (DList.toList constraints)
     return a
 
 checkEqual :: Range -> Ctx -> Type -> Term -> Term -> ElabM ()
-checkEqual l ctx ty t1 t2 = ElabM (lift (unify l ctx ty t1 t2))
+checkEqual l ctx ty t1 t2 = ElabM (tell (DList.singleton (Unify l ctx ty t1 t2)))
 
 typeCheck :: [Statement N] -> TcM [Statement Tc]
 typeCheck = mapM typeCheckStatement

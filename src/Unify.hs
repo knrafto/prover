@@ -22,6 +22,15 @@ data Constraint
     -- constraint is well-typed.
     | Guard Constraint Constraint
 
+solveConstraints :: [Constraint] -> TcM ()
+solveConstraints cs = do
+    mapM_ go cs
+    checkSolved
+  where
+    go (Unify l ctx ty t1 t2) = unify l ctx ty t1 t2
+    go (Conj cs') = mapM_ go cs'
+    go (Guard c1 c2) = go c1 >> go c2
+
 saveEquation :: Range -> Ctx -> Type -> Term -> Term -> TcM ()
 saveEquation l ctx ty t1 t2 =
     modify $ \s -> s { tcUnsolvedEquations = (l, ctx, ty, t1, t2) : tcUnsolvedEquations s }
