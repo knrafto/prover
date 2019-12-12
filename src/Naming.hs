@@ -55,7 +55,7 @@ emptyEnv = Env { envLocalNames  = HashMap.empty
                }
 
 insertIdent :: Ident -> HashMap Text Ident -> HashMap Text Ident
-insertIdent ident = HashMap.insert (unLoc ident) ident
+insertIdent ident = HashMap.insert (identText ident) ident
 
 lookupIdent :: Env -> Ident -> Name
 lookupIdent env ident = fromMaybe (Name Unbound ident ident) $ asum
@@ -63,7 +63,7 @@ lookupIdent env ident = fromMaybe (Name Unbound ident ident) $ asum
     , Name Defined ident <$> HashMap.lookup name (envDefinitions env)
     , Name Assumed ident <$> HashMap.lookup name (envAssumptions env)
     ]
-    where name = unLoc ident
+    where name = identText ident
 
 resolveExpr :: Env -> Expr P -> Expr N
 resolveExpr env = \case

@@ -74,7 +74,7 @@ typeCheck = mapM typeCheckStatement
 typeCheckStatement :: Statement N -> TcM (Statement Tc)
 typeCheckStatement = \case
     Syntax.Define n mty body -> do
-        let name = unLoc (nameUsage n)
+        let name = identText (nameUsage n)
         (body', mty') <- runElabM $ do
             body' <- typeCheckExpr C0 [] body
             mty' <- case mty of
@@ -87,7 +87,7 @@ typeCheckStatement = \case
         modify $ \s -> s { tcDefinitions = HashMap.insert name (exprUTerm body') (tcDefinitions s) }
         return (Syntax.Define n mty' body')
     Syntax.Assume n ty -> do
-        let name = unLoc (nameUsage n)
+        let name = identText (nameUsage n)
         ty' <- runElabM $ typeCheckExpr C0 [] ty
         modify $ \s -> s { tcAssumptions = HashMap.insert name (exprTerm ty') (tcAssumptions s) }
         return (Syntax.Assume n ty')
@@ -96,7 +96,7 @@ typeCheckStatement = \case
 typeCheckExpr :: Ctx -> [Text] -> Expr N -> ElabM (Expr Tc)
 typeCheckExpr ctx names = \case
     Syntax.Var l n -> do
-        let name = unLoc (nameUsage n)
+        let name = identText (nameUsage n)
         -- We assume that name resolution is correct so that the map lookups cannot fail.
         tt <- case nameKind n of
             Local -> do
@@ -174,7 +174,7 @@ weakenUTerm (t, ty) = (weaken t, weaken ty)
 
 typeCheckParam :: Ctx -> [Text] -> Param N -> Expr N -> ElabM (Param Tc, UTerm, Expr Tc)
 typeCheckParam ctx names (n, me) body = do
-    let name = unLoc (nameUsage n)
+    let name = identText (nameUsage n)
     (me', tt) <- case me of
         Nothing -> do
             tt <- hole ctx
@@ -230,9 +230,9 @@ printStatements = mapM_ printStatement
 printStatement :: Statement Tc -> IO ()
 printStatement = \case
     Syntax.Define n _ body -> do
-        let name = unLoc (nameUsage n)
+        let name = identText (nameUsage n)
         putStrLn $ "define " ++ Text.unpack name ++ " := " ++ show (exprTerm body)
     Syntax.Assume n ty -> do
-        let name = unLoc (nameUsage n)
+        let name = identText (nameUsage n)
         putStrLn $ "assume " ++ Text.unpack name ++ " : " ++ show (exprTerm ty)
     Syntax.Prove _ _ -> fail "prove not implemented"

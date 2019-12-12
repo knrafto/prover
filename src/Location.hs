@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+-- Source locations.
 module Location where
 
 import           Data.Aeson
@@ -15,16 +16,14 @@ instance Show Range where
 instance ToJSON Range where
     toJSON (Range s e) = object ["start" .= s, "end" .= e]
 
+-- Returns a range that covers both given range. The first range must be before
+-- the second.
 spanRange :: Range -> Range -> Range
 spanRange (Range s _) (Range _ e) = Range s e
 
-data Located e = L !Range !e
+-- A range, along with the text that occupies that range.
+data Ident = Ident
+    { identRange :: !Range
+    , identText :: !Text
+    }
     deriving (Eq, Show)
-
-location :: Located e -> Range
-location (L l _) = l
-
-unLoc :: Located e -> e
-unLoc (L _ e) = e
-
-type Ident = Located Text

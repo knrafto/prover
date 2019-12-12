@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+-- Compiler diagnostics, e.g. error messages and warnings.
 module Diagnostic where
 
 import Data.Aeson
@@ -6,7 +7,7 @@ import Data.Aeson
 import Location
 
 data Diagnostic = Diagnostic
-    { diagnosticRange :: !Range
+    { diagnosticRange :: Range
     , diagnosticMessage :: String
     }
     deriving (Show)

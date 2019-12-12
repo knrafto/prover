@@ -42,7 +42,7 @@ reservedWord w = lexeme . try $ do
     notFollowedBy (satisfy isWordChar)
     Range s <$> getOffset
 
-identifier :: Parser (Id P)
+identifier :: Parser Ident
 identifier = lexeme . try $ do
     s <- getOffset
     w <- takeWhile1P (Just "word character") isWordChar
@@ -52,7 +52,7 @@ identifier = lexeme . try $ do
         ++ " is reserved and cannot be used as an identifier"
         )
     e <- getOffset
-    return (L (Range s e) w)
+    return (Ident (Range s e) w)
   where
     reservedWords :: [Text]
     reservedWords =
@@ -85,7 +85,7 @@ atom = var <|> hole <|> type_ <|> tuple <|> sigma <|> pi_ <|> lam
   where
     var = do
         i <- identifier
-        return (Var (location i) i)
+        return (Var (identRange i) i)
     hole  = Hole <$> reservedWord "_"
     type_ = Type <$> reservedWord "Type"
     tuple = do

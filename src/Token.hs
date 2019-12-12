@@ -58,21 +58,21 @@ symbolChars = "(),."
 isWordChar :: Char -> Bool
 isWordChar c = c `notElem` (spaceChars ++ symbolChars)
 
-located :: Parser a -> Parser (Located a)
-located m = do
+ident :: Parser Text -> Parser Ident
+ident m = do
     s <- getOffset
     a <- m
     e <- getOffset
-    return (L (Range s e) a)
+    return (Ident (Range s e) a)
 
 symbol :: Char -> Parser Ident
-symbol c = located $ string (Text.pack [c])
+symbol c = ident $ string (Text.pack [c])
 
 reservedWord :: Text -> Parser Ident
-reservedWord w = located $ try (string w <* notFollowedBy (satisfy isWordChar))
+reservedWord w = ident $ try (string w <* notFollowedBy (satisfy isWordChar))
 
 identifier :: Parser Ident
-identifier = located $ takeWhile1P (Just "word character") isWordChar
+identifier = ident $ takeWhile1P (Just "word character") isWordChar
 
 token :: Parser Token
 token = choice

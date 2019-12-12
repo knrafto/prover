@@ -48,7 +48,7 @@ instance ToJSON Response where
 tokenHighlighting :: [Token] -> [HighlightedRange]
 tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
     Nothing -> Nothing
-    Just s -> Just (HighlightedRange (location (tokenIdent t)) s)
+    Just s -> Just (HighlightedRange (identRange (tokenIdent t)) s)
   where
     tokenClass t = case tokenKind t of
         Token.Identifier  -> Nothing
@@ -72,7 +72,7 @@ tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
 
 
 nameHighlighting :: [Name] -> [HighlightedRange]
-nameHighlighting = map (\n -> HighlightedRange (location (nameUsage n)) (nameClass n))
+nameHighlighting = map (\n -> HighlightedRange (identRange (nameUsage n)) (nameClass n))
   where
     nameClass n = case nameKind n of
         Local   -> "local_name"
