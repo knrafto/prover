@@ -18,7 +18,7 @@ import           Diagnostic
 import qualified Flags
 import           Location
 import           Monad
-import           Naming
+import           ScopeCheck
 import           Syntax
 import           Token (Token(..))
 import qualified Token
@@ -96,7 +96,7 @@ main = do
             Left  e -> panic (errorBundlePretty e)
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
-        let stmts' = resolveNames stmts
+        let stmts' = scopeCheck stmts
         result <- runTcM (typeCheck stmts')
         ds <- case result of
             Left  d            -> do

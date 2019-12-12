@@ -1,11 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Naming
+-- Scope-checking, i.e. name resolution.
+module ScopeCheck
     ( NameKind(..)
     , Name(..)
     , N
-    , resolveNames
+    , scopeCheck
     )
 where
 
@@ -104,8 +105,8 @@ resolveStatement env = \case
         )
     Prove i ty -> (Prove (Name Defined i i) (resolveExpr env ty), env)
 
-resolveNames :: [Statement P] -> [Statement N]
-resolveNames = go emptyEnv
+scopeCheck :: [Statement P] -> [Statement N]
+scopeCheck = go emptyEnv
   where
     go _ [] = []
     go env (stmt : rest) =

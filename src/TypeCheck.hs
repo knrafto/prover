@@ -19,8 +19,8 @@ import qualified Data.Text                     as Text
 import           Diagnostic
 import           Location
 import           Monad
-import           Naming
 import           Term
+import           ScopeCheck
 import           Syntax                         ( Id
                                                 , Ann
                                                 , ann
