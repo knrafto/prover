@@ -1,3 +1,4 @@
+-- Easy command-line flags as global constants.
 module Flags where
 
 import           Data.List
