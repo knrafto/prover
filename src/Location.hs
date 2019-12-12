@@ -5,8 +5,8 @@ module Location where
 import           Data.Aeson
 import           Data.Text                      ( Text )
 
--- A range of text in the source file, represented by two offsets in Unicode
--- code points.
+-- A half-open interval of text in the source file, represented by two offsets
+-- of Unicode code points.
 data Range = Range !Int !Int
     deriving (Eq)
 

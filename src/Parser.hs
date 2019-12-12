@@ -27,7 +27,7 @@ type instance Ann P = Range
 type Parser = Parsec Void Text
 
 sc :: Parser ()
-sc = L.space space1 (L.skipLineComment "--") (L.skipBlockComment "{-" "-}")
+sc = L.space space1 (L.skipLineComment "--") (L.skipBlockCommentNested "{-" "-}")
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc

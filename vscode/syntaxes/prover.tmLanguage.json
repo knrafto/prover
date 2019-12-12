@@ -2,21 +2,33 @@
     "scopeName": "source.prover",
     "patterns": [
         {
-            "include": "#comments"
+            "include": "#line_comment"
+        },
+        {
+            "include": "#block_comment"
         }
     ],
     "repository": {
-        "comments": {
+        "line_comment": {
             "patterns": [
                 {
                     "begin": "--",
                     "end": "\\n",
                     "name": "comment.line"
-                },
+                }
+            ]
+        },
+        "block_comment": {
+            "patterns": [
                 {
                     "begin": "{-",
                     "end": "-}",
-                    "name": "comment.block"
+                    "name": "comment.block",
+                    "patterns": [
+                        {
+                            "include": "$self"
+                        }
+                    ]
                 }
             ]
         }

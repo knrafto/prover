@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+-- Tokenization.
 module Token where
 
 import           Control.Monad
@@ -14,8 +15,6 @@ import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer    as L
 
 import           Location
-
-type Parser = Parsec Void Text
 
 data TokenType
     = Identifier
@@ -44,16 +43,17 @@ data Token = Token
     }
     deriving (Eq, Show)
 
+type Parser = Parsec Void Text
+
 spaceChars :: [Char]
 spaceChars = " \t\r\n\f\v"
 
--- TODO: allow nested comments (in TextMate grammar, too)
-sc :: Parser ()
-sc = L.space spaces (L.skipLineComment "--") (L.skipBlockComment "{-" "-}")
-    where spaces = void $ takeWhile1P (Just "white space") (`elem` spaceChars)
-
 symbolChars :: [Char]
 symbolChars = "(),."
+
+sc :: Parser ()
+sc = L.space spaces (L.skipLineComment "--") (L.skipBlockCommentNested "{-" "-}")
+    where spaces = void $ takeWhile1P (Just "white space") (`elem` spaceChars)
 
 isWordChar :: Char -> Bool
 isWordChar c = c `notElem` (spaceChars ++ symbolChars)
