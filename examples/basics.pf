@@ -87,3 +87,27 @@ define π₂-pair
 -- Sets and logic.
 define IsContr ≡ λ A : Type. Σ a : A. Π x : A. a = x
 define IsProp ≡ λ A : Type. Π x : A. Π y : A. x = y
+
+-- Natural numbers.
+define add
+    : ℕ → ℕ → ℕ
+    ≡ ℕ-ind _ (λ m. m) (λ n. λ n+. λ m. suc (n+ m))
+
+define zero-+
+    : Π n. add zero n = n
+    ≡ happly _ _ _ _ (ℕ-ind-zero _ _ _)
+
+define suc-+
+    : Π n. Π m. add (suc n) m = suc (add n m)
+    ≡ λ n. happly _ _ _ _ (ℕ-ind-suc _ _ _ _)
+
+define +-zero
+    : Π n. add n zero = n
+    ≡ ℕ-ind _ (zero-+ _) (λ n. λ add-n-zero=n. trans _ _ _ _ (suc-+ _ _) (ap _ _ suc _ _ add-n-zero=n))
+
+-- TODO: finish
+define +-suc
+    : Π n. Π m. add n (suc m) = suc (add n m)
+    ≡ ℕ-ind _
+        (λ m. trans _ _ _ _ (zero-+ _) (ap _ _ suc _ _ (sym _ _ _ (zero-+ _))))
+        (λ n. λ rec. λ m. _)
