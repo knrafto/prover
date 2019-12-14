@@ -224,15 +224,17 @@ typeCheckTuple l ctx (a : rest) = do
     pair <- assumption "pair"
     typeCheckApps l ctx pair [_A, _B, a, b]
 
-printStatements :: [Statement Tc] -> IO ()
+printStatements :: [Statement Tc] -> TcM ()
 printStatements = mapM_ printStatement
 
-printStatement :: Statement Tc -> IO ()
+printStatement :: Statement Tc -> TcM ()
 printStatement = \case
     Syntax.Define n _ body -> do
         let name = identText (nameUsage n)
-        putStrLn $ "define " ++ Text.unpack name ++ " := " ++ show (exprTerm body)
+        body' <- reduce (exprTerm body)
+        liftIO $ putStrLn $ "define " ++ Text.unpack name ++ " := " ++ show body'
     Syntax.Assume n ty -> do
         let name = identText (nameUsage n)
-        putStrLn $ "assume " ++ Text.unpack name ++ " : " ++ show (exprTerm ty)
+        ty' <- reduce (exprTerm ty)
+        liftIO $ putStrLn $ "assume " ++ Text.unpack name ++ " : " ++ show ty'
     Syntax.Prove _ _ -> fail "prove not implemented"

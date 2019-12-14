@@ -49,8 +49,8 @@ newtype TcM a = TcM { unTcM :: StateT TcState (ExceptT Diagnostic IO) a }
     deriving (Functor, Applicative, Monad, MonadFail, MonadIO, MonadError Diagnostic, MonadState TcState)
 
 -- Runs a search, reporting any failure
-runTcM :: TcM a -> IO (Either Diagnostic (a, TcState))
-runTcM (TcM m) = runExceptT (runStateT m initialState)
+runTcM :: TcM a -> IO (Either Diagnostic a)
+runTcM (TcM m) = runExceptT (evalStateT m initialState)
 
 {-# NOINLINE indentRef #-}
 indentRef :: IORef Int

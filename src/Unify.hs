@@ -130,7 +130,7 @@ unifySpine l ctx hty ((arg1, arg2) : args) = do
     unify l ctx _A arg1 arg2
     unifySpine l ctx (instantiate _B arg1) args 
 
--- Attempts to simplify a term to a weak head normal form.
+-- Attempts to reduce a term to a weak head normal form.
 whnf :: Term -> TcM Term
 whnf t = case t of
     Meta m args -> do
@@ -140,6 +140,23 @@ whnf t = case t of
             Nothing -> return t
             Just t' -> return (app t' args)
     _ -> return t
+
+-- Reduces a term as much as possible.
+-- This should only be used before printing, since it will destroy sharing.
+-- TODO: monadic printing so this doesn't have to exist.
+reduce :: Term -> TcM Term
+reduce t = case t of
+    Meta m args -> do
+        metaValues <- gets tcMetaValues
+        -- TODO: path compression
+        case HashMap.lookup m metaValues of
+            Nothing -> return t
+            Just t' -> app <$> reduce t' <*> mapM reduce args
+    Var i args -> Var i <$> mapM reduce args
+    Assumption n args -> Assumption n <$> mapM reduce args
+    Lam b -> Lam <$> reduce b
+    Universe -> return Universe
+    Pi a b -> Pi <$> reduce a <*> reduce b
 
 -- A variable substitution, represented as a list of de Bruijn indices. Note
 -- that this may seem reversed, since index zero is written on the left for

@@ -97,16 +97,16 @@ main = do
             Right x -> return x
         when Flags.print_parse $ pPrint stmts
         let stmts' = scopeCheck stmts
-        result <- runTcM (typeCheck stmts')
+        result <- runTcM $ do
+            stmts'' <- typeCheck stmts'
+            unless Flags.json $ printStatements stmts''
         ds <- case result of
-            Left  d            -> do
+            Left  d -> do
                 unless Flags.json $ do
                     putStrLn $ "Error at " ++ show (diagnosticRange d)
                     putStrLn (diagnosticMessage d)
                 return [d]
-            Right (stmts'', _) -> do
-                unless Flags.json $ printStatements stmts''
-                return []
+            Right _ -> return []
         let r = Response
                 { highlighting = tokenHighlighting tokens ++ nameHighlighting (extractNames stmts')
                 , diagnostics  = ds
