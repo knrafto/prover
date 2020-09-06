@@ -24,8 +24,9 @@ data Name = Name
   } deriving (Show)
 
 data BindingType
-  = VarBinding  -- ^ A local variable.
-  | DefBinding  -- ^ A defined or assumed name.
+  = VarBinding    -- ^ A local variable.
+  | DefBinding    -- ^ A defined name.
+  | AxiomBinding  -- ^ An assumed name.
   deriving (Show)
 
 -- | Information about where a name was brought into scope.
@@ -39,8 +40,9 @@ instance HasRange Name where
   getRange = nameRange
 
 data Expr
-  = Var Name  -- ^ A bound variable.
-  | Def Name  -- ^ A defined or assumed name.
+  = Var Name    -- ^ A bound variable.
+  | Def Name    -- ^ A defined name.
+  | Axiom Name  -- ^ An assumed name.
   | Hole Range  -- ^ An underscore hole.
   | Type Range
   | App Range Expr Expr
@@ -59,6 +61,7 @@ instance HasRange Expr where
   getRange = \case
     Var n         -> getRange n
     Def n         -> getRange n
+    Axiom n       -> getRange n
     Hole r        -> r
     Type r        -> r
     App r _ _     -> r

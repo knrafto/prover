@@ -63,8 +63,9 @@ scopeCheckName (C.Name t@(_, s)) = do
               , A.nameBindingSite = A.bindingSite binding
               }
         return $ case A.bindingType binding of
-          A.VarBinding -> A.Var n
-          A.DefBinding -> A.Def n
+          A.VarBinding   -> A.Var n
+          A.DefBinding   -> A.Def n
+          A.AxiomBinding -> A.Axiom n
 
 scopeCheckBinop
   :: (Range -> A.Expr -> A.Expr -> A.Expr)
@@ -105,5 +106,5 @@ scopeCheckDecls = \case
   (C.Assume n e):decls      -> do
     n' <- makeName n
     e' <- scopeCheckExpr e
-    decls' <- withBinding n' A.DefBinding $ scopeCheckDecls decls
+    decls' <- withBinding n' A.AxiomBinding $ scopeCheckDecls decls
     return $ A.Assume n' e' : decls'
