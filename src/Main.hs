@@ -14,6 +14,7 @@ import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec               hiding (Token, tokens)
 import           Text.Pretty.Simple
 
+import qualified Prover.Syntax.Concrete as C
 import           Diagnostic
 import qualified Flags
 import           Location
@@ -24,11 +25,6 @@ import           Token (Token(..))
 import qualified Token
 import           TypeCheck
 import           Parser
-
-panic :: String -> IO a
-panic message = do
-    hPutStrLn stderr message
-    exitWith (ExitFailure 1)
 
 data HighlightedRange = HighlightedRange Range String
     deriving (Show)
@@ -87,28 +83,31 @@ main :: IO ()
 main = do
     path <- case Flags.positionalArgs of
         [path] -> return path
-        _      -> panic "usage: prover FILE"
+        _      -> die "usage: prover FILE"
     withFile path ReadMode $ \handle -> do
-        input <- Text.hGetContents handle
-        let tokens = Token.tokenize input
-        when Flags.print_tokens $ forM_ tokens print
-        stmts <- case parse statements path input of
-            Left  e -> panic (errorBundlePretty e)
-            Right x -> return x
-        when Flags.print_parse $ pPrint stmts
-        let stmts' = scopeCheck stmts
-        result <- runTcM $ do
-            stmts'' <- typeCheck stmts'
-            unless Flags.json $ printStatements stmts''
-        ds <- case result of
-            Left  d -> do
-                unless Flags.json $ do
-                    putStrLn $ "Error at " ++ show (diagnosticRange d)
-                    putStrLn (diagnosticMessage d)
-                return [d]
-            Right _ -> return []
-        let r = Response
-                { highlighting = tokenHighlighting tokens ++ nameHighlighting (extractNames stmts')
-                , diagnostics  = ds
-                }
-        when Flags.json $ B.putStrLn (encode r)
+        input <- hGetContents handle
+        case C.parse input of
+            Left err -> die err
+            Right expr -> print expr
+        -- let tokens = Token.tokenize input
+        -- when Flags.print_tokens $ forM_ tokens print
+        -- stmts <- case parse statements path input of
+        --     Left  e -> die (errorBundlePretty e)
+        --     Right x -> return x
+        -- when Flags.print_parse $ pPrint stmts
+        -- let stmts' = scopeCheck stmts
+        -- result <- runTcM $ do
+        --     stmts'' <- typeCheck stmts'
+        --     unless Flags.json $ printStatements stmts''
+        -- ds <- case result of
+        --     Left  d -> do
+        --         unless Flags.json $ do
+        --             putStrLn $ "Error at " ++ show (diagnosticRange d)
+        --             putStrLn (diagnosticMessage d)
+        --         return [d]
+        --     Right _ -> return []
+        -- let r = Response
+        --         { highlighting = tokenHighlighting tokens ++ nameHighlighting (extractNames stmts')
+        --         , diagnostics  = ds
+        --         }
+        -- when Flags.json $ B.putStrLn (encode r)

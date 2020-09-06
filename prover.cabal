@@ -24,6 +24,12 @@ source-repository head
 executable prover
   main-is: Main.hs
   other-modules:
+      Prover.Syntax.Concrete
+      Prover.Syntax.Concrete.Abs
+      Prover.Syntax.Concrete.ErrM
+      Prover.Syntax.Concrete.Lex
+      Prover.Syntax.Concrete.Par
+      Prover.Syntax.Concrete.Print
       Diagnostic
       Flags
       Location
@@ -35,12 +41,14 @@ executable prover
       Token
       TypeCheck
       Unify
-      Paths_prover
   hs-source-dirs:
-      src
-  ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+      src, bnfc
+  build-tools:
+      alex, happy
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson >=1.4.6.0 && <2
+    , array >=0.5.4.0 && <1
     , base >=4.7 && <5
     , bytestring >=0.10.8.2 && <1
     , dlist >=0.8.0.7 && <1
