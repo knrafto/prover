@@ -1,4 +1,4 @@
-entrypoints Expr;
+entrypoints Module;
 
 comment "--";
 comment "{-" "-}";
@@ -6,14 +6,34 @@ comment "{-" "-}";
 -- TODO: exclude \v (vertical tab)
 position token Name (char - [" \t\r\n\f(),."])+;
 
-Lam.    Expr  ::= "λ" Name "." Expr;
+layout toplevel;
+
+Module. Module ::= [Decl];
+
+Define. Decl ::= "define" Param "≡" Expr;
+Assume. Decl ::= "assume" Name ":" Expr;
+Prove.  Decl ::= "prove"  Name ":" Expr;
+
+separator Decl ";";
+
 Arrow.  Expr  ::= Expr1 "→" Expr;
 _.      Expr  ::= Expr1;
-Times.  Expr1 ::= Expr2 "×" Expr2;
+Times.  Expr1 ::= Expr2 "×" Expr1;
 _.      Expr1 ::= Expr2;
-Equal.  Expr2 ::= Expr3 "=" Expr3;
+Equals. Expr2 ::= Expr3 "=" Expr3;
 _.      Expr2 ::= Expr3;
 App.    Expr3 ::= Expr3 Expr4;
 _.      Expr3 ::= Expr4;
-_.      Expr4 ::= "(" Expr ")";
-Id.     Expr4 ::= Name;
+Lam.    Expr4 ::= "λ" Param "." Expr;  -- ambiguous, requires shift
+Pi.     Expr4 ::= "Π" Param "." Expr;  -- ambiguous, requires shift
+Sigma.  Expr4 ::= "Σ" Param "." Expr;  -- ambiguous, requires shift
+_.      Expr4 ::= Expr5;
+Parens. Expr5 ::= "(" [Expr] ")";
+Id.     Expr5 ::= Name;
+Hole.   Expr5 ::= "_";
+Type.   Expr5 ::= "Type";
+
+separator nonempty Expr ",";
+
+UntypedParam. Param ::= Name;
+TypedParam.   Param ::= Name ":" Expr;

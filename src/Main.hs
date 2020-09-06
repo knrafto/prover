@@ -88,7 +88,9 @@ main = do
         input <- hGetContents handle
         case C.parse input of
             Left err -> die err
-            Right expr -> print expr
+            Right expr -> do
+                print expr
+                putStrLn (C.printTree expr)
         -- let tokens = Token.tokenize input
         -- when Flags.print_tokens $ forM_ tokens print
         -- stmts <- case parse statements path input of

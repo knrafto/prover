@@ -6,6 +6,7 @@ build: $(hs_sources) $(bnfc_output)
 	cabal build
 
 .PHONY: clean
+clean:
 	rm -rf bnfc
 	cabal clean
 
