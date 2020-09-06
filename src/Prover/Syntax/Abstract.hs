@@ -1,11 +1,38 @@
 -- Syntax that has been scope-checked.
 module Prover.Syntax.Abstract where
 
+import Data.Text (Text)
+
 import Prover.Syntax.Position
 
--- TODO: text, range, binding site, unique id?
+-- | A unique identifier for a thing with a name, used to determine if two names
+-- refer to "the same thing", or two different things with the same name.
+newtype NameId = NameId Int
+  deriving (Eq, Show, Enum)
+
+-- | An occurence of a name.
 data Name = Name
-  { nameRange :: Range
+  { -- | Unique identifier for the name. All names that refer to the same
+    -- binding site have the same nameId.
+    nameId          :: NameId
+    -- | The spelling of this name.
+  , nameText        :: Text
+    -- | Where this name was used.
+  , nameRange       :: Range
+    -- | Where this name was defined.
+  , nameBindingSite :: Range
+  } deriving (Show)
+
+data BindingType
+  = VarBinding  -- ^ A local variable.
+  | DefBinding  -- ^ A defined or assumed name.
+  deriving (Show)
+
+-- | Information about where a name was brought into scope.
+data Binding = Binding
+  { bindingNameId :: NameId
+  , bindingSite   :: Range
+  , bindingType   :: BindingType
   } deriving (Show)
 
 instance HasRange Name where

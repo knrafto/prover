@@ -25,6 +25,7 @@ executable prover
   main-is: Main.hs
   other-modules:
       Prover.Monad
+      Prover.ScopeCheck
       Prover.Syntax.Abstract
       Prover.Syntax.Concrete
       Prover.Syntax.Concrete.Abs
@@ -66,5 +67,6 @@ executable prover
     , unordered-containers >=0.2.10.0 && <1
   default-language: Haskell2010
   default-extensions:
-      LambdaCase
+      GeneralizedNewtypeDeriving
+    , LambdaCase
     , MultiParamTypeClasses

@@ -4,16 +4,30 @@ module Prover.Monad where
 import Control.Exception
 import Data.IORef
 
+import Data.HashMap.Strict (HashMap)
+import Data.Text (Text)
+
 import Control.Monad.Error.Class
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 
+import qualified Prover.Syntax.Abstract as A
+import Prover.Syntax.Position
+
 data TCEnv = TCEnv
+  { -- | All variables in scope and their bindings.
+    tcScope :: HashMap Text A.Binding
+  } deriving (Show)
 
 data TCState = TCState
+  { -- | For generating fresh NameIds.
+    nextNameId :: !A.NameId
+  } deriving (Show)
 
-data TCErr = TCErr
+data TCErr
+  -- | A name could not be resolved.
+  = UnboundName Range Text
   deriving (Show)
 
 instance Exception TCErr
@@ -49,3 +63,10 @@ instance MonadError TCErr TCM where
 
 debug :: String -> TCM ()
 debug = liftIO . putStrLn
+
+freshNameId :: TCM A.NameId
+freshNameId = do
+  s <- get
+  let nameId = nextNameId s
+  put s { nextNameId = succ nameId }
+  return nameId

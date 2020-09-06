@@ -39,5 +39,5 @@ Type.   Expr6 ::= TypeKeyword;
 
 coercions Expr 6;
 
-UntypedParam. Param ::= Name;
 TypedParam.   Param ::= Name ":" Expr;
+UntypedParam. Param ::= Name;
