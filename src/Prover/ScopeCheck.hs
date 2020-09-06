@@ -74,15 +74,36 @@ scopeCheckBinop op e1 e2 = do
   e2' <- scopeCheckExpr e2
   return $ op (rangeSpan (getRange e1') (getRange e2')) e1' e2'
 
+scopeCheckParam :: C.Param -> TCM (C.Name, Maybe A.Expr)
+scopeCheckParam = \case
+  C.TypedParam n ty -> do
+    ty' <- scopeCheckExpr ty
+    return (n, Just ty')
+  C.UntypedParam n  -> return (n, Nothing)
+
 scopeCheckBinder
   :: (Range -> A.Param -> A.Expr -> A.Expr)
   -> ((Int, Int), String) -> C.Param -> C.Expr -> TCM A.Expr
 scopeCheckBinder binder t param e = do
-  (n, ty) <- case param of
-    C.TypedParam n ty -> do
-      ty' <- scopeCheckExpr ty
-      return (n, Just ty')
-    C.UntypedParam n  -> return (n, Nothing)
+  (n, ty) <- scopeCheckParam param
   n' <- makeName n
   e' <- withBinding n' A.VarBinding $ scopeCheckExpr e
   return $ binder (rangeSpan (tokenRange t) (getRange e')) (n', ty) e'
+
+scopeCheckModule :: C.Module -> TCM A.Module
+scopeCheckModule (C.Module decls) = A.Module <$> scopeCheckDecls decls
+
+scopeCheckDecls :: [C.Decl] -> TCM [A.Decl]
+scopeCheckDecls = \case
+  []                       -> return []
+  (C.Define param e):decls -> do
+    (n, ty) <- scopeCheckParam param
+    n' <- makeName n
+    e' <- scopeCheckExpr e
+    decls' <- withBinding n' A.DefBinding $ scopeCheckDecls decls
+    return $ A.Define n' ty e' : decls'
+  (C.Assume n e):decls      -> do
+    n' <- makeName n
+    e' <- scopeCheckExpr e
+    decls' <- withBinding n' A.DefBinding $ scopeCheckDecls decls
+    return $ A.Assume n' e' : decls'

@@ -38,12 +38,6 @@ data Binding = Binding
 instance HasRange Name where
   getRange = nameRange
 
-data Decls
-  = Define Name (Maybe Expr) Expr
-  | Assume Name Expr
-  | Prove  Name Expr
-  deriving (Show)
-
 data Expr
   = Var Name  -- ^ A bound variable.
   | Def Name  -- ^ A defined or assumed name.
@@ -75,3 +69,11 @@ instance HasRange Expr where
     Times r _ _   -> r
     Pair r _ _    -> r
     Equals r _ _  -> r
+
+data Decl
+  = Define Name (Maybe Expr) Expr
+  | Assume Name Expr
+  deriving (Show)
+
+newtype Module = Module [Decl]
+  deriving (Show)

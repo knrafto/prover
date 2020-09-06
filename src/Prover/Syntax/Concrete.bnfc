@@ -18,7 +18,6 @@ Module. Module ::= [Decl];
 
 Define. Decl ::= "define" Param "≡" Expr;
 Assume. Decl ::= "assume" Name ":" Expr;
-Prove.  Decl ::= "prove"  Name ":" Expr;
 
 separator Decl ";";
 
