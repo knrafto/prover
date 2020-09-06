@@ -3,6 +3,15 @@ entrypoints Module;
 comment "--";
 comment "{-" "-}";
 
+-- These are tokens, not terminals, so we can recover source positions
+position token LamKeyword   {"λ"};
+position token PiKeyword    {"Π"};
+position token SigmaKeyword {"Σ"};
+position token HoleKeyword  {"_"};
+position token TypeKeyword  {"Type"};
+position token LParen       {"("};
+position token RParen       {")"};
+
 -- TODO: exclude \v (vertical tab)
 position token Name (char - [" \t\r\n\f(),."])+;
 
@@ -24,14 +33,20 @@ Equals. Expr2 ::= Expr3 "=" Expr3;
 _.      Expr2 ::= Expr3;
 App.    Expr3 ::= Expr3 Expr4;
 _.      Expr3 ::= Expr4;
-Lam.    Expr4 ::= "λ" Param "." Expr;  -- ambiguous, requires shift
-Pi.     Expr4 ::= "Π" Param "." Expr;  -- ambiguous, requires shift
-Sigma.  Expr4 ::= "Σ" Param "." Expr;  -- ambiguous, requires shift
+
+-- Binders are ambiguous and cause shift/reduce conflicts (which should be
+-- resolved by shifting).
+Lam.    Expr4 ::= LamKeyword   Param "." Expr;
+Pi.     Expr4 ::= PiKeyword    Param "." Expr;
+Sigma.  Expr4 ::= SigmaKeyword Param "." Expr;
 _.      Expr4 ::= Expr5;
-Parens. Expr5 ::= "(" [Expr] ")";
+
+-- Includes both parethensized expressions, and tuples
+Parens. Expr5 ::= LParen [Expr] RParen;
+
 Id.     Expr5 ::= Name;
-Hole.   Expr5 ::= "_";
-Type.   Expr5 ::= "Type";
+Hole.   Expr5 ::= HoleKeyword;
+Type.   Expr5 ::= TypeKeyword;
 
 separator nonempty Expr ",";
 
