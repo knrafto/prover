@@ -6,6 +6,9 @@
         },
         {
             "include": "#block_comment"
+        },
+        {
+            "include": "#keywords"
         }
     ],
     "repository": {
@@ -29,6 +32,14 @@
                             "include": "$self"
                         }
                     ]
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "match": "(?<![^(),.\\s])(define|assume)(?![^(),.\\s])",
+                    "name": "keyword.control"
                 }
             ]
         }
