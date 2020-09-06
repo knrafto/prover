@@ -24,8 +24,6 @@ import           Location
 import           Monad
 import           ScopeCheck
 import           Syntax
-import           Token (Token(..))
-import qualified Token
 import           TypeCheck
 import           Parser
 
@@ -43,32 +41,6 @@ data Response = Response
 
 instance ToJSON Response where
     toJSON r = object ["highlighting" .= highlighting r, "diagnostics" .= diagnostics r]
-
-tokenHighlighting :: [Token] -> [HighlightedRange]
-tokenHighlighting = mapMaybe $ \t -> case tokenClass t of
-    Nothing -> Nothing
-    Just s -> Just (HighlightedRange (identRange (tokenIdent t)) s)
-  where
-    tokenClass t = case tokenKind t of
-        Token.Identifier  -> Nothing
-        Token.LParen      -> Just "lparen"
-        Token.RParen      -> Just "rparen"
-        Token.Comma       -> Just "comma"
-        Token.Dot         -> Just "dot"
-        Token.Underscore  -> Just "underscore"
-        Token.Colon       -> Just "colon"
-        Token.DefEquals   -> Just "def_equals"
-        Token.Sigma       -> Just "sigma"
-        Token.Pi          -> Just "pi"
-        Token.Lambda      -> Just "lambda"
-        Token.Equals      -> Just "equals"
-        Token.Times       -> Just "times"
-        Token.Arrow       -> Just "arrow"
-        Token.Type        -> Just "type"
-        Token.Define      -> Just "define"
-        Token.Assume      -> Just "assume"
-        Token.Prove       -> Just "prove"
-
 
 nameHighlighting :: [Name] -> [HighlightedRange]
 nameHighlighting = map (\n -> HighlightedRange (identRange (nameUsage n)) (nameClass n))
@@ -94,8 +66,6 @@ main = do
             Right x -> return x
         abstract <- runTCM $ scopeCheckModule concrete
         print abstract
-        -- let tokens = Token.tokenize input
-        -- when Flags.print_tokens $ forM_ tokens print
         -- stmts <- case parse statements path input of
         --     Left  e -> die (errorBundlePretty e)
         --     Right x -> return x
@@ -112,7 +82,7 @@ main = do
         --         return [d]
         --     Right _ -> return []
         -- let r = Response
-        --         { highlighting = tokenHighlighting tokens ++ nameHighlighting (extractNames stmts')
+        --         { highlighting = nameHighlighting (extractNames stmts')
         --         , diagnostics  = ds
         --         }
         -- when Flags.json $ B.putStrLn (encode r)

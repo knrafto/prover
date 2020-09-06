@@ -38,7 +38,6 @@ executable prover
       ScopeCheck
       Syntax
       Term
-      Token
       TypeCheck
       Unify
   hs-source-dirs:
