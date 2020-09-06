@@ -8,6 +8,6 @@ Features:
 # Building
 
 ```
-stack build
-stack exec prover -- examples/basics.pf
+cabal build
+cabal run prover -- examples/basics.pf
 ```

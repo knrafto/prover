@@ -6,7 +6,6 @@ import           Data.IORef
 import           System.IO.Unsafe
 
 import           Control.Monad.Except
-import           Control.Monad.Fail
 import           Control.Monad.State
 import           Data.HashMap.Strict            ( HashMap )
 import qualified Data.HashMap.Strict           as HashMap

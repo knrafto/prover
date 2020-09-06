@@ -7,7 +7,6 @@ module TypeCheck where
 import           Data.List
 
 import           Control.Monad.Except
-import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Data.DList (DList)

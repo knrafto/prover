@@ -9,7 +9,6 @@ module Token
 
 import           Control.Monad
 
-import           Data.Text                      ( Text )
 import           Data.Text                     as Text
 import           Data.Void
 import           Text.Megaparsec         hiding ( Token
