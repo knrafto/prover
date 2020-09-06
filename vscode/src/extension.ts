@@ -26,7 +26,7 @@ type Response = {
 
 // TODO: configure
 let binaryPath =
-    '/Users/knrafto/code/prover/.stack-work/dist/x86_64-osx/Cabal-2.4.0.1/build/prover/prover';
+    '/Users/knrafto/code/prover/dist-newstyle/build/x86_64-osx/ghc-8.10.1/prover-0.1.0.0/x/prover/build/prover/prover';
 
 
 let highlightStyles: Map<string, string> = new Map([

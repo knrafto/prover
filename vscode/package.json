@@ -1,11 +1,12 @@
 {
     "name": "prover",
-    "displayName": "prover",
-    "description": "",
     "version": "0.0.1",
+    "publisher": "knrafto",
     "engines": {
         "vscode": "^1.40.0"
     },
+    "displayName": "prover",
+    "description": "",
     "categories": [
         "Programming Languages"
     ],
@@ -52,5 +53,9 @@
         "typescript": "^3.6.4",
         "tslint": "^5.20.0",
         "vscode-test": "^1.2.2"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/knrafto/prover.git"
     }
 }
