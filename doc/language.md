@@ -74,14 +74,15 @@ atom =
     _
     name
     Type
-    ( expr [, expr]* )
+    ( expr )
 
 apps = [ apps ] atom
 equals = apps [ = apps ]
 times = equals [ × times ]
 arrow = times [ → arrow ]
+tuple = arrow [ , tuple ]
 binder =
-    arrow
+    tuple
     Π param . binder
     λ param . binder
     Σ param . binder

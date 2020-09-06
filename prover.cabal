@@ -24,17 +24,12 @@ source-repository head
 executable prover
   main-is: Main.hs
   other-modules:
-      Prover.Monad
-      Prover.ScopeCheck
       Prover.Syntax.Abstract
       Prover.Syntax.Concrete
-      Prover.Syntax.Concrete.Abs
-      Prover.Syntax.Concrete.ErrM
-      Prover.Syntax.Concrete.Layout
-      Prover.Syntax.Concrete.Lex
-      Prover.Syntax.Concrete.Par
-      Prover.Syntax.Concrete.Print
       Prover.Syntax.Position
+      Prover.Monad
+      Prover.Parser
+      Prover.ScopeCheck
       Diagnostic
       Flags
       Location
@@ -47,9 +42,7 @@ executable prover
       TypeCheck
       Unify
   hs-source-dirs:
-      src, bnfc
-  build-tools:
-      alex, happy
+      src
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson >=1.4.6.0 && <2
@@ -70,3 +63,4 @@ executable prover
       GeneralizedNewtypeDeriving
     , LambdaCase
     , MultiParamTypeClasses
+    , OverloadedStrings

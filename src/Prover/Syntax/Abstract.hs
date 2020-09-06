@@ -1,4 +1,6 @@
--- Syntax that has been scope-checked.
+-- | Syntax that has been typed-checked. This syntax still represents what the
+-- user wrote, but it has been annotated with type information and
+-- name-resolution information.
 module Prover.Syntax.Abstract where
 
 import Data.Text (Text)
@@ -40,38 +42,38 @@ instance HasRange Name where
   getRange = nameRange
 
 data Expr
-  = Var Name    -- ^ A bound variable.
-  | Def Name    -- ^ A defined name.
-  | Axiom Name  -- ^ An assumed name.
-  | Hole Range  -- ^ An underscore hole.
-  | Type Range
-  | App Range Expr Expr
-  | Pi Range Param Expr
-  | Arrow Range Expr Expr
-  | Lam Range Param Expr
-  | Sigma Range Param Expr
-  | Times Range Expr Expr
-  | Pair Range Expr Expr
-  | Equals Range Expr Expr
+  = Var     Name   -- ^ A bound variable.
+  | Def     Name   -- ^ A defined name.
+  | Axiom   Name   -- ^ An assumed name.
+  | Hole    Range  -- ^ An underscore hole.
+  | Type    Range
+  | Pi      Range Param Expr
+  | Lam     Range Param Expr
+  | Sigma   Range Param Expr
+  | App     Range Expr Expr
+  | Arrow   Range Expr Expr
+  | Times   Range Expr Expr
+  | Equals  Range Expr Expr
+  | Pair    Range Expr Expr
   deriving (Show)
 
 type Param = (Name, Maybe Expr)
 
 instance HasRange Expr where
   getRange = \case
-    Var n         -> getRange n
-    Def n         -> getRange n
-    Axiom n       -> getRange n
-    Hole r        -> r
-    Type r        -> r
-    App r _ _     -> r
-    Pi r _ _      -> r
-    Arrow r _ _   -> r
-    Lam r _ _     -> r
-    Sigma r _ _   -> r
-    Times r _ _   -> r
-    Pair r _ _    -> r
-    Equals r _ _  -> r
+    Var     n     -> getRange n
+    Def     n     -> getRange n
+    Axiom   n     -> getRange n
+    Hole    r     -> r
+    Type    r     -> r
+    Pi      r _ _ -> r
+    Lam     r _ _ -> r
+    Sigma   r _ _ -> r
+    App     r _ _ -> r
+    Arrow   r _ _ -> r
+    Times   r _ _ -> r
+    Equals  r _ _ -> r
+    Pair    r _ _ -> r
 
 data Decl
   = Define Name (Maybe Expr) Expr

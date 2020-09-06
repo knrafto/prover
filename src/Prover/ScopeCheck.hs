@@ -4,7 +4,6 @@ module Prover.ScopeCheck where
 import Control.Monad.Error.Class
 import Control.Monad.Reader.Class
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Text as Text
 
 import Prover.Monad
 import qualified Prover.Syntax.Abstract as A
@@ -12,13 +11,13 @@ import qualified Prover.Syntax.Concrete as C
 import Prover.Syntax.Position
 
 makeName :: C.Name -> TCM A.Name
-makeName (C.Name t@(_, s)) = do
+makeName (C.Name r s) = do
   nameId <- freshNameId
   let name = A.Name
         { A.nameId          = nameId
-        , A.nameText        = Text.pack s
-        , A.nameRange       = tokenRange t
-        , A.nameBindingSite = tokenRange t
+        , A.nameText        = s
+        , A.nameRange       = r
+        , A.nameBindingSite = r
         }
   return name
 
@@ -34,76 +33,65 @@ withBinding n bindingType m = do
 
 scopeCheckExpr :: C.Expr -> TCM A.Expr
 scopeCheckExpr = \case
-  C.Pair e1 e2                    -> scopeCheckBinop  A.Pair   e1 e2
-  C.Arrow e1 e2                   -> scopeCheckBinop  A.Arrow  e1 e2
-  C.Times e1 e2                   -> scopeCheckBinop  A.Times  e1 e2
-  C.Equals e1 e2                  -> scopeCheckBinop  A.Equals e1 e2
-  C.App e1 e2                     -> scopeCheckBinop  A.App    e1 e2
-  C.Pi (C.PiKeyword t) p e        -> scopeCheckBinder A.Pi     t p e
-  C.Lam (C.LamKeyword t) p e      -> scopeCheckBinder A.Lam    t p e
-  C.Sigma (C.SigmaKeyword t) p e  -> scopeCheckBinder A.Sigma  t p e
-  C.Id n                          -> scopeCheckName n
-  C.Type (C.TypeKeyword t)        -> return $ A.Type (tokenRange t)
+  C.Id      n       -> scopeCheckId n
+  C.Hole    r       -> return $ A.Hole r
+  C.Type    r       -> return $ A.Type r
+  C.Pi      r p e   -> scopeCheckBinder A.Pi     r p e
+  C.Lam     r p e   -> scopeCheckBinder A.Lam    r p e
+  C.Sigma   r p e   -> scopeCheckBinder A.Sigma  r p e
+  C.App     r e1 e2 -> scopeCheckBinop  A.App    r e1 e2
+  C.Arrow   r e1 e2 -> scopeCheckBinop  A.Arrow  r e1 e2
+  C.Times   r e1 e2 -> scopeCheckBinop  A.Times  r e1 e2
+  C.Equals  r e1 e2 -> scopeCheckBinop  A.Equals r e1 e2
+  C.Pair    r e1 e2 -> scopeCheckBinop  A.Pair   r e1 e2
 
-scopeCheckName :: C.Name -> TCM A.Expr
-scopeCheckName (C.Name t@(_, s)) = do
-  let r  = tokenRange t
-      s' = Text.pack s
+scopeCheckId :: C.Name -> TCM A.Expr
+scopeCheckId (C.Name r s) = do
   scope <- asks tcScope
-  if s == "_" then
-    return $ A.Hole r
-  else
-    case HashMap.lookup (Text.pack s) scope of
-      Nothing      -> throwError $ UnboundName r s'
-      Just binding -> do
-        let n = A.Name 
-              { A.nameId          = A.bindingNameId binding
-              , A.nameText        = s'
-              , A.nameRange       = r
-              , A.nameBindingSite = A.bindingSite binding
-              }
-        return $ case A.bindingType binding of
-          A.VarBinding   -> A.Var n
-          A.DefBinding   -> A.Def n
-          A.AxiomBinding -> A.Axiom n
-
-scopeCheckBinop
-  :: (Range -> A.Expr -> A.Expr -> A.Expr)
-  -> C.Expr -> C.Expr -> TCM A.Expr
-scopeCheckBinop op e1 e2 = do
-  e1' <- scopeCheckExpr e1
-  e2' <- scopeCheckExpr e2
-  return $ op (rangeSpan (getRange e1') (getRange e2')) e1' e2'
-
-scopeCheckParam :: C.Param -> TCM (C.Name, Maybe A.Expr)
-scopeCheckParam = \case
-  C.TypedParam n ty -> do
-    ty' <- scopeCheckExpr ty
-    return (n, Just ty')
-  C.UntypedParam n  -> return (n, Nothing)
+  case HashMap.lookup s scope of
+    Nothing      -> throwError $ UnboundName r s
+    Just binding -> do
+      let n = A.Name 
+            { A.nameId          = A.bindingNameId binding
+            , A.nameText        = s
+            , A.nameRange       = r
+            , A.nameBindingSite = A.bindingSite binding
+            }
+      return $ case A.bindingType binding of
+        A.VarBinding   -> A.Var n
+        A.DefBinding   -> A.Def n
+        A.AxiomBinding -> A.Axiom n
 
 scopeCheckBinder
   :: (Range -> A.Param -> A.Expr -> A.Expr)
-  -> ((Int, Int), String) -> C.Param -> C.Expr -> TCM A.Expr
-scopeCheckBinder binder t param e = do
-  (n, ty) <- scopeCheckParam param
+  -> Range -> C.Param -> C.Expr -> TCM A.Expr
+scopeCheckBinder binder r (n, ty) e = do
   n' <- makeName n
+  ty' <- mapM scopeCheckExpr ty
   e' <- withBinding n' A.VarBinding $ scopeCheckExpr e
-  return $ binder (rangeSpan (tokenRange t) (getRange e')) (n', ty) e'
+  return $ binder r (n', ty') e'
+
+scopeCheckBinop
+  :: (Range -> A.Expr -> A.Expr -> A.Expr)
+  -> Range -> C.Expr -> C.Expr -> TCM A.Expr
+scopeCheckBinop op r e1 e2 = do
+  e1' <- scopeCheckExpr e1
+  e2' <- scopeCheckExpr e2
+  return $ op r e1' e2'
 
 scopeCheckModule :: C.Module -> TCM A.Module
 scopeCheckModule (C.Module decls) = A.Module <$> scopeCheckDecls decls
 
 scopeCheckDecls :: [C.Decl] -> TCM [A.Decl]
 scopeCheckDecls = \case
-  []                       -> return []
-  (C.Define param e):decls -> do
-    (n, ty) <- scopeCheckParam param
+  []                      -> return []
+  (C.Define n ty e):decls -> do
     n' <- makeName n
+    ty' <- mapM scopeCheckExpr ty
     e' <- scopeCheckExpr e
     decls' <- withBinding n' A.DefBinding $ scopeCheckDecls decls
-    return $ A.Define n' ty e' : decls'
-  (C.Assume n e):decls      -> do
+    return $ A.Define n' ty' e' : decls'
+  (C.Assume n e):decls     -> do
     n' <- makeName n
     e' <- scopeCheckExpr e
     decls' <- withBinding n' A.AxiomBinding $ scopeCheckDecls decls

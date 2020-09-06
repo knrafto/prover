@@ -16,7 +16,7 @@ import           Text.Pretty.Simple
 
 import Prover.Monad
 import Prover.ScopeCheck
-import qualified Prover.Syntax.Concrete as C
+import Prover.Parser
 
 import           Diagnostic
 import qualified Flags
@@ -88,10 +88,10 @@ main = do
         [path] -> return path
         _      -> die "usage: prover FILE"
     withFile path ReadMode $ \handle -> do
-        input <- hGetContents handle
-        concrete <- case C.parse input of
-            Left err -> die err
-            Right m  -> return m
+        input <- Text.hGetContents handle
+        concrete <- case parse module_ path input of
+            Left  e -> die (errorBundlePretty e)
+            Right x -> return x
         abstract <- runTCM $ scopeCheckModule concrete
         print abstract
         -- let tokens = Token.tokenize input
