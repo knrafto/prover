@@ -14,7 +14,10 @@ import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec               hiding (Token, tokens)
 import           Text.Pretty.Simple
 
+import Prover.Monad
+import Prover.ScopeCheck
 import qualified Prover.Syntax.Concrete as C
+
 import           Diagnostic
 import qualified Flags
 import           Location
@@ -86,11 +89,11 @@ main = do
         _      -> die "usage: prover FILE"
     withFile path ReadMode $ \handle -> do
         input <- hGetContents handle
-        case C.parse input of
+        concrete <- case C.parse input of
             Left err -> die err
-            Right expr -> do
-                print expr
-                putStrLn (C.printTree expr)
+            Right m  -> return m
+        abstract <- runTCM $ scopeCheckModule concrete
+        print abstract
         -- let tokens = Token.tokenize input
         -- when Flags.print_tokens $ forM_ tokens print
         -- stmts <- case parse statements path input of

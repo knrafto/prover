@@ -3,8 +3,10 @@ module Prover.Monad where
 
 import Control.Exception
 import Data.IORef
+import System.Exit
 
 import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import Data.Text (Text)
 
 import Control.Monad.Error.Class
@@ -20,17 +22,27 @@ data TCEnv = TCEnv
     tcScope :: HashMap Text A.Binding
   } deriving (Show)
 
+initialEnv :: TCEnv
+initialEnv = TCEnv
+  { tcScope = HashMap.empty
+  }
+
 data TCState = TCState
   { -- | For generating fresh NameIds.
     nextNameId :: !A.NameId
   } deriving (Show)
 
-data TCErr
+initialState :: TCState
+initialState = TCState
+  { nextNameId = A.NameId 0
+  }
+
+data TCError
   -- | A name could not be resolved.
   = UnboundName Range Text
   deriving (Show)
 
-instance Exception TCErr
+instance Exception TCError
 
 newtype TCM a = TCM { unTCM :: IORef TCState -> TCEnv -> IO a }
 
@@ -57,9 +69,17 @@ instance MonadState TCState TCM where
   get   = TCM $ \r _ -> liftIO (readIORef r)
   put s = TCM $ \r _ -> liftIO (writeIORef r s)
 
-instance MonadError TCErr TCM where
+instance MonadError TCError TCM where
   throwError err = liftIO (throwIO err)
   catchError m h = TCM $ \r e ->  unTCM m r e `catch` \err -> unTCM (h err) r e
+
+runTCM :: TCM a -> IO a
+runTCM (TCM m) = do
+  r <- newIORef initialState
+  let e = initialEnv
+  m r e `catch` \err -> do
+    -- TODO: pretty-print errors
+    die (show (err :: TCError))
 
 debug :: String -> TCM ()
 debug = liftIO . putStrLn
