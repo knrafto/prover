@@ -24,6 +24,7 @@ source-repository head
 executable prover
   main-is: Main.hs
   other-modules:
+      Prover.Syntax.Abstract
       Prover.Syntax.Concrete
       Prover.Syntax.Concrete.Abs
       Prover.Syntax.Concrete.ErrM

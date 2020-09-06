@@ -1,3 +1,5 @@
+-- | The raw parser syntax tree. This is turned into abstract syntax during
+-- scope-checking.
 module Prover.Syntax.Concrete
   ( module Prover.Syntax.Concrete.Abs
   , parse

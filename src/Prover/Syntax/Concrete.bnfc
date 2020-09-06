@@ -4,10 +4,9 @@ comment "--";
 comment "{-" "-}";
 
 -- These are tokens, not terminals, so we can recover source positions
-position token LamKeyword   {"λ"};
 position token PiKeyword    {"Π"};
+position token LamKeyword   {"λ"};
 position token SigmaKeyword {"Σ"};
-position token HoleKeyword  {"_"};
 position token TypeKeyword  {"Type"};
 
 -- TODO: exclude \v (vertical tab)
@@ -31,12 +30,11 @@ App.    Expr4 ::= Expr4 Expr5;
 
 -- Binders are ambiguous and cause shift/reduce conflicts (which should be
 -- resolved by shifting).
-Lam.    Expr5 ::= LamKeyword   Param "." Expr;
 Pi.     Expr5 ::= PiKeyword    Param "." Expr;
+Lam.    Expr5 ::= LamKeyword   Param "." Expr;
 Sigma.  Expr5 ::= SigmaKeyword Param "." Expr;
 
 Id.     Expr6 ::= Name;
-Hole.   Expr6 ::= HoleKeyword;
 Type.   Expr6 ::= TypeKeyword;
 
 coercions Expr 6;
