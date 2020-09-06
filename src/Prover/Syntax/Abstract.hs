@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 -- Syntax that has been scope-checked.
 module Prover.Syntax.Abstract where
 
