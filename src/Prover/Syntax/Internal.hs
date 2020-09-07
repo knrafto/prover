@@ -1,6 +1,8 @@
 -- | The syntax of the raw type theory.
 module Prover.Syntax.Internal where
 
+import Data.Hashable
+
 -- | A de Bruijn index.
 newtype Var = V Int
   deriving (Eq, Show)
@@ -8,11 +10,11 @@ newtype Var = V Int
 -- | A unique identifier for a thing with a name, used to determine if two names
 -- refer to "the same thing", or two different things with the same name.
 newtype NameId = NameId Int
-  deriving (Eq, Show, Enum)
+  deriving (Eq, Ord, Show, Enum, Hashable)
 
 -- | A unique identifier for a metavariable.
 newtype MetaId = MetaId Int
-  deriving (Eq, Show, Enum)
+  deriving (Eq, Ord, Show, Enum, Hashable)
 
 -- | The head of a neutral term.
 data Head
