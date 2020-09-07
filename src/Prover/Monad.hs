@@ -3,6 +3,7 @@ module Prover.Monad where
 
 import Control.Exception
 import Data.IORef
+import System.IO
 
 import Data.Text (Text)
 
@@ -80,7 +81,7 @@ runM (M m) = do
   (Right <$> m r e) `catch` \err -> return (Left err)
 
 debug :: String -> M ()
-debug = liftIO . putStrLn
+debug = liftIO . hPutStrLn stderr
 
 freshNameId :: M NameId
 freshNameId = do

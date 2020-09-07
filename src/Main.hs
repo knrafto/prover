@@ -36,4 +36,4 @@ main = do
             { highlighting = highlightModule m
             , diagnostics  = []
             }
-    B.putStrLn (encode r)
+    when Flags.json $ B.putStrLn (encode r)
