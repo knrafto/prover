@@ -14,14 +14,7 @@ import Prover.Interaction
 import Prover.Monad
 import Prover.Parser
 
-import           Diagnostic
 import qualified Flags
-import           Location
-import           Monad
-import           ScopeCheck
-import           Syntax
-import           TypeCheck
-import           Parser
 
 main :: IO ()
 main = do

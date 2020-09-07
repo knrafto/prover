@@ -31,16 +31,7 @@ executable prover
       Prover.Syntax.Concrete
       Prover.Syntax.Internal
       Prover.Syntax.Position
-      Diagnostic
       Flags
-      Location
-      Monad
-      Parser
-      ScopeCheck
-      Syntax
-      Term
-      TypeCheck
-      Unify
   hs-source-dirs:
       src
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
@@ -49,13 +40,10 @@ executable prover
     , array >=0.5.4.0 && <1
     , base >=4.7 && <5
     , bytestring >=0.10.8.2 && <1
-    , dlist >=0.8.0.7 && <1
-    , hashable >=1.2.7.0 && <2
     , megaparsec >=7.0.5 && <8
     , mtl >=2.2.2 && <3
     , parser-combinators >=1.1.0 && <2
     , text >=1.2.3.1 && <2
-    , transformers >=0.5.6.2 && <1
     , unordered-containers >=0.2.10.0 && <1
   default-language: Haskell2010
   default-extensions:
