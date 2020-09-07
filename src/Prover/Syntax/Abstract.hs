@@ -1,6 +1,7 @@
 -- | Syntax that has been typed-checked. This syntax still represents what the
--- user wrote, but it has been annotated with type information and
--- name-resolution information.
+-- user wrote, but it has been annotated with lots of information that proves it
+-- is "correct". For example, every expression is annotated with a term and
+-- type, and overloaded names have been resolved.
 module Prover.Syntax.Abstract where
 
 import Data.Text (Text)
