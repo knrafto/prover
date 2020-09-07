@@ -11,19 +11,6 @@ assume Id-ind-refl : Π A.
     Π a.
     Id-ind A C c a a (refl A a) = c a
 
--- Dependent sum type.
-assume Σ' : Π A : Type. Π B : A → Type. Type
-assume pair : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. Σ a : A. B a
-assume Σ-ind : Π A : Type. Π B : A → Type.
-    Π C : (Σ a : A. B a) → Type.
-    (Π a : A. Π b : B a. C (pair A B a b)) →
-    Π p : (Σ a : A. B a). C p
-assume Σ-ind-pair : Π A : Type. Π B : A → Type.
-    Π C : (Σ a : A. B a) → Type.
-    Π c : (Π a : A. Π b : B a. C (pair A B a b)).
-    Π a : A. Π b : B a. 
-    Σ-ind A B C c (pair A B a b) = c a b
-
 -- Empty type.
 assume 0 : Type
 assume 0-ind : Π C : 0 → Type. Π a. C a
@@ -69,20 +56,6 @@ define trans
 define happly
     : Π A : Type. Π B : Type. Π f : A → B. Π g : A → B. f = g → Π x : A. f x = g x
     ≡ λ A : Type. λ B : Type. Id-ind (A → B) _ (λ f. λ x. refl B (f x))
-
--- Sigma types.
-define π₁
-    : Π A : Type. Π B : A → Type. (Σ a : A. B a) → A
-    ≡ λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. a
-define π₁-pair
-    : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. π₁ A B (a, b) = a
-    ≡ λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
-define π₂
-    : Π A : Type. Π B : A → Type. Π p : Σ a : A. B a. B (π₁ A B p)
-    ≡ λ A : Type. λ B : A → Type. Σ-ind A B _ λ a : A. λ b : B a. subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
-define π₂-pair
-    : Π A : Type. Π B : A → Type. Π a : A. Π b : B a. π₂ A B (a, b) = subst A B _ _ (sym A _ _ (π₁-pair A B a b)) b
-    ≡ λ A : Type. λ B : A → Type. λ a : A. λ b : B a. Σ-ind-pair A B _ _ a b
 
 -- Sets and logic.
 define IsContr ≡ λ A : Type. Σ a : A. Π x : A. a = x
