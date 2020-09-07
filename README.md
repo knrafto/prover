@@ -8,7 +8,7 @@ Features:
 # Prerequisites (macOS)
 
 ```
-brew install cabal bnfc npm
+brew install cabal npm
 npm install -g vsce
 ```
 
