@@ -4,8 +4,6 @@ module Prover.Monad where
 import Control.Exception
 import Data.IORef
 
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
 import Data.Text (Text)
 
 import Control.Monad.Error.Class
@@ -13,27 +11,28 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 
-import qualified Prover.Syntax.Abstract as A
+import Prover.Syntax.Internal
 import Prover.Syntax.Position
 
 data TCEnv = TCEnv
-  { -- | All variables in scope and their bindings.
-    tcScope :: HashMap Text A.Binding
+  { 
   } deriving (Show)
 
 initialEnv :: TCEnv
 initialEnv = TCEnv
-  { tcScope = HashMap.empty
-  }
+  {}
 
 data TCState = TCState
   { -- | For generating fresh NameIds.
-    nextNameId :: !A.NameId
+    nextNameId :: !NameId
+    -- | For generating fresh MetaIds.
+  , nextMetaId :: !MetaId
   } deriving (Show)
 
 initialState :: TCState
 initialState = TCState
-  { nextNameId = A.NameId 0
+  { nextNameId = NameId 0
+  , nextMetaId = MetaId 0
   }
 
 data TCError
@@ -81,9 +80,16 @@ runTCM (TCM m) = do
 debug :: String -> TCM ()
 debug = liftIO . putStrLn
 
-freshNameId :: TCM A.NameId
+freshNameId :: TCM NameId
 freshNameId = do
   s <- get
   let nameId = nextNameId s
   put s { nextNameId = succ nameId }
   return nameId
+
+freshMetaId :: TCM MetaId
+freshMetaId = do
+  s <- get
+  let metaId = nextMetaId s
+  put s { nextMetaId = succ metaId }
+  return metaId

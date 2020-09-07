@@ -12,8 +12,6 @@ import           Text.Megaparsec               hiding (Token, tokens)
 
 import Prover.Interaction
 import Prover.Monad
-import Prover.ScopeCheck
-import Prover.ScopeCheck
 import Prover.Parser
 
 import           Diagnostic
@@ -35,7 +33,7 @@ main = do
     concrete <- case parse module_ path input of
       Left  e -> die (errorBundlePretty e)
       Right x -> return x
-    result <- runTCM $ scopeCheckModule concrete
+    result <- runTCM _
     let r = case result of
           Left err -> Response
             { highlighting = []

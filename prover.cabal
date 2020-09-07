@@ -27,7 +27,6 @@ executable prover
       Prover.Interaction
       Prover.Monad
       Prover.Parser
-      Prover.ScopeCheck
       Prover.Syntax.Abstract
       Prover.Syntax.Concrete
       Prover.Syntax.Internal

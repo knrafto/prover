@@ -6,79 +6,56 @@ module Prover.Syntax.Abstract where
 
 import Data.Text (Text)
 
+import Prover.Syntax.Internal
 import Prover.Syntax.Position
-
--- | A unique identifier for a thing with a name, used to determine if two names
--- refer to "the same thing", or two different things with the same name.
-newtype NameId = NameId Int
-  deriving (Eq, Show, Enum)
 
 -- | An occurence of a name.
 data Name = Name
-  { -- | Unique identifier for the name. All names that refer to the same
-    -- binding site have the same nameId.
+  { -- | Unique identifier for the thing that this name refers to. All names
+    -- that refer to the same binding site have the same nameId.
     nameId          :: NameId
     -- | The spelling of this name.
   , nameText        :: Text
     -- | Where this name was used.
   , nameRange       :: Range
-    -- | Where this name was defined.
-  , nameBindingSite :: Range
   } deriving (Show)
 
-data BindingType
-  = VarBinding    -- ^ A local variable.
-  | DefBinding    -- ^ A defined name.
-  | AxiomBinding  -- ^ An assumed name.
-  deriving (Show)
-
--- | Information about where a name was brought into scope.
-data Binding = Binding
-  { bindingNameId :: NameId
-  , bindingSite   :: Range
-  , bindingType   :: BindingType
+data ExprInfo = ExprInfo
+  { -- | The location of the expression.
+    exprRange :: Range
+    -- | The inferred term that this expression represents.
+  , exprTerm  :: Term
+    -- | The inferred type of the term that this expression represents.
+  , exprType  :: Type
   } deriving (Show)
-
-instance HasRange Name where
-  getRange = nameRange
 
 data Expr
-  = Var     Name   -- ^ A bound variable.
-  | Def     Name   -- ^ A defined name.
-  | Axiom   Name   -- ^ An assumed name.
-  | Hole    Range  -- ^ An underscore hole.
-  | Type    Range
-  | Pi      Range Param Expr
-  | Lam     Range Param Expr
-  | Sigma   Range Param Expr
-  | App     Range Expr Expr
-  | Arrow   Range Expr Expr
-  | Times   Range Expr Expr
-  | Equals  Range Expr Expr
-  | Pair    Range Expr Expr
+  = Var     ExprInfo Name  -- ^ A bound variable.
+  | Def     ExprInfo Name  -- ^ A defined name.
+  | Axiom   ExprInfo Name  -- ^ An assumed name.
+  | Hole    ExprInfo       -- ^ An underscore hole.
+  | Type    ExprInfo
+  | Pi      ExprInfo Binding Expr
+  | Lam     ExprInfo Binding Expr
+  | Sigma   ExprInfo Binding Expr
+  | App     ExprInfo Expr Expr
+  | Arrow   ExprInfo Expr Expr
+  | Times   ExprInfo Expr Expr
+  | Equals  ExprInfo Expr Expr
+  | Pair    ExprInfo Expr Expr
   deriving (Show)
 
-type Param = (Name, Maybe Expr)
-
-instance HasRange Expr where
-  getRange = \case
-    Var     n     -> getRange n
-    Def     n     -> getRange n
-    Axiom   n     -> getRange n
-    Hole    r     -> r
-    Type    r     -> r
-    Pi      r _ _ -> r
-    Lam     r _ _ -> r
-    Sigma   r _ _ -> r
-    App     r _ _ -> r
-    Arrow   r _ _ -> r
-    Times   r _ _ -> r
-    Equals  r _ _ -> r
-    Pair    r _ _ -> r
+-- | A name that was optionally annotated with a type by the user (but we know
+-- the type now).
+data Binding = Binding
+  { bindingName       :: Name
+  , bindingType       :: Type
+  , bindingAnnotation :: Maybe Expr
+  } deriving (Show)
 
 data Decl
-  = Define Name (Maybe Expr) Expr
-  | Assume Name Expr
+  = Define Binding Expr
+  | Assume Binding
   deriving (Show)
 
 newtype Module = Module [Decl]

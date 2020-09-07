@@ -6,7 +6,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Prover.Monad
-import qualified Prover.Syntax.Abstract as A
+import Prover.Syntax.Abstract
 import Prover.Syntax.Position
 
 data Response = Response
@@ -49,38 +49,33 @@ data Diagnostic = Diagnostic
 instance ToJSON Diagnostic where
   toJSON (Diagnostic r m) = object ["range" .= r, "message" .= m]
 
-highlightExpr :: A.Expr -> [HighlightedRange]
+highlightExpr :: Expr -> [HighlightedRange]
 highlightExpr = \case
-  A.Var     n       -> [HighlightedRange (A.nameRange n) HighlightVarName]
-  A.Def     n       -> [HighlightedRange (A.nameRange n) HighlightDefName]
-  A.Axiom   n       -> [HighlightedRange (A.nameRange n) HighlightAxiomName]
-  A.Hole    r       -> [HighlightedRange r HighlightHole]
-  A.Type    r       -> [HighlightedRange r HighlightType]
-  A.Pi      _ p e   -> highlightParam p ++ highlightExpr e
-  A.Lam     _ p e   -> highlightParam p ++ highlightExpr e
-  A.Sigma   _ p e   -> highlightParam p ++ highlightExpr e
-  A.App     _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
-  A.Arrow   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
-  A.Times   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
-  A.Equals  _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
-  A.Pair    _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  Var     _ n     -> [HighlightedRange (nameRange n) HighlightVarName]
+  Def     _ n     -> [HighlightedRange (nameRange n) HighlightDefName]
+  Axiom   _ n     -> [HighlightedRange (nameRange n) HighlightAxiomName]
+  Hole    i       -> [HighlightedRange (exprRange i) HighlightHole]
+  Type    i       -> [HighlightedRange (exprRange i) HighlightType]
+  Pi      _ b e   -> highlightBinding b HighlightVarName ++ highlightExpr e
+  Lam     _ b e   -> highlightBinding b HighlightVarName ++ highlightExpr e
+  Sigma   _ b e   -> highlightBinding b HighlightVarName ++ highlightExpr e
+  App     _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  Arrow   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  Times   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  Equals  _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  Pair    _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
 
-highlightParam :: A.Param -> [HighlightedRange]
-highlightParam (n, ty) =
-  HighlightedRange (A.nameRange n) HighlightVarName :
-    foldMap highlightExpr ty
+highlightBinding :: Binding -> HighlightKind -> [HighlightedRange]
+highlightBinding (Binding n _ ann) kind =
+  HighlightedRange (nameRange n) kind : foldMap highlightExpr ann
 
-highlightDecl :: A.Decl -> [HighlightedRange]
+highlightDecl :: Decl -> [HighlightedRange]
 highlightDecl = \case
-  A.Define n ty e ->
-    HighlightedRange (A.nameRange n) HighlightDefName :
-      foldMap highlightExpr ty ++ highlightExpr e
-  A.Assume n ty   ->
-    HighlightedRange (A.nameRange n) HighlightAxiomName :
-      highlightExpr ty
+  Define b e -> highlightBinding b HighlightDefName ++ highlightExpr e
+  Assume b   -> highlightBinding b HighlightAxiomName
 
-highlightModule :: A.Module -> [HighlightedRange]
-highlightModule (A.Module decls) = concatMap highlightDecl decls
+highlightModule :: Module -> [HighlightedRange]
+highlightModule (Module decls) = concatMap highlightDecl decls
 
 quote :: Text -> String
 quote t = "'" ++ Text.unpack t ++ "'"
