@@ -33,11 +33,11 @@ main = do
     concrete <- case parse module_ path input of
       Left  e -> die (errorBundlePretty e)
       Right x -> return x
-    result <- runTCM _
+    result <- runM _
     let r = case result of
           Left err -> Response
             { highlighting = []
-            , diagnostics  = [errorDiagnostic err]
+            , diagnostics  = [diagnoseErr err]
             }
           Right m  -> Response
             { highlighting = highlightModule m

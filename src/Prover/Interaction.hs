@@ -80,6 +80,6 @@ highlightModule (Module decls) = concatMap highlightDecl decls
 quote :: Text -> String
 quote t = "'" ++ Text.unpack t ++ "'"
 
-errorDiagnostic :: TCError -> Diagnostic
-errorDiagnostic = \case
+diagnoseErr :: Err -> Diagnostic
+diagnoseErr = \case
   UnboundName r e -> Diagnostic r $ "unbound name " ++ quote e
