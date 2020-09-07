@@ -24,12 +24,13 @@ source-repository head
 executable prover
   main-is: Main.hs
   other-modules:
-      Prover.Syntax.Abstract
-      Prover.Syntax.Concrete
-      Prover.Syntax.Position
+      Prover.Highlight
       Prover.Monad
       Prover.Parser
       Prover.ScopeCheck
+      Prover.Syntax.Abstract
+      Prover.Syntax.Concrete
+      Prover.Syntax.Position
       Diagnostic
       Flags
       Location

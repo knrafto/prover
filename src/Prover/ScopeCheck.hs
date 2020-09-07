@@ -79,9 +79,6 @@ scopeCheckBinop op r e1 e2 = do
   e2' <- scopeCheckExpr e2
   return $ op r e1' e2'
 
-scopeCheckModule :: C.Module -> TCM A.Module
-scopeCheckModule (C.Module decls) = A.Module <$> scopeCheckDecls decls
-
 scopeCheckDecls :: [C.Decl] -> TCM [A.Decl]
 scopeCheckDecls = \case
   []                      -> return []
@@ -96,3 +93,6 @@ scopeCheckDecls = \case
     e' <- scopeCheckExpr e
     decls' <- withBinding n' A.AxiomBinding $ scopeCheckDecls decls
     return $ A.Assume n' e' : decls'
+
+scopeCheckModule :: C.Module -> TCM A.Module
+scopeCheckModule (C.Module decls) = A.Module <$> scopeCheckDecls decls

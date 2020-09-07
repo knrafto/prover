@@ -28,34 +28,12 @@ type Response = {
 let binaryPath =
     '/Users/knrafto/code/prover/dist-newstyle/build/x86_64-osx/ghc-8.10.1/prover-0.1.0.0/x/prover/build/prover/prover';
 
-
 let highlightStyles: Map<string, string> = new Map([
-  // Delimiters
-  ['lparen', 'red'],
-  ['rparen', 'red'],
-  ['comma', 'red'],
-  // Binders
-  ['sigma', 'yellow'],
-  ['pi', 'yellow'],
-  ['lambda', 'yellow'],
-  ['dot', 'yellow'],
-  // Operators
-  ['colon', 'green'],
-  ['def_equals', 'green'],
-  ['equals', 'green'],
-  ['times', 'green'],
-  ['arrow', 'green'],
-  // Keywords
-  ['define', 'magenta'],
-  ['assume', 'magenta'],
-  ['prove', 'magenta'],
-  // Names
-  ['local_name', 'base1'],
-  ['unbound_name', 'base1'],
-  ['defined_name', 'blue'],
-  ['assumed_name', 'blue'],
+  ['var_name', 'base1'],
+  ['def_name', 'blue'],
+  ['axiom_name', 'blue'],
   ['type', 'blue'],
-  ['underscore', 'cyan'],
+  ['hole', 'cyan'],
 ]);
 
 // Colors from Solarized dark: https://ethanschoonover.com/solarized/
