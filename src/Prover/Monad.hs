@@ -3,7 +3,6 @@ module Prover.Monad where
 
 import Control.Exception
 import Data.IORef
-import System.Exit
 
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
@@ -73,13 +72,11 @@ instance MonadError TCError TCM where
   throwError err = liftIO (throwIO err)
   catchError m h = TCM $ \r e ->  unTCM m r e `catch` \err -> unTCM (h err) r e
 
-runTCM :: TCM a -> IO a
+runTCM :: TCM a -> IO (Either TCError a)
 runTCM (TCM m) = do
   r <- newIORef initialState
   let e = initialEnv
-  m r e `catch` \err -> do
-    -- TODO: pretty-print errors
-    die (show (err :: TCError))
+  (Right <$> m r e) `catch` \err -> return (Left err)
 
 debug :: String -> TCM ()
 debug = liftIO . putStrLn

@@ -14,7 +14,7 @@ import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec               hiding (Token, tokens)
 import           Text.Pretty.Simple
 
-import Prover.Highlight
+import Prover.Interaction
 import Prover.Monad
 import Prover.ScopeCheck
 import Prover.ScopeCheck
@@ -29,15 +29,6 @@ import           Syntax
 import           TypeCheck
 import           Parser
 
-data Response = Response
-  { highlighting :: [HighlightedRange]
-  , diagnostics  :: [Diagnostic]
-  }
-  deriving (Show)
-
-instance ToJSON Response where
-  toJSON r = object ["highlighting" .= highlighting r, "diagnostics" .= diagnostics r]
-
 main :: IO ()
 main = do
   path <- case Flags.positionalArgs of
@@ -48,29 +39,14 @@ main = do
     concrete <- case parse module_ path input of
       Left  e -> die (errorBundlePretty e)
       Right x -> return x
-    abstract <- runTCM $ scopeCheckModule concrete
-    let r = Response
-          { highlighting = highlightModule abstract
-          , diagnostics  = []
-          }
+    result <- runTCM $ scopeCheckModule concrete
+    let r = case result of
+          Left err -> Response
+            { highlighting = []
+            , diagnostics  = [errorDiagnostic err]
+            }
+          Right m  -> Response
+            { highlighting = highlightModule m
+            , diagnostics  = []
+            }
     B.putStrLn (encode r)
-    -- stmts <- case parse statements path input of
-    --   Left  e -> die (errorBundlePretty e)
-    --   Right x -> return x
-    -- when Flags.print_parse $ pPrint stmts
-    -- let stmts' = scopeCheck stmts
-    -- result <- runTcM $ do
-    --   stmts'' <- typeCheck stmts'
-    --   unless Flags.json $ printStatements stmts''
-    -- ds <- case result of
-    --   Left  d -> do
-    --     unless Flags.json $ do
-    --       putStrLn $ "Error at " ++ show (diagnosticRange d)
-    --       putStrLn (diagnosticMessage d)
-    --     return [d]
-    --   Right _ -> return []
-    -- let r = Response
-    --       { highlighting = nameHighlighting (extractNames stmts')
-    --       , diagnostics  = ds
-    --       }
-    -- when Flags.json $ B.putStrLn (encode r)

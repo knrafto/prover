@@ -1,10 +1,22 @@
--- | Syntax highlighting.
-module Prover.Highlight where
+-- | Syntax highlighting and error messages.
+module Prover.Interaction where
 
 import Data.Aeson
+import Data.Text (Text)
+import qualified Data.Text as Text
 
+import Prover.Monad
 import qualified Prover.Syntax.Abstract as A
 import Prover.Syntax.Position
+
+data Response = Response
+  { highlighting :: [HighlightedRange]
+  , diagnostics  :: [Diagnostic]
+  }
+  deriving (Show)
+
+instance ToJSON Response where
+  toJSON r = object ["highlighting" .= highlighting r, "diagnostics" .= diagnostics r]
 
 data HighlightKind
   = HighlightVarName
@@ -27,6 +39,15 @@ data HighlightedRange = HighlightedRange Range HighlightKind
 
 instance ToJSON HighlightedRange where
   toJSON (HighlightedRange r k) = object ["range" .= r, "kind" .= k]
+
+data Diagnostic = Diagnostic
+  { diagnosticRange :: Range
+  , diagnosticMessage :: String
+  }
+  deriving (Show)
+
+instance ToJSON Diagnostic where
+  toJSON (Diagnostic r m) = object ["range" .= r, "message" .= m]
 
 highlightExpr :: A.Expr -> [HighlightedRange]
 highlightExpr = \case
@@ -60,3 +81,10 @@ highlightDecl = \case
 
 highlightModule :: A.Module -> [HighlightedRange]
 highlightModule (A.Module decls) = concatMap highlightDecl decls
+
+quote :: Text -> String
+quote t = "'" ++ Text.unpack t ++ "'"
+
+errorDiagnostic :: TCError -> Diagnostic
+errorDiagnostic = \case
+  UnboundName r e -> Diagnostic r $ "unbound name " ++ quote e
