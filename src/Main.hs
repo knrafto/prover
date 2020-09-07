@@ -2,17 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Monad
-import           Data.Monoid
 import           System.Exit
 import           System.IO
 
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8    as B
-import           Data.Maybe
 import qualified Data.Text.IO                  as Text
 import           Text.Megaparsec               hiding (Token, tokens)
-import           Text.Pretty.Simple
 
 import Prover.Interaction
 import Prover.Monad
