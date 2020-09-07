@@ -30,6 +30,7 @@ executable prover
       Prover.ScopeCheck
       Prover.Syntax.Abstract
       Prover.Syntax.Concrete
+      Prover.Syntax.Internal
       Prover.Syntax.Position
       Diagnostic
       Flags
