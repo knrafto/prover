@@ -51,11 +51,11 @@ instance ToJSON Diagnostic where
 
 highlightExpr :: Expr -> [HighlightedRange]
 highlightExpr = \case
-  Var     _ n     -> [HighlightedRange (nameRange n) HighlightVarName]
-  Def     _ n     -> [HighlightedRange (nameRange n) HighlightDefName]
-  Axiom   _ n     -> [HighlightedRange (nameRange n) HighlightAxiomName]
-  Hole    i       -> [HighlightedRange (exprRange i) HighlightHole]
-  Type    i       -> [HighlightedRange (exprRange i) HighlightType]
+  Var     _ n     -> [HighlightedRange (getRange n) HighlightVarName]
+  Def     _ n     -> [HighlightedRange (getRange n) HighlightDefName]
+  Axiom   _ n     -> [HighlightedRange (getRange n) HighlightAxiomName]
+  Hole    i       -> [HighlightedRange (getRange i) HighlightHole]
+  Type    i       -> [HighlightedRange (getRange i) HighlightType]
   Pi      _ b e   -> highlightBinding b HighlightVarName ++ highlightExpr e
   Lam     _ b e   -> highlightBinding b HighlightVarName ++ highlightExpr e
   Sigma   _ b e   -> highlightBinding b HighlightVarName ++ highlightExpr e
