@@ -29,8 +29,12 @@ data Head
   deriving (Show)
 
 -- | A term in some context of some type. Terms are kept in
--- almost-but-not-quite-normal form. The term can only be reduced by
--- substituting for the head of a neutral term.
+-- almost-but-not-quite-normal form with variables represented by de Bruijn
+-- indices. The term can only be reduced by substituting for the head of a
+-- neutral term.
+--
+-- A useful property of this representation that we can (ab)use is that a closed
+-- term can be used in any context without explicitly applying a substitution.
 data Term
   -- | A neutral term application.
   = App !Head [Term]
@@ -44,7 +48,7 @@ data Term
 
 -- | A type, represented by terms in a universe.
 -- TODO: universe levels
-newtype Type = El Term
+newtype Type = El { unEl :: Term }
   deriving (Show)
 
 -- | The body of a binder (Π or λ). This type is mostly so we're careful when
@@ -55,5 +59,89 @@ newtype Abs t = Abs t
 -- | A context for a term.
 data Ctx
   = C0
-  | !Ctx :< Type
+  | !Ctx :> Type
   deriving (Show)
+
+-- | Substitutions.
+-- TODO: revisit. Add comments with type-theoretic explanations, and add more
+-- (e.g. identity, lift from empty context)
+data Subst
+  = SubstWeaken !Int
+  | SubstLift Subst
+  | SubstTerm Term
+  deriving (Show)
+
+-- | Construct a universe type.
+universe :: Type
+universe = El Type
+
+-- | Construct a bound variable.
+var :: Int -> Term
+var i = App (Var (V i)) []
+
+-- | Apply a term to more terms.
+applyTerm :: Term -> [Term] -> Term
+applyTerm t [] = t
+applyTerm t args@(arg:rest) = case t of
+  App h args' -> App h (args' ++ args)
+  Lam b       -> applyTerm (instantiate b arg) rest
+  _           -> error "applyTerm"
+
+lookupVar :: Subst -> Var -> Term
+lookupVar (SubstWeaken k)    (V i) = var (i + k)
+lookupVar (SubstLift _)      (V 0) = var 0
+lookupVar (SubstLift subst') (V i) = weaken (lookupVar subst' (V (i - 1)))
+lookupVar (SubstTerm t)      (V 0) = t
+lookupVar (SubstTerm _)      (V i) = var (i - 1)
+
+class ApplySubst a where
+  applySubst :: Subst -> a -> a
+
+instance ApplySubst a => ApplySubst [a] where
+  applySubst subst xs = map (applySubst subst) xs
+
+instance ApplySubst Term where
+  applySubst subst t = case t of
+    App (Var v) args -> applyTerm (lookupVar subst v) (applySubst subst args)
+    -- All other heads are closed.
+    App h       args -> App h (map (applySubst subst) args)
+    Type             -> Type
+    Pi a b           -> Pi (applySubst subst a) (applySubst subst b)
+    Lam b            -> Lam (applySubst subst b)
+
+instance ApplySubst Type where
+  applySubst subst (El t) = El (applySubst subst t)
+
+instance ApplySubst a => ApplySubst (Abs a) where
+  applySubst subst (Abs t) = Abs (applySubst (SubstLift subst) t)
+
+-- TODO: comment
+weaken :: ApplySubst a => a -> a
+weaken a = applySubst (SubstWeaken 1) a
+
+-- TODO: comment
+instantiate :: ApplySubst a => Abs a -> Term -> a
+instantiate (Abs a) t = applySubst (SubstTerm t) a
+
+-- | Lift a term/type by abstracting over an unnamed variable.
+-- TODO: comment
+abstract :: ApplySubst a => a -> Abs a
+abstract a = Abs (weaken a)
+
+-- | Construct a Π-type out of a context ending with the given type.
+ctxPi :: Ctx -> Type -> Type
+ctxPi C0          t = t
+ctxPi (ctx :> ty) t = ctxPi ctx (El (Pi ty (Abs t)))
+
+-- | Construct a lambda out of a context with the given body.
+ctxLam :: Ctx -> Term -> Term
+ctxLam C0         t = t
+ctxLam (ctx :> _) t = ctxLam ctx (Lam (Abs t))
+
+-- | Returns all the bound variables of a context, in the same order as ctxPi
+-- e.g. v₃ v₂ v₁ v₀.
+ctxVars :: Ctx -> [Term]
+ctxVars = reverse . go 0
+  where
+    go _ C0         = []
+    go i (ctx :> _) = var i : go (i + 1) ctx
