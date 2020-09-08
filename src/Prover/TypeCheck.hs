@@ -159,7 +159,20 @@ checkExpr = \case
     return $ A.Arrow (A.ExprInfo r t universe) e1' e2'
 
   C.Times   r _  _  -> throwError $ Unimplemented r "Σ-types"
-  C.Equals  r _  _  -> throwError $ Unimplemented r "equality"
+
+  C.Equals  r e1 e2 -> do
+    -- Desugar a = b to Id (_ : Type) a b
+    -- TODO: check type of Id is correct! 
+    s   <- get
+    id  <- case HashMap.lookup "Id" (globalNames s) of
+      Nothing -> throwError $ MissingBuiltin r "Id"
+      Just id -> return id
+    a   <- createMetaTerm universe
+    e1' <- checkExpr e1
+    e2' <- checkExpr e2
+    let t   = App (Def id) [a, A.exprTerm e1', A.exprTerm e2']
+    return $ A.Equals (A.ExprInfo r t universe) e1' e2'
+
   C.Pair    r _  _  -> throwError $ Unimplemented r "Σ-types"
 
 -- | Produce a judgement Γ ⊢ t : Type.

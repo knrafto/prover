@@ -65,8 +65,8 @@ initialState = State
 data Err
   -- | A name could not be resolved.
   = UnboundName Range Text
-  -- | A global name has already been defined.
-  | DuplicateName Name
+  -- | A built-in has not been defined.
+  | MissingBuiltin Range Text
   -- | An expression cannot be applied to arguments.
   | CannotApply Expr
   -- | Some feature is currently unimplemented.
