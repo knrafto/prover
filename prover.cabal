@@ -27,6 +27,7 @@ executable prover
       Prover.Interaction
       Prover.Monad
       Prover.Parser
+      Prover.Pretty
       Prover.Syntax.Abstract
       Prover.Syntax.Concrete
       Prover.Syntax.Internal
@@ -45,6 +46,7 @@ executable prover
     , megaparsec >=7.0.5 && <8
     , mtl >=2.2.2 && <3
     , parser-combinators >=1.1.0 && <2
+    , prettyprinter >=1.7.0 && <2
     , text >=1.2.3.1 && <2
     , unordered-containers >=0.2.10.0 && <1
   default-language: Haskell2010

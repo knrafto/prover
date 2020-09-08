@@ -9,8 +9,10 @@ import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 import qualified Data.HashMap.Strict as HashMap
 import Data.Text (Text)
+import Prettyprinter
 
 import Prover.Monad
+import Prover.Pretty
 import qualified Prover.Syntax.Abstract as A
 import qualified Prover.Syntax.Concrete as C
 import Prover.Syntax.Internal
@@ -25,6 +27,11 @@ createMetaTerm ty = do
   -- a function Γ → A and apply it to all the variables in Γ.
   let metaTy = ctxPi ctx ty
   modify $ \s -> s { metaTypes = HashMap.insert id metaTy (metaTypes s) }
+  debugFields "created meta" $
+    [ "meta" |: return (prettyMeta id)
+    , "ctx"  |: prettyCtx ctx
+    , "type" |: prettyType ctx ty
+    ]
   -- TODO: print debug info
   return $ App (Meta id) (ctxVars ctx)
 
@@ -41,11 +48,25 @@ createName (C.Name r t) = do
 -- | Generate a constraint that two terms (of possibly different types) are
 -- equal.
 checkEqualTerms :: Range -> Term -> Type -> Term -> Type -> M ()
-checkEqualTerms _ _ _ _ _ = return ()  -- TODO: print debug info
+checkEqualTerms _ a tyA b tyB = do
+  ctx <- asks envCtx
+  debugFields "unify terms" $
+    [ "ctx" |: prettyCtx ctx
+    , "a"   |: prettyTerm ctx a
+    , "A"   |: prettyType ctx tyA
+    , "b"   |: prettyTerm ctx b
+    , "B"   |: prettyType ctx tyB
+    ]
 
 -- | Generate a constraint that two types equal.
 checkEqualTypes :: Range -> Type -> Type -> M ()
-checkEqualTypes _ _ _ = return ()  -- TODO: print debug info
+checkEqualTypes _ tyA tyB = do
+  ctx <- asks envCtx
+  debugFields "unify types" $
+    [ "ctx" |: prettyCtx ctx
+    , "A"   |: prettyType ctx tyA
+    , "B"   |: prettyType ctx tyB
+    ]
 
 -- | Type-check with a new binding.
 extendEnv :: Maybe A.Name -> Type -> M a -> M a
@@ -169,7 +190,7 @@ checkExpr = \case
     a   <- createMetaTerm universe
     e1' <- checkExpr e1
     e2' <- checkExpr e2
-    let t   = App (Def id) [a, A.exprTerm e1', A.exprTerm e2']
+    let t   = App (Axiom id) [a, A.exprTerm e1', A.exprTerm e2']
     return $ A.Equals (A.ExprInfo r t universe) e1' e2'
 
   C.Pair    r _  _  -> throwError $ Unimplemented r "Σ-types"
@@ -210,21 +231,25 @@ checkBinding (n, ann) = do
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
   C.Define n ann e -> do
+    debug $ "checking definition" <+> pretty (C.nameText n) <+> "..."
     b  <- checkBinding (n, ann)
     e' <- checkExpr e
     checkEqualTypes (getRange e') (A.bindingType b) (A.exprType e')
     let n' = A.bindingName b
     modify $ \s -> s
       { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
+      , defNames    = HashMap.insert (A.nameId n') n' (defNames s)
       , defTypes    = HashMap.insert (A.nameId n') (A.exprType e') (defTypes s)
       , defTerms    = HashMap.insert (A.nameId n') (A.exprTerm e') (defTerms s)
       }
     return $ A.Define b e'
   C.Assume n e    -> do
+    debug $ "checking assumption" <+> pretty (C.nameText n) <+> "..."
     n' <- createName n
     e' <- checkExprIsType e
     modify $ \s -> s
       { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
+      , axiomNames  = HashMap.insert (A.nameId n') n' (axiomNames s)
       , axiomTypes  = HashMap.insert (A.nameId n') (El (A.exprTerm e')) (axiomTypes s)
       }
     return $ A.Assume (A.Binding n' (A.exprType e') (Just e'))

@@ -3,8 +3,8 @@ module Prover.Monad where
 
 import Control.Exception
 import Data.IORef
-import System.IO
 
+import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Text (Text)
@@ -41,13 +41,14 @@ data State = State
   , nextMetaId        :: !MetaId
     -- | Globally-defined names.
   , globalNames       :: HashMap Text NameId
-    -- | Definition types.
+    -- | Definitions.
+  , defNames          :: HashMap NameId Name
   , defTypes          :: HashMap NameId Type
-    -- | Definition bodies.
   , defTerms          :: HashMap NameId Term
-    -- | Assumption types.
+    -- | Assumptions.
+  , axiomNames        :: HashMap NameId Name
   , axiomTypes        :: HashMap NameId Type
-    -- | Metavariable types.
+    -- | Metavariables.
   , metaTypes         :: HashMap MetaId Type
   } deriving (Show)
 
@@ -56,8 +57,10 @@ initialState = State
   { nextNameId        = NameId 0
   , nextMetaId        = MetaId 0
   , globalNames       = HashMap.empty
+  , defNames          = HashMap.empty
   , defTypes          = HashMap.empty
   , defTerms          = HashMap.empty
+  , axiomNames        = HashMap.empty
   , axiomTypes        = HashMap.empty
   , metaTypes         = HashMap.empty
   }
@@ -110,9 +113,6 @@ runM (M m) = do
   let e = initialEnv
   (Right <$> m r e) `catch` \err -> return (Left err)
 
-debug :: String -> M ()
-debug = liftIO . hPutStrLn stderr
-
 freshNameId :: M NameId
 freshNameId = do
   s <- get
@@ -126,3 +126,10 @@ freshMetaId = do
   let id = nextMetaId s
   put s { nextMetaId = succ id }
   return id
+
+lookupState :: (Eq k, Hashable k, Show k) => k -> (State -> HashMap k v) -> M v
+lookupState k f = do
+  m <- gets f
+  case HashMap.lookup k m of
+    Nothing -> error $ "lookup: " ++ show k
+    Just v  -> return v
