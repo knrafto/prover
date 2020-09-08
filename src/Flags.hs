@@ -1,12 +1,6 @@
 -- Easy command-line flags as global constants. This module is intended to be
 -- imported qualified.
-module Flags
-    ( positionalArgs
-    , print_tokens
-    , print_parse
-    , print_trace
-    , json
-    ) where
+module Flags where
 
 import           Data.List
 
@@ -39,14 +33,8 @@ positionalArgs = snd (splitArgs commandLine)
 boolFlag :: String -> Bool
 boolFlag name = "--" ++ name `elem` commandLineFlags
 
-print_tokens :: Bool
-print_tokens = boolFlag "print_tokens"
-
-print_parse :: Bool
-print_parse = boolFlag "print_parse"
-
-print_trace :: Bool
-print_trace = boolFlag "print_trace"
+debug :: Bool
+debug = boolFlag "debug"
 
 json :: Bool
 json = boolFlag "json"

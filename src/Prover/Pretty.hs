@@ -8,20 +8,22 @@ import Control.Monad.IO.Class
 import Prettyprinter hiding (Doc, parens)
 import qualified Prettyprinter as PP
 import Prettyprinter.Render.Text
-
 import Prover.Monad
 import qualified Prover.Syntax.Abstract as A
 import Prover.Syntax.Internal
 
+import qualified Flags
+
 type Doc = PP.Doc Void
 
 debug :: Doc -> M ()
-debug doc = liftIO $ hPutDoc stderr (doc <> line)
+debug doc = when Flags.debug $
+  liftIO $ hPutDoc stderr (doc <> line)
 
 debugM :: M Doc -> M ()
-debugM m = do
+debugM m = when Flags.debug $ do
   doc <- m
-  debug doc
+  liftIO $ hPutDoc stderr (doc <> line)
 
 -- | Convenient infix pair (useful for debugFields) below.
 (|:) :: a -> b -> (a, b)
