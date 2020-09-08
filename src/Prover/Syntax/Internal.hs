@@ -4,8 +4,7 @@ module Prover.Syntax.Internal where
 import Data.Hashable
 
 -- | A de Bruijn index.
-newtype Var = V Int
-  deriving (Eq, Show)
+type Var = Int
 
 -- | A unique identifier for a thing with a name, used to determine if two names
 -- refer to "the same thing", or two different things with the same name.
@@ -77,7 +76,7 @@ universe = El Type
 
 -- | Construct a bound variable.
 var :: Int -> Term
-var i = App (Var (V i)) []
+var i = App (Var i) []
 
 -- | Apply a term to more terms.
 applyTerm :: Term -> [Term] -> Term
@@ -88,11 +87,11 @@ applyTerm t args@(arg:rest) = case t of
   _           -> error "applyTerm"
 
 lookupVar :: Subst -> Var -> Term
-lookupVar (SubstWeaken k)    (V i) = var (i + k)
-lookupVar (SubstLift _)      (V 0) = var 0
-lookupVar (SubstLift subst') (V i) = weaken (lookupVar subst' (V (i - 1)))
-lookupVar (SubstTerm t)      (V 0) = t
-lookupVar (SubstTerm _)      (V i) = var (i - 1)
+lookupVar (SubstWeaken k)    i = var (i + k)
+lookupVar (SubstLift _)      0 = var 0
+lookupVar (SubstLift subst') i = weaken (lookupVar subst' (i - 1))
+lookupVar (SubstTerm t)      0 = t
+lookupVar (SubstTerm _)      i = var (i - 1)
 
 class ApplySubst a where
   applySubst :: Subst -> a -> a
@@ -128,11 +127,16 @@ instantiate (Abs a) t = applySubst (SubstTerm t) a
 abstract :: ApplySubst a => a -> Abs a
 abstract a = Abs (weaken a)
 
+-- | The number of variables in a context.
+ctxLength :: Ctx -> Int
+ctxLength C0         = 0
+ctxLength (ctx :> _) = 1 + ctxLength ctx
+
 -- | Get the type of a variable in a context.
-lookupCtx :: Ctx -> Var -> Type
-lookupCtx C0          _     = error "lookupCtx: empty context"
-lookupCtx (_   :> ty) (V 0) = weaken ty
-lookupCtx (ctx :> _ ) (V i) = weaken (lookupCtx ctx (V (i - 1)))
+ctxLookup :: Ctx -> Var -> Type
+ctxLookup C0          _ = error "ctxLookup: empty context"
+ctxLookup (_   :> ty) 0 = weaken ty
+ctxLookup (ctx :> _ ) i = weaken (ctxLookup ctx (i - 1))
 
 -- | Construct a Π-type out of a context ending with the given type.
 ctxPi :: Ctx -> Type -> Type

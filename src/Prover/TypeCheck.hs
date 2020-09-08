@@ -55,7 +55,7 @@ extendEnv n ty = local $ \e -> Env
   }
 
 -- | Lookup the de Bruijn index of a local variable name.
-lookupLocal :: Text -> [Maybe A.Name] -> Maybe (Int, A.Name)
+lookupLocal :: Text -> [Maybe A.Name] -> Maybe (Var, A.Name)
 lookupLocal t varNames = go 0 varNames
   where
     go _ []               = Nothing
@@ -72,9 +72,8 @@ checkExpr = \case
     e <- ask
     s <- get
     case () of
-      _ | Just (i, n) <- lookupLocal t (envVarNames e) -> do
-          let v    = V i
-              ty   = lookupCtx (envCtx e) v
+      _ | Just (v, n) <- lookupLocal t (envVarNames e) -> do
+          let ty   = ctxLookup (envCtx e) v
               info = A.ExprInfo r (App (Var v) []) ty
               n'   = A.Name (A.nameId n) r t
           return $ A.Var info n'
