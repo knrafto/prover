@@ -128,6 +128,12 @@ instantiate (Abs a) t = applySubst (SubstTerm t) a
 abstract :: ApplySubst a => a -> Abs a
 abstract a = Abs (weaken a)
 
+-- | Get the type of a variable in a context.
+lookupCtx :: Ctx -> Var -> Type
+lookupCtx C0          _     = error "lookupCtx: empty context"
+lookupCtx (_   :> ty) (V 0) = weaken ty
+lookupCtx (ctx :> _ ) (V i) = weaken (lookupCtx ctx (V (i - 1)))
+
 -- | Construct a Π-type out of a context ending with the given type.
 ctxPi :: Ctx -> Type -> Type
 ctxPi C0          t = t

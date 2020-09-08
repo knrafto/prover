@@ -80,6 +80,11 @@ highlightModule (Module decls) = concatMap highlightDecl decls
 quote :: Text -> String
 quote t = "'" ++ Text.unpack t ++ "'"
 
+-- TODO: Move Err type into Prover.Errors, provide getRange and errorMessage
 diagnoseErr :: Err -> Diagnostic
 diagnoseErr = \case
-  UnboundName r e -> Diagnostic r $ "unbound name " ++ quote e
+  UnboundName r n   -> Diagnostic r $ "unbound name " ++ quote n
+  DuplicateName n   -> Diagnostic (nameRange n) $ "duplicate name " ++ quote (nameText n)
+  -- TODO: pretty-print expression
+  CannotApply e     -> Diagnostic (getRange e) "expression cannot be applied to args"
+  Unimplemented r s -> Diagnostic r $ "unimplemented: " ++ s

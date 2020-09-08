@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import           Control.Monad
 import           System.Exit
 import           System.IO
 
@@ -13,6 +14,7 @@ import           Text.Megaparsec               hiding (Token, tokens)
 import Prover.Interaction
 import Prover.Monad
 import Prover.Parser
+import Prover.TypeCheck
 
 import qualified Flags
 
@@ -26,7 +28,7 @@ main = do
     concrete <- case parse module_ path input of
       Left  e -> die (errorBundlePretty e)
       Right x -> return x
-    result <- runM _
+    result <- runM $ checkModule concrete
     let r = case result of
           Left err -> Response
             { highlighting = []

@@ -31,10 +31,11 @@ executable prover
       Prover.Syntax.Concrete
       Prover.Syntax.Internal
       Prover.Syntax.Position
+      Prover.TypeCheck
       Flags
   hs-source-dirs:
       src
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wno-name-shadowing -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson >=1.4.6.0 && <2
     , array >=0.5.4.0 && <1
