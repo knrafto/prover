@@ -58,7 +58,7 @@ define happly
     ≡ λ A : Type. λ B : Type. Id-ind (A → B) _ (λ f. λ x. refl B (f x))
 
 -- Sets and logic.
-define IsContr ≡ λ A : Type. Σ a : A. Π x : A. a = x
+-- define IsContr ≡ λ A : Type. Σ a : A. Π x : A. a = x
 define IsProp ≡ λ A : Type. Π x : A. Π y : A. x = y
 
 -- Natural numbers.
