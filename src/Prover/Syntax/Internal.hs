@@ -40,20 +40,12 @@ data Term
   -- | A universe.
   | Type
   -- | A Π-type.
-  | Pi Type (Abs Type)
+  | Pi Term Term
   -- | A lambda function.
-  | Lam (Abs Term)
+  | Lam Term
   deriving (Show)
 
--- | A type, represented by terms in a universe.
--- TODO: universe levels
-newtype Type = El { unEl :: Term }
-  deriving (Show)
-
--- | The body of a binder (Π or λ). This type is mostly so we're careful when
--- juggling de Bruijn indices.
-newtype Abs t = Abs t
-  deriving (Show)
+type Type = Term
 
 -- | A context for a term.
 data Ctx
@@ -69,10 +61,6 @@ data Subst
   | SubstLift Subst
   | SubstTerm Term
   deriving (Show)
-
--- | Construct a universe type.
-universe :: Type
-universe = El Type
 
 -- | Construct a bound variable.
 var :: Int -> Term
@@ -93,39 +81,22 @@ lookupVar (SubstLift subst') i = weaken (lookupVar subst' (i - 1))
 lookupVar (SubstTerm t)      0 = t
 lookupVar (SubstTerm _)      i = var (i - 1)
 
-class ApplySubst a where
-  applySubst :: Subst -> a -> a
-
-instance ApplySubst a => ApplySubst [a] where
-  applySubst subst xs = map (applySubst subst) xs
-
-instance ApplySubst Term where
-  applySubst subst t = case t of
-    App (Var v) args -> applyTerm (lookupVar subst v) (applySubst subst args)
-    -- All other heads are closed.
-    App h       args -> App h (map (applySubst subst) args)
-    Type             -> Type
-    Pi a b           -> Pi (applySubst subst a) (applySubst subst b)
-    Lam b            -> Lam (applySubst subst b)
-
-instance ApplySubst Type where
-  applySubst subst (El t) = El (applySubst subst t)
-
-instance ApplySubst a => ApplySubst (Abs a) where
-  applySubst subst (Abs t) = Abs (applySubst (SubstLift subst) t)
+applySubst :: Subst -> Term -> Term
+applySubst subst t = case t of
+  App (Var v) args -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
+  -- All other heads are closed.
+  App h       args -> App h (map (applySubst subst) args)
+  Type             -> Type
+  Pi a b           -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
+  Lam b            -> Lam (applySubst (SubstLift subst) b)
 
 -- TODO: comment
-weaken :: ApplySubst a => a -> a
+weaken :: Term -> Term
 weaken a = applySubst (SubstWeaken 1) a
 
 -- TODO: comment
-instantiate :: ApplySubst a => Abs a -> Term -> a
-instantiate (Abs a) t = applySubst (SubstTerm t) a
-
--- | Lift a term/type by abstracting over an unnamed variable.
--- TODO: comment
-abstract :: ApplySubst a => a -> Abs a
-abstract a = Abs (weaken a)
+instantiate :: Term -> Term -> Term
+instantiate a t = applySubst (SubstTerm t) a
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
@@ -141,12 +112,12 @@ ctxLookup (ctx :> _ ) i = weaken (ctxLookup ctx (i - 1))
 -- | Construct a Π-type out of a context ending with the given type.
 ctxPi :: Ctx -> Type -> Type
 ctxPi C0          t = t
-ctxPi (ctx :> ty) t = ctxPi ctx (El (Pi ty (Abs t)))
+ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
 
 -- | Construct a lambda out of a context with the given body.
 ctxLam :: Ctx -> Term -> Term
 ctxLam C0         t = t
-ctxLam (ctx :> _) t = ctxLam ctx (Lam (Abs t))
+ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
 
 -- | Returns all the bound variables of a context, in the same order as ctxPi
 -- e.g. v₃ v₂ v₁ v₀.

@@ -19,8 +19,8 @@ import Prover.Syntax.Internal
 import Prover.Syntax.Position
 
 -- | Create a metavariable with the given type in the given context.
-createMetaTerm :: Type -> M Term
-createMetaTerm ty = do
+createMeta :: Type -> M Term
+createMeta ty = do
   ctx <- asks envCtx
   id  <- freshMetaId
   -- Metavariables always represent closed terms, so in a context Γ we create
@@ -30,14 +30,10 @@ createMetaTerm ty = do
   debugFields "created meta" $
     [ "meta" |: return (prettyMeta id)
     , "ctx"  |: prettyCtx ctx
-    , "type" |: prettyType ctx ty
+    , "type" |: prettyTerm ctx ty
     ]
   -- TODO: print debug info
   return $ App (Meta id) (ctxVars ctx)
-
--- | Create a metavariable type.
-createMetaType :: M Type
-createMetaType = El <$> createMetaTerm universe
 
 -- | Create a new name.
 createName :: C.Name -> M A.Name
@@ -53,9 +49,9 @@ checkEqualTerms _ a tyA b tyB = do
   debugFields "unify terms" $
     [ "ctx" |: prettyCtx ctx
     , "a"   |: prettyTerm ctx a
-    , "A"   |: prettyType ctx tyA
+    , "A"   |: prettyTerm ctx tyA
     , "b"   |: prettyTerm ctx b
-    , "B"   |: prettyType ctx tyB
+    , "B"   |: prettyTerm ctx tyB
     ]
 
 -- | Generate a constraint that two types equal.
@@ -64,8 +60,8 @@ checkEqualTypes _ tyA tyB = do
   ctx <- asks envCtx
   debugFields "unify types" $
     [ "ctx" |: prettyCtx ctx
-    , "A"   |: prettyType ctx tyA
-    , "B"   |: prettyType ctx tyB
+    , "A"   |: prettyTerm ctx tyA
+    , "B"   |: prettyTerm ctx tyB
     ]
 
 -- | Type-check with a new binding.
@@ -114,12 +110,12 @@ checkExpr = \case
       _ -> throwError $ UnboundName r t
 
   C.Hole    r       -> do
-    ty <- createMetaType
-    t  <- createMetaTerm ty
+    ty <- createMeta Type
+    t  <- createMeta ty
     return $ A.Hole (A.ExprInfo r t ty)
 
   C.Type    r       -> do
-    return $ A.Type (A.ExprInfo r Type universe)
+    return $ A.Type (A.ExprInfo r Type Type)
 
   C.Pi      r p e   -> do
     -- Γ ⊢ A : Type
@@ -129,9 +125,8 @@ checkExpr = \case
     e' <- extendEnv (Just n) tyA $ checkExprIsType e
 
     -- ⟹ Γ ⊢ (Π x : A. B) : Type
-    let tyB = Abs (El (A.exprTerm e'))
-        t   = Pi tyA tyB
-    return $ A.Pi (A.ExprInfo r t universe) b e'
+    let t   = Pi tyA (A.exprTerm e')
+    return $ A.Pi (A.ExprInfo r t Type) b e'
 
   C.Lam     r p e   -> do
     -- Γ ⊢ A : Type
@@ -141,9 +136,8 @@ checkExpr = \case
     e' <- extendEnv (Just n) tyA $ checkExpr e
 
     -- ⟹ Γ ⊢ (λ x : A. e) : (Π x : A. B)
-    let t   = Lam (Abs (A.exprTerm e'))
-        tyB = Abs (A.exprType e')
-        ty  = El (Pi tyA tyB)
+    let t   = Lam (A.exprTerm e')
+        ty  = Pi tyA (A.exprType e')
     return $ A.Lam (A.ExprInfo r t ty) b e'
 
   C.Sigma   r _ _   -> throwError $ Unimplemented r "Σ-types"
@@ -154,9 +148,9 @@ checkExpr = \case
 
     -- Γ ⊢ f : (Π x : A. B)
     let tyA = A.exprType a'
-    tyB <- extendEnv Nothing tyA $ Abs <$> createMetaType
+    tyB <- extendEnv Nothing tyA (createMeta Type)
     f'  <- checkExpr f
-    checkEqualTypes r (A.exprType f') (El (Pi tyA tyB))
+    checkEqualTypes r (A.exprType f') (Pi tyA tyB)
 
     -- ⟹ Γ ⊢ f a : B[a/x]
     checkApply f'
@@ -173,10 +167,8 @@ checkExpr = \case
     e2' <- checkExprIsType e2
 
     -- ⟹ Γ ⊢ (Π _ : A. B) : Type
-    let tyA = El (A.exprTerm e1')
-        tyB = abstract (El (A.exprTerm e1'))
-        t   = Pi tyA tyB
-    return $ A.Arrow (A.ExprInfo r t universe) e1' e2'
+    let t   = Pi (A.exprTerm e1') (weaken (A.exprTerm e1'))
+    return $ A.Arrow (A.ExprInfo r t Type) e1' e2'
 
   C.Times   r _  _  -> throwError $ Unimplemented r "Σ-types"
 
@@ -187,11 +179,11 @@ checkExpr = \case
     id  <- case HashMap.lookup "Id" (globalNames s) of
       Nothing -> throwError $ MissingBuiltin r "Id"
       Just id -> return id
-    a   <- createMetaTerm universe
+    a   <- createMeta Type
     e1' <- checkExpr e1
     e2' <- checkExpr e2
     let t   = App (Axiom id) [a, A.exprTerm e1', A.exprTerm e2']
-    return $ A.Equals (A.ExprInfo r t universe) e1' e2'
+    return $ A.Equals (A.ExprInfo r t Type) e1' e2'
 
   C.Pair    r _  _  -> throwError $ Unimplemented r "Σ-types"
 
@@ -199,7 +191,7 @@ checkExpr = \case
 checkExprIsType :: C.Expr -> M A.Expr
 checkExprIsType e = do
   e' <- checkExpr e
-  checkEqualTypes (getRange e') (A.exprType e') universe
+  checkEqualTypes (getRange e') (A.exprType e') Type
   return e'
 
 -- | Check that an expression can be applied to an argument before constructing
@@ -221,11 +213,11 @@ checkBinding (n, ann) = do
   n' <- createName n
   (ty, ann') <- case ann of
     Nothing -> do
-      ty <- createMetaType
+      ty <- createMeta Type
       return (ty, Nothing)
     Just e -> do
       e' <- checkExprIsType e
-      return (El (A.exprTerm e'), Just e')
+      return (A.exprTerm e', Just e')
   return $ A.Binding n' ty ann'
 
 checkDecl :: C.Decl -> M A.Decl
@@ -243,16 +235,16 @@ checkDecl = \case
       , defTerms    = HashMap.insert (A.nameId n') (A.exprTerm e') (defTerms s)
       }
     return $ A.Define b e'
-  C.Assume n e    -> do
+  C.Assume n ty   -> do
     debug $ "checking assumption" <+> pretty (C.nameText n) <+> "..."
-    n' <- createName n
-    e' <- checkExprIsType e
+    n'  <- createName n
+    ty' <- checkExprIsType ty
     modify $ \s -> s
       { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , axiomNames  = HashMap.insert (A.nameId n') n' (axiomNames s)
-      , axiomTypes  = HashMap.insert (A.nameId n') (El (A.exprTerm e')) (axiomTypes s)
+      , axiomTypes  = HashMap.insert (A.nameId n') (A.exprTerm ty') (axiomTypes s)
       }
-    return $ A.Assume (A.Binding n' (A.exprType e') (Just e'))
+    return $ A.Assume (A.Binding n' (A.exprTerm ty') (Just ty'))
 
 -- TODO: solve constraints after each decl
 checkModule :: C.Module -> M A.Module

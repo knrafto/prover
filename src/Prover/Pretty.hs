@@ -72,17 +72,17 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
 
     prettyPrec :: Int -> Int -> Term -> M Doc
     prettyPrec k d = \case
-      App h []                -> prettyHead k h
-      App h args              -> parens (d > appPrec) $ do
+      App h []    -> prettyHead k h
+      App h args  -> parens (d > appPrec) $ do
         hDoc     <- prettyHead k h
         argsDocs <- mapM (prettyPrec k (appPrec + 1)) args
         return $ hsep (hDoc : argsDocs)
-      Type                    -> return "Type"
-      Pi (El a) (Abs (El b))  -> parens (d > binderPrec) $ do
+      Type        -> return "Type"
+      Pi a b  -> parens (d > binderPrec) $ do
         aDoc <- prettyPrec k (appPrec + 1) a
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "Π" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
-      Lam (Abs b)             -> parens (d > binderPrec) $ do
+      Lam b       -> parens (d > binderPrec) $ do
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "λ" <+> prettyVar k <> "." <+> bDoc
 
@@ -97,17 +97,13 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
         return $ pretty (A.nameText n)
       Meta id  -> return $ prettyMeta id
 
--- | Pretty-print a type.
-prettyType :: Ctx -> Type -> M Doc
-prettyType ctx (El t) = prettyTerm ctx t
-
 -- | Pretty-print a context.
 prettyCtx :: Ctx -> M Doc
 prettyCtx C0          = return mempty
 prettyCtx (C0  :> ty) = do
-  tyDoc  <- prettyType C0 ty
+  tyDoc  <- prettyTerm C0 ty
   return $ prettyVar 0 <+> ":" <+> tyDoc
 prettyCtx (ctx :> ty) = do
   ctxDoc <- prettyCtx ctx
-  tyDoc  <- prettyType ctx ty
+  tyDoc  <- prettyTerm ctx ty
   return $ ctxDoc <> line <> prettyVar (ctxLength ctx) <+> ":" <+> tyDoc
