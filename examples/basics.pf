@@ -39,8 +39,8 @@ assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n. C n
 
 -- Structure of identity types.
 define ap
-    : Π A : Type. Π B : Type. Π f : A → B. Π x : A. Π y : A. x = y → f x = f y
-    ≡ λ A : Type. λ B : Type. λ f : A → B. Id-ind A _ (λ x. refl B (f x))
+    : Π A : Type. Π B : Type. Π x : A. Π y : A. Π f : A → B. x = y → f x = f y
+    ≡ λ A : Type. λ B : Type. λ x : A. λ y : A. λ f : A → B. Id-ind A _ (λ x. refl B (f x)) x y
 define subst
     : Π A : Type. Π B : A → Type. Π x : A. Π y : A. x = y → B x → B y
     ≡ λ A : Type. λ B : A → Type. Id-ind A _ (λ x. λ b. b)
@@ -76,11 +76,11 @@ define suc-+
 
 define +-zero
     : Π n. add n zero = n
-    ≡ ℕ-ind _ (zero-+ _) (λ n. λ add-n-zero=n. trans _ _ _ _ (suc-+ _ _) (ap _ _ suc _ _ add-n-zero=n))
+    ≡ ℕ-ind _ (zero-+ _) (λ n. λ add-n-zero=n. trans _ _ _ _ (suc-+ _ _) (ap _ _ _ _ suc add-n-zero=n))
 
 -- TODO: finish
 define +-suc
     : Π n. Π m. add n (suc m) = suc (add n m)
     ≡ ℕ-ind _
-        (λ m. trans _ _ _ _ (zero-+ _) (ap _ _ suc _ _ (sym _ _ _ (zero-+ _))))
+        (λ m. trans _ _ _ _ (zero-+ _) (ap _ _ _ _ suc (sym _ _ _ (zero-+ _))))
         (λ n. λ rec. λ m. _)
