@@ -193,19 +193,6 @@ checkExpr expr outputTy = case expr of
 
   C.Pair    r _  _  -> throwError $ Unimplemented r "Σ-types"
 
--- | Check that an expression can be applied to an argument before constructing
--- a term for the application (which would otherwise fail).
--- TODO: should we save the range of the larger application too?
-checkApply :: A.Expr -> M ()
-checkApply = \case
-  A.Var     _ _   -> return ()
-  A.Def     _ _   -> return ()
-  A.Axiom   _ _   -> return ()
-  A.Hole    _     -> return ()
-  A.Lam     _ _ _ -> return ()
-  A.App     _ _ _ -> return ()
-  e               -> throwError $ CannotApply e
-
 -- | Given (x : A), check Γ ⊢ A : Type and construct a binding for x.
 checkBinding :: C.Param -> M A.Binding
 checkBinding (n, ann) = do
