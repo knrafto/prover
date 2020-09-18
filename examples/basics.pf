@@ -64,7 +64,7 @@ define IsProp ≡ λ A : Type. Π x : A. Π y : A. x = y
 -- Natural numbers.
 define add
     : ℕ → ℕ → ℕ
-    ≡ ℕ-ind _ (λ m. m) (λ n. λ n+. λ m. suc (n+ m))
+    ≡ ℕ-ind _ (λ m. m) (λ n. λ rec. λ m. suc (rec m))
 
 define zero-+
     : Π n. add zero n = n
