@@ -33,7 +33,6 @@ createMeta r ty = do
     , "ctx"  |: prettyCtx ctx
     , "type" |: prettyTerm ctx ty
     ]
-  -- TODO: print debug info
   return $ App (Meta id) (ctxVars ctx)
 
 -- | Create a new name.
@@ -75,14 +74,14 @@ addConstraint r a tyA b tyB = do
 -- | Generate expression info for a range, term, and type, while checking that
 -- it matches the expected output type.
 expect :: Range -> Term -> Type -> Type -> M A.ExprInfo
-expect r a tyA tyB = do
-  b <- createMeta r tyB
-  addConstraint r a tyA b tyB
-  return (A.ExprInfo r b tyB)
+expect r t ty expectedTy = do
+  m <- createMeta r expectedTy
+  addConstraint r m expectedTy t ty
+  return (A.ExprInfo r m expectedTy)
 
 -- | Producing a judgement Γ ⊢ t : A.
 checkExpr :: C.Expr -> Type -> M A.Expr
-checkExpr expr outputTy = case expr of
+checkExpr expr expectedTy = case expr of
   C.Id      n       -> do
     let r = C.nameRange n
         s = C.nameText n
@@ -93,31 +92,31 @@ checkExpr expr outputTy = case expr of
           let t    = App (Var v) []
               ty   = ctxLookup (envCtx e) v
               n'   = A.Name (A.nameId n) r s
-          i <- expect r t ty outputTy
+          i <- expect r t ty expectedTy
           return $ A.Var i n'
 
       _ | Just id <- HashMap.lookup s (globalNames state)
         , Just ty <- HashMap.lookup id (defTypes state) -> do
           let t    = App (Def id) []
               n'   = A.Name id r s
-          i <- expect r t ty outputTy
+          i <- expect r t ty expectedTy
           return $ A.Def i n'
 
       _ | Just id <- HashMap.lookup s (globalNames state)
         , Just ty <- HashMap.lookup id (axiomTypes state) -> do
           let t    = App (Axiom id) []
               n'   = A.Name id r s
-          i <- expect r t ty outputTy
+          i <- expect r t ty expectedTy
           return $ A.Axiom i n'
 
       _ -> throwError $ UnboundName r s
 
   C.Hole    r       -> do
-    t <- createMeta r outputTy
-    return $ A.Hole (A.ExprInfo r t outputTy)
+    t <- createMeta r expectedTy
+    return $ A.Hole (A.ExprInfo r t expectedTy)
 
   C.Type    r       -> do
-    i <- expect r Type Type outputTy
+    i <- expect r Type Type expectedTy
     return $ A.Type i
 
   C.Pi      r p e   -> do
@@ -129,7 +128,8 @@ checkExpr expr outputTy = case expr of
 
     -- ⟹ Γ ⊢ (Π x : A. B) : Type
     let t   = Pi tyA (A.exprTerm e')
-    return $ A.Pi (A.ExprInfo r t Type) b e'
+    i <- expect r t Type expectedTy
+    return $ A.Pi i b e'
 
   C.Lam     r p e   -> do
     -- Γ ⊢ A : Type
@@ -142,7 +142,7 @@ checkExpr expr outputTy = case expr of
     -- ⟹ Γ ⊢ (λ x : A. e) : (Π x : A. B)
     let t   = Lam (A.exprTerm e')
         ty  = Pi tyA (A.exprType e')
-    i <- expect r t ty outputTy
+    i <- expect r t ty expectedTy
     return $ A.Lam i b e'
 
   C.Sigma   r _ _   -> throwError $ Unimplemented r "Σ-types"
@@ -161,7 +161,7 @@ checkExpr expr outputTy = case expr of
     -- arguments
     let t  = applyTerm (A.exprTerm f') [A.exprTerm a']
         ty = instantiate tyB (A.exprTerm a') 
-    i <- expect r t ty outputTy
+    i <- expect r t ty expectedTy
     return $ A.App i f' a'
   C.Arrow   r e1 e2 ->  do
     -- Γ ⊢ A : Type
@@ -172,7 +172,7 @@ checkExpr expr outputTy = case expr of
 
     -- ⟹ Γ ⊢ (Π _ : A. B) : Type
     let t = Pi (A.exprTerm e1') (weaken (A.exprTerm e1'))
-    i <- expect r t Type outputTy
+    i <- expect r t Type expectedTy
     return $ A.Arrow i e1' e2'
 
   C.Times   r _  _  -> throwError $ Unimplemented r "Σ-types"
@@ -188,7 +188,7 @@ checkExpr expr outputTy = case expr of
     e1' <- checkExpr e1 tyA
     e2' <- checkExpr e2 tyA
     let t   = App (Axiom id) [tyA, A.exprTerm e1', A.exprTerm e2']
-    i <- expect r t Type outputTy
+    i <- expect r t Type expectedTy
     return $ A.Equals i e1' e2'
 
   C.Pair    r _  _  -> throwError $ Unimplemented r "Σ-types"
