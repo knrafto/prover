@@ -22,17 +22,19 @@ data HighlightKind
   = HighlightVarName
   | HighlightDefName
   | HighlightAxiomName
+  | HighlightUnboundName
   | HighlightHole
   | HighlightType
   deriving (Show)
 
 instance ToJSON HighlightKind where
   toJSON = \case
-    HighlightVarName    -> "var_name"
-    HighlightDefName    -> "def_name"
-    HighlightAxiomName  -> "axiom_name"
-    HighlightHole       -> "hole"
-    HighlightType       -> "type"
+    HighlightVarName      -> "var_name"
+    HighlightDefName      -> "def_name"
+    HighlightAxiomName    -> "axiom_name"
+    HighlightUnboundName  -> "unbound_name"
+    HighlightHole         -> "hole"
+    HighlightType         -> "type"
 
 data HighlightedRange = HighlightedRange Range HighlightKind
   deriving (Show)
@@ -51,9 +53,10 @@ instance ToJSON Diagnostic where
 
 highlightExpr :: Expr -> [HighlightedRange]
 highlightExpr = \case
-  Var     _ n     -> [HighlightedRange (getRange n) HighlightVarName]
-  Def     _ n     -> [HighlightedRange (getRange n) HighlightDefName]
-  Axiom   _ n     -> [HighlightedRange (getRange n) HighlightAxiomName]
+  Var     i _     -> [HighlightedRange (getRange i) HighlightVarName]
+  Def     i _     -> [HighlightedRange (getRange i) HighlightDefName]
+  Axiom   i _     -> [HighlightedRange (getRange i) HighlightAxiomName]
+  Unbound i _     -> [HighlightedRange (getRange i) HighlightUnboundName]
   Hole    i       -> [HighlightedRange (getRange i) HighlightHole]
   Type    i       -> [HighlightedRange (getRange i) HighlightType]
   Pi      _ b e   -> highlightBinding b HighlightVarName ++ highlightExpr e
@@ -80,11 +83,7 @@ highlightModule (Module decls) = concatMap highlightDecl decls
 quote :: Text -> String
 quote t = "'" ++ Text.unpack t ++ "'"
 
--- TODO: Move Err type into Prover.Errors, provide getRange and errorMessage
-diagnoseErr :: Err -> Diagnostic
-diagnoseErr = \case
+-- TODO: Move Error type into Prover.Errors, provide getRange and errorMessage
+diagnoseError :: Error -> Diagnostic
+diagnoseError = \case
   UnboundName r n     -> Diagnostic r $ "unbound name " ++ quote n
-  MissingBuiltin r n  -> Diagnostic r $ "missing built-in " ++ quote n
-  -- TODO: pretty-print expression
-  CannotApply e       -> Diagnostic (getRange e) "expression cannot be applied to args"
-  Unimplemented r s   -> Diagnostic r $ "unimplemented: " ++ s

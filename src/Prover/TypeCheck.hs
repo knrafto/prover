@@ -4,7 +4,6 @@
 -- https://arxiv.org/pdf/1609.09709v1.pdf.
 module Prover.TypeCheck where
 
-import Control.Monad.Error.Class
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 import qualified Data.HashMap.Strict as HashMap
@@ -109,7 +108,10 @@ checkExpr expr expectedTy = case expr of
           i <- expect r t ty expectedTy
           return $ A.Axiom i n'
 
-      _ -> throwError $ UnboundName r s
+      _ -> do
+        emitError $ UnboundName r s
+        t <- createMeta r expectedTy
+        return $ A.Unbound (A.ExprInfo r t expectedTy) s
 
   C.Hole    r       -> do
     t <- createMeta r expectedTy
@@ -145,7 +147,7 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t ty expectedTy
     return $ A.Lam i b e'
 
-  C.Sigma   r _ _   -> throwError $ Unimplemented r "Σ-types"
+  C.Sigma   _ _ _   -> error "Σ-types"
 
   C.App     r f a   -> do
     -- Γ ⊢ a : A
@@ -175,14 +177,14 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t Type expectedTy
     return $ A.Arrow i e1' e2'
 
-  C.Times   r _  _  -> throwError $ Unimplemented r "Σ-types"
+  C.Times   _ _  _  -> error "Σ-types"
 
   C.Equals  r e1 e2 -> do
     -- Desugar a = b to Id (_ : Type) a b
     -- TODO: check type of Id is correct! 
     s   <- get
     id  <- case HashMap.lookup "Id" (globalNames s) of
-      Nothing -> throwError $ MissingBuiltin r "Id"
+      Nothing -> error "missing builtin Id"
       Just id -> return id
     tyA <- createMeta r Type
     e1' <- checkExpr e1 tyA
@@ -191,7 +193,7 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t Type expectedTy
     return $ A.Equals i e1' e2'
 
-  C.Pair    r _  _  -> throwError $ Unimplemented r "Σ-types"
+  C.Pair    _ _  _  -> error "Σ-types"
 
 -- | Given (x : A), check Γ ⊢ A : Type and construct a binding for x.
 checkBinding :: C.Param -> M A.Binding

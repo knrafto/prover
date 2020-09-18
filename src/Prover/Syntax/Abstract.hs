@@ -39,6 +39,7 @@ data Expr
   = Var     ExprInfo Name  -- ^ A bound variable.
   | Def     ExprInfo Name  -- ^ A defined name.
   | Axiom   ExprInfo Name  -- ^ An assumed name.
+  | Unbound ExprInfo Text  -- ^ An unbound name.
   | Hole    ExprInfo       -- ^ An underscore hole.
   | Type    ExprInfo
   | Pi      ExprInfo Binding Expr
@@ -56,6 +57,7 @@ exprInfo = \case
   Var     i _   -> i
   Def     i _   -> i
   Axiom   i _   -> i
+  Unbound i _   -> i
   Hole    i     -> i
   Type    i     -> i
   Pi      i _ _ -> i

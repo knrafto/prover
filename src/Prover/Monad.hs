@@ -1,7 +1,6 @@
 -- | The main type-checking monad.
 module Prover.Monad where
 
-import Control.Exception
 import Data.IORef
 
 import Data.Hashable
@@ -9,7 +8,6 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Text (Text)
 
-import Control.Monad.Error.Class
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
@@ -17,6 +15,11 @@ import Control.Monad.State.Class
 import Prover.Syntax.Abstract
 import Prover.Syntax.Internal
 import Prover.Syntax.Position
+
+data Error
+  -- | A name could not be resolved.
+  = UnboundName Range Text
+  deriving (Show)
 
 -- | Read-only environment used for local variables.
 data Env = Env
@@ -35,8 +38,10 @@ initialEnv = Env
 
 -- | Global type-checking state.
 data State = State
-  { -- | For generating fresh NameIds.
-    nextNameId        :: !NameId
+  { -- | Error messages.
+    errors            :: [Error]
+    -- | For generating fresh NameIds.
+  , nextNameId        :: !NameId
     -- | For generating fresh MetaIds.
   , nextMetaId        :: !MetaId
     -- | Globally-defined names.
@@ -54,7 +59,8 @@ data State = State
 
 initialState :: State
 initialState = State
-  { nextNameId        = NameId 0
+  { errors            = []
+  , nextNameId        = NameId 0
   , nextMetaId        = MetaId 0
   , globalNames       = HashMap.empty
   , defNames          = HashMap.empty
@@ -64,19 +70,6 @@ initialState = State
   , axiomTypes        = HashMap.empty
   , metaTypes         = HashMap.empty
   }
-
-data Err
-  -- | A name could not be resolved.
-  = UnboundName Range Text
-  -- | A built-in has not been defined.
-  | MissingBuiltin Range Text
-  -- | An expression cannot be applied to arguments.
-  | CannotApply Expr
-  -- | Some feature is currently unimplemented.
-  | Unimplemented Range String
-  deriving (Show)
-
-instance Exception Err
 
 newtype M a = M { unM :: IORef State -> Env -> IO a }
 
@@ -103,15 +96,16 @@ instance MonadState State M where
   get   = M $ \r _ -> liftIO (readIORef r)
   put s = M $ \r _ -> liftIO (writeIORef r s)
 
-instance MonadError Err M where
-  throwError err = liftIO (throwIO err)
-  catchError m h = M $ \r e ->  unM m r e `catch` \err -> unM (h err) r e
-
-runM :: M a -> IO (Either Err a)
+runM :: M a -> IO (a, State)
 runM (M m) = do
   r <- newIORef initialState
   let e = initialEnv
-  (Right <$> m r e) `catch` \err -> return (Left err)
+  a <- m r e
+  s <- readIORef r
+  return (a, s)
+
+emitError :: Error -> M ()
+emitError e = modify $ \s -> s { errors = e : errors s }
 
 freshNameId :: M NameId
 freshNameId = do

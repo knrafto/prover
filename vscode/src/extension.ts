@@ -32,6 +32,7 @@ let highlightStyles: Map<string, string> = new Map([
   ['var_name', 'base1'],
   ['def_name', 'blue'],
   ['axiom_name', 'blue'],
+  ['unbound_name', 'red'],
   ['type', 'blue'],
   ['hole', 'cyan'],
 ]);

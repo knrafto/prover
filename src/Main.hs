@@ -28,14 +28,9 @@ main = do
     concrete <- case parse module_ path input of
       Left  e -> die (errorBundlePretty e)
       Right x -> return x
-    result <- runM $ checkModule concrete
-    let r = case result of
-          Left err -> Response
-            { highlighting = []
-            , diagnostics  = [diagnoseErr err]
-            }
-          Right m  -> Response
-            { highlighting = highlightModule m
-            , diagnostics  = []
-            }
+    (m, state) <- runM $ checkModule concrete
+    let r = Response
+          { highlighting = highlightModule m
+          , diagnostics  = map diagnoseError (errors state)
+          }
     when Flags.json $ B.putStrLn (encode r)
