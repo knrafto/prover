@@ -29,23 +29,29 @@ lexeme = L.lexeme sc
 isWordChar :: Char -> Bool
 isWordChar c = c `notElem` (" \t\r\n\f\v(),." :: [Char])
 
+getPosition :: Parser Position
+getPosition = do
+    SourcePos _ l c <- getSourcePos
+    offset <- getOffset
+    return (Position (unPos l) (unPos c) offset)
+
 reservedWord :: Text -> Parser Range
 reservedWord w = lexeme . try $ do
-    s <- getOffset
+    s <- getPosition
     _ <- string w
     notFollowedBy (satisfy isWordChar)
-    Range s <$> getOffset
+    Range s <$> getPosition
 
 name :: Parser Name
 name = lexeme . try $ do
-    s <- getOffset
+    s <- getPosition
     w <- takeWhile1P (Just "word character") isWordChar
     when (w `elem` reservedWords) $ fail
         (  "keyword "
         ++ Text.unpack w
         ++ " is reserved and cgetRangeot be used as a name"
         )
-    e <- getOffset
+    e <- getPosition
     return (Name (Range s e) w)
   where
     reservedWords :: [Text]
@@ -67,9 +73,9 @@ name = lexeme . try $ do
 
 symbol :: Char -> Parser Range
 symbol c = lexeme $ do
-    s <- getOffset
+    s <- getPosition
     _ <- char c
-    Range s <$> getOffset
+    Range s <$> getPosition
 
 param :: Parser Param
 param = (,) <$> name <*> optional (reservedWord ":" *> expr)
