@@ -19,8 +19,8 @@ import Prover.Syntax.Internal
 import Prover.Syntax.Position
 
 -- | Create a metavariable with the given type in the given context.
-createMeta :: Type -> M Term
-createMeta ty = do
+createMeta :: Range -> Type -> M Term
+createMeta r ty = do
   ctx <- asks envCtx
   id  <- freshMetaId
   -- Metavariables always represent closed terms, so in a context Γ we create
@@ -28,7 +28,8 @@ createMeta ty = do
   let metaTy = ctxPi ctx ty
   modify $ \s -> s { metaTypes = HashMap.insert id metaTy (metaTypes s) }
   debugFields "created meta" $
-    [ "meta" |: return (prettyMeta id)
+    [ "loc"  |: return (pretty r)
+    , "meta" |: return (prettyMeta id)
     , "ctx"  |: prettyCtx ctx
     , "type" |: prettyTerm ctx ty
     ]
@@ -60,10 +61,11 @@ lookupLocal t varNames = go 0 varNames
 -- | Generate a constraint that two terms (of possibly different types) are
 -- equal.
 addConstraint :: Range -> Term -> Type -> Term -> Type -> M ()
-addConstraint _ a tyA b tyB = do
+addConstraint r a tyA b tyB = do
   ctx <- asks envCtx
   debugFields "created constraint" $
-    [ "ctx" |: prettyCtx ctx
+    [ "loc" |: return (pretty r)
+    , "ctx" |: prettyCtx ctx
     , "a"   |: prettyTerm ctx a
     , "A"   |: prettyTerm ctx tyA
     , "b"   |: prettyTerm ctx b
@@ -74,7 +76,7 @@ addConstraint _ a tyA b tyB = do
 -- it matches the expected output type.
 expect :: Range -> Term -> Type -> Type -> M A.ExprInfo
 expect r a tyA tyB = do
-  b <- createMeta tyB
+  b <- createMeta r tyB
   addConstraint r a tyA b tyB
   return (A.ExprInfo r b tyB)
 
@@ -111,7 +113,7 @@ checkExpr expr outputTy = case expr of
       _ -> throwError $ UnboundName r s
 
   C.Hole    r       -> do
-    t <- createMeta outputTy
+    t <- createMeta r outputTy
     return $ A.Hole (A.ExprInfo r t outputTy)
 
   C.Type    r       -> do
@@ -134,7 +136,7 @@ checkExpr expr outputTy = case expr of
     b@(A.Binding n tyA _) <- checkBinding p
 
     -- Γ, x : A ⊢ e : B
-    tyB <- extendEnv (Just n) tyA $ createMeta Type
+    tyB <- extendEnv (Just n) tyA $ createMeta r Type
     e'  <- extendEnv (Just n) tyA $ checkExpr e tyB
 
     -- ⟹ Γ ⊢ (λ x : A. e) : (Π x : A. B)
@@ -147,11 +149,11 @@ checkExpr expr outputTy = case expr of
 
   C.App     r f a   -> do
     -- Γ ⊢ a : A
-    tyA <- createMeta Type
+    tyA <- createMeta r Type
     a'  <- checkExpr a tyA
 
     -- Γ ⊢ f : (Π x : A. B)
-    tyB <- extendEnv Nothing tyA (createMeta Type)
+    tyB <- extendEnv Nothing tyA (createMeta r Type)
     f'  <- checkExpr f (Pi tyA tyB)
 
     -- ⟹ Γ ⊢ f a : B[a/x]
@@ -182,7 +184,7 @@ checkExpr expr outputTy = case expr of
     id  <- case HashMap.lookup "Id" (globalNames s) of
       Nothing -> throwError $ MissingBuiltin r "Id"
       Just id -> return id
-    tyA <- createMeta Type
+    tyA <- createMeta r Type
     e1' <- checkExpr e1 tyA
     e2' <- checkExpr e2 tyA
     let t   = App (Axiom id) [tyA, A.exprTerm e1', A.exprTerm e2']
@@ -210,7 +212,7 @@ checkBinding (n, ann) = do
   n' <- createName n
   (ty', ann') <- case ann of
     Nothing -> do
-      ty <- createMeta Type
+      ty <- createMeta (A.nameRange n') Type
       return (ty, Nothing)
     Just ty -> do
       ty' <- checkExpr ty Type
