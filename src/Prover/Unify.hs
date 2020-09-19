@@ -138,9 +138,9 @@ unify ctx ty t1 t2 = do
     (_, App (Meta m1) _, App (Meta m2) _) | m1 == m2 ->
       return $ TermEq ctx ty' t1' t2'
 
-    -- TODO: for meta/meta, try both ways?
-    (_, App (Meta m) args, t) -> unifyMeta ctx ty' m args t
-    (_, t, App (Meta m) args) -> unifyMeta ctx ty' m args t
+    (_, App (Meta m1) args1, App (Meta m2) args2) -> flexFlex ctx ty' m1 args1 m2 args2
+    (_, App (Meta m) args, t) -> flexRigid ctx ty' m args t
+    (_, t, App (Meta m) args) -> flexRigid ctx ty' m args t
 
     (_, App (Var i1) args1, App (Var i2) args2)
       | i1 == i2 && length args1 == length args2 ->
@@ -196,17 +196,36 @@ unifySpine ctx ty ((arg1, arg2):rest) = do
     Nothing -> guarded (TermEq ctx a arg1 arg2) (SpineEq ctx (instantiate b arg1) rest)
     Just b' -> simplify $ And [TermEq ctx a arg1 arg2, SpineEq ctx b' rest]
 
-unifyMeta :: Ctx -> Type -> MetaId -> [Term] -> Term -> M Constraint
-unifyMeta ctx ty m args t = do
-  result <- runMaybeT $ do
-    σ <- convertMetaArgs args
-    invertVarSubst σ t
-  case result of
+-- | Try both ways.
+flexFlex :: Ctx -> Type -> MetaId -> [Term] -> MetaId -> [Term] -> M Constraint
+flexFlex ctx ty m1 args1 m2 args2 = do
+  let t1 = App (Meta m1) args1
+      t2 = App (Meta m2) args2
+  solveMeta args1 t2 >>= \case
+    Just t2' -> do
+      assignMeta m1 t2'
+      return $ Solved True
+    Nothing -> solveMeta args2 t1 >>= \case
+      Just t1' -> do
+        assignMeta m2 t1'
+        return $ Solved True
+      Nothing -> return $ TermEq ctx ty t1 t2
+
+flexRigid :: Ctx -> Type -> MetaId -> [Term] -> Term -> M Constraint
+flexRigid ctx ty m args t =
+  solveMeta args t >>= \case
     Nothing -> return $ TermEq ctx ty (App (Meta m) args) t
     Just t' -> do
-      -- TODO: occurs check
-      assignMeta m (makeLam (length args) t')
+      assignMeta m t'
       return $ Solved True
+
+-- | Given α args = t, try to find a unique solution for α.
+solveMeta :: [Term] -> Term -> M (Maybe Term)
+solveMeta args t = runMaybeT $ do
+  σ  <- convertMetaArgs args
+  t' <- invertVarSubst σ t
+  -- TODO: occurs check
+  return $ makeLam (length args) t'
   where
     makeLam 0 t' = t'
     makeLam n t' = makeLam (n - 1) (Lam t')
