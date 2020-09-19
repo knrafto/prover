@@ -173,7 +173,7 @@ checkExpr expr expectedTy = case expr of
     e2' <- checkExpr e2 Type
 
     -- ⟹ Γ ⊢ (Π _ : A. B) : Type
-    let t = Pi (A.exprTerm e1') (weaken (A.exprTerm e1'))
+    let t = Pi (A.exprTerm e1') (weaken (A.exprTerm e2'))
     i <- expect r t Type expectedTy
     return $ A.Arrow i e1' e2'
 
