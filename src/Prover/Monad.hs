@@ -6,6 +6,8 @@ import Data.IORef
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import Data.Text (Text)
 
 import Control.Monad.IO.Class
@@ -80,7 +82,12 @@ data State = State
   , metaRanges        :: HashMap MetaId Range
   , metaTypes         :: HashMap MetaId Type
   , metaTerms         :: HashMap MetaId Term
-    -- | Constraints
+    -- | Unsolved metavariables for the current definition, for tracking errors.
+    -- If unification fails, there may be metas that are not "unsolved" yet do
+    -- not have a term assigned, but we don't want to emit an error about these
+    -- metas again.
+  , unsolvedMetas     :: HashSet MetaId
+    -- | Constraints.
   , constraints       :: [TopLevelConstraint]
   } deriving (Show)
 
@@ -98,6 +105,7 @@ initialState = State
   , metaRanges        = HashMap.empty
   , metaTypes         = HashMap.empty
   , metaTerms         = HashMap.empty
+  , unsolvedMetas     = HashSet.empty
   , constraints       = []
   }
 

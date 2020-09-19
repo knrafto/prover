@@ -7,6 +7,7 @@ import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
 import Control.Monad.State.Class
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as HashSet
 import Prettyprinter
 
 import Prover.Monad
@@ -32,26 +33,24 @@ solveConstraints = do
         [ "loc"  |: return (pretty r)
         ]
       emitError $ UnsolvedConstraint r
-  -- Report unsolved metas
-  metaIds <- gets (HashMap.keys . metaTypes)
+  -- Report and clear unsolved metas
+  metaIds <- gets unsolvedMetas
+  modify $ \s -> s { unsolvedMetas = HashSet.empty }
   forM_ metaIds $ \id -> do
     r <- getState id metaRanges
-    lookupState id metaTerms >>= \case
-      Nothing -> do
-        debugFields "unsolved meta" $
-          [ "loc"  |: return (pretty r)
-          , "meta" |: return (prettyMeta id)
-          ]
-        emitError $ UnsolvedMeta r id
-      Just _  -> return ()
+    debugFields "unsolved meta" $
+      [ "loc"  |: return (pretty r)
+      , "meta" |: return (prettyMeta id)
+      ]
+    emitError $ UnsolvedMeta r id
   where
     go :: [TopLevelConstraint] -> M [TopLevelConstraint]
     go cs = do
       -- Loop until no more additional metas get solved
-      solvedMetasBefore <- gets (HashMap.size . metaTerms)
+      unsolvedBefore <- gets (HashSet.size . unsolvedMetas)
       cs' <- mapM simplifyTopLevelConstraint cs
-      solvedMetasAfter <- gets (HashMap.size . metaTerms)
-      if solvedMetasBefore == solvedMetasAfter then return cs' else go cs'
+      unsolvedAfter <- gets (HashSet.size . unsolvedMetas)
+      if unsolvedBefore == unsolvedAfter then return cs' else go cs'
 
 simplifyTopLevelConstraint :: TopLevelConstraint -> M TopLevelConstraint
 simplifyTopLevelConstraint (TopLevelConstraint r c) = TopLevelConstraint r <$> simplify c
@@ -105,7 +104,10 @@ assignMeta id t = do
     [ "meta" |: return (prettyMeta id)
     , "term" |: prettyTerm C0 t
     ]
-  modify $ \s -> s { metaTerms = HashMap.insert id t (metaTerms s) }
+  modify $ \s -> s
+    { metaTerms = HashMap.insert id t (metaTerms s)
+    , unsolvedMetas = HashSet.delete id (unsolvedMetas s)
+    }
 
 -- | Attempts to reduce a term to a weak head normal form.
 whnf :: Term -> M Term
@@ -132,6 +134,7 @@ unify ctx ty t1 t2 = do
     , "b"    |: prettyTerm ctx t2'
     ]
   case (ty', t1', t2') of
+    -- TODO: intersect?
     (_, App (Meta m1) _, App (Meta m2) _) | m1 == m2 ->
       return $ TermEq ctx ty' t1' t2'
 
@@ -201,6 +204,7 @@ unifyMeta ctx ty m args t = do
   case result of
     Nothing -> return $ TermEq ctx ty (App (Meta m) args) t
     Just t' -> do
+      -- TODO: occurs check
       assignMeta m (makeLam (length args) t')
       return $ Solved True
   where

@@ -8,6 +8,7 @@ import Control.Monad
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as HashSet
 import Data.Text (Text)
 import Prettyprinter
 
@@ -30,6 +31,7 @@ createMeta r ty = do
   modify $ \s -> s
     { metaRanges = HashMap.insert id r (metaRanges s)
     , metaTypes = HashMap.insert id metaTy (metaTypes s)
+    , unsolvedMetas = HashSet.insert id (unsolvedMetas s)
     }
   debugFields "create meta" $
     [ "loc"  |: return (pretty r)
