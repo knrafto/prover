@@ -77,10 +77,3 @@ define suc-+
 define +-zero
     : Π n. add n zero = n
     ≡ ℕ-ind _ (zero-+ _) (λ n. λ add-n-zero=n. trans _ _ _ _ (suc-+ _ _) (ap _ _ _ _ suc add-n-zero=n))
-
--- TODO: finish
-define +-suc
-    : Π n. Π m. add n (suc m) = suc (add n m)
-    ≡ ℕ-ind _
-        (λ m. trans _ _ _ _ (zero-+ _) (ap _ _ _ _ suc (sym _ _ _ (zero-+ _))))
-        (λ n. λ rec. λ m. _)
