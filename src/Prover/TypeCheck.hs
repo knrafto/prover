@@ -4,6 +4,7 @@
 -- https://arxiv.org/pdf/1609.09709v1.pdf.
 module Prover.TypeCheck where
 
+import Control.Monad
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 import qualified Data.HashMap.Strict as HashMap
@@ -16,6 +17,7 @@ import qualified Prover.Syntax.Abstract as A
 import qualified Prover.Syntax.Concrete as C
 import Prover.Syntax.Internal
 import Prover.Syntax.Position
+import Prover.Unify
 
 -- | Create a metavariable with the given type in the given context.
 createMeta :: Range -> Type -> M Term
@@ -25,8 +27,11 @@ createMeta r ty = do
   -- Metavariables always represent closed terms, so in a context Γ we create
   -- a function Γ → A and apply it to all the variables in Γ.
   let metaTy = ctxPi ctx ty
-  modify $ \s -> s { metaTypes = HashMap.insert id metaTy (metaTypes s) }
-  debugFields "created meta" $
+  modify $ \s -> s
+    { metaRanges = HashMap.insert id r (metaRanges s)
+    , metaTypes = HashMap.insert id metaTy (metaTypes s)
+    }
+  debugFields "create meta" $
     [ "loc"  |: return (pretty r)
     , "meta" |: return (prettyMeta id)
     , "ctx"  |: prettyCtx ctx
@@ -61,7 +66,7 @@ lookupLocal t varNames = go 0 varNames
 addConstraint :: Range -> Term -> Type -> Term -> Type -> M ()
 addConstraint r a tyA b tyB = do
   ctx <- asks envCtx
-  debugFields "created constraint" $
+  debugFields "create constraint" $
     [ "loc" |: return (pretty r)
     , "ctx" |: prettyCtx ctx
     , "a"   |: prettyTerm ctx a
@@ -69,6 +74,8 @@ addConstraint r a tyA b tyB = do
     , "b"   |: prettyTerm ctx b
     , "B"   |: prettyTerm ctx tyB
     ]
+  let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
+  modify $ \s -> s { constraints = TopLevelConstraint r c : constraints s}
 
 -- | Generate expression info for a range, term, and type, while checking that
 -- it matches the expected output type.
@@ -182,8 +189,7 @@ checkExpr expr expectedTy = case expr of
   C.Equals  r e1 e2 -> do
     -- Desugar a = b to Id (_ : Type) a b
     -- TODO: check type of Id is correct! 
-    s   <- get
-    id  <- case HashMap.lookup "Id" (globalNames s) of
+    id  <- lookupState "Id" globalNames >>= \case
       Nothing -> error "missing builtin Id"
       Just id -> return id
     tyA <- createMeta r Type
@@ -235,4 +241,9 @@ checkDecl = \case
 
 -- TODO: solve constraints after each decl
 checkModule :: C.Module -> M A.Module
-checkModule (C.Module decls) = A.Module <$> mapM checkDecl decls
+checkModule (C.Module decls) = do
+   decls' <- forM decls $ \decl -> do
+     decl' <- checkDecl decl
+     solveConstraints
+     return decl'
+   return (A.Module decls')

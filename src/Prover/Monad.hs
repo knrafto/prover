@@ -19,6 +19,14 @@ import Prover.Syntax.Position
 data Error
   -- | A name could not be resolved.
   = UnboundName Range Text
+  -- | A false constraint.
+  -- TODO: add more info
+  | TypeError Range
+  -- | An unsolved constraint.
+  -- TODO: add more info
+  | UnsolvedConstraint Range
+  -- | An unsolved meta.
+  | UnsolvedMeta Range MetaId
   deriving (Show)
 
 -- | Read-only environment used for local variables.
@@ -35,6 +43,21 @@ initialEnv = Env
   { envVarNames = []
   , envCtx      = C0
   }
+
+-- | Constraints for unification.
+data Constraint
+  -- TODO: split into two constructors? "trivial", "inconsistent"
+  = Solved Bool
+  | TermEq Ctx Type Term Term
+  | SpineEq Ctx Type [(Term, Term)]
+  | And [Constraint]
+  | ExactlyOne [Constraint]
+  | Guarded Constraint Constraint
+  deriving (Show)
+
+-- | A "user-facing" constraint as a result of typechecking.
+data TopLevelConstraint = TopLevelConstraint Range Constraint
+  deriving (Show)
 
 -- | Global type-checking state.
 data State = State
@@ -54,7 +77,11 @@ data State = State
   , axiomNames        :: HashMap NameId Name
   , axiomTypes        :: HashMap NameId Type
     -- | Metavariables.
+  , metaRanges        :: HashMap MetaId Range
   , metaTypes         :: HashMap MetaId Type
+  , metaTerms         :: HashMap MetaId Term
+    -- | Constraints
+  , constraints       :: [TopLevelConstraint]
   } deriving (Show)
 
 initialState :: State
@@ -68,7 +95,10 @@ initialState = State
   , defTerms          = HashMap.empty
   , axiomNames        = HashMap.empty
   , axiomTypes        = HashMap.empty
+  , metaRanges        = HashMap.empty
   , metaTypes         = HashMap.empty
+  , metaTerms         = HashMap.empty
+  , constraints       = []
   }
 
 newtype M a = M { unM :: IORef State -> Env -> IO a }
@@ -121,9 +151,14 @@ freshMetaId = do
   put s { nextMetaId = succ id }
   return id
 
-lookupState :: (Eq k, Hashable k, Show k) => k -> (State -> HashMap k v) -> M v
-lookupState k f = do
+getState :: (Eq k, Hashable k, Show k) => k -> (State -> HashMap k v) -> M v
+getState k f = do
   m <- gets f
   case HashMap.lookup k m of
-    Nothing -> error $ "lookup: " ++ show k
+    Nothing -> error $ "getState: " ++ show k
     Just v  -> return v
+
+lookupState :: (Eq k, Hashable k, Show k) => k -> (State -> HashMap k v) -> M (Maybe v)
+lookupState k f = do
+  m <- gets f
+  return (HashMap.lookup k m)

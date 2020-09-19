@@ -82,7 +82,7 @@ lookupVar (SubstTerm t)      0 = t
 lookupVar (SubstTerm _)      i = var (i - 1)
 
 applySubst :: Subst -> Term -> Term
-applySubst subst t = case t of
+applySubst subst = \case
   App (Var v) args -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
   -- All other heads are closed.
   App h       args -> App h (map (applySubst subst) args)
@@ -93,6 +93,21 @@ applySubst subst t = case t of
 -- TODO: comment
 weaken :: Term -> Term
 weaken a = applySubst (SubstWeaken 1) a
+
+strengthen :: Term -> Maybe Term
+strengthen = go 0
+  where
+  go :: Int -> Term -> Maybe Term
+  go i = \case
+    App (Var j) args
+      | j < i        -> App (Var j) <$> traverse (go i) args
+      | j == i       -> Nothing
+      | otherwise    -> App (Var (j - 1)) <$> traverse (go i) args
+    -- All other heads are closed.
+    App h       args -> App h <$> traverse (go i) args
+    Type             -> return Type
+    Pi a b           -> Pi <$> go i a <*> go (i + 1) b
+    Lam b            -> Lam <$> go (i + 1) b
 
 -- TODO: comment
 instantiate :: Term -> Term -> Term

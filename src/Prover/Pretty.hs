@@ -90,10 +90,10 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
     prettyHead k = \case
       Var i    -> return $ prettyVar (k - i - 1)
       Def id   -> do
-        n <- lookupState id defNames
+        n <- getState id defNames
         return $ pretty (A.nameText n)
       Axiom id -> do
-        n <- lookupState id axiomNames
+        n <- getState id axiomNames
         return $ pretty (A.nameText n)
       Meta id  -> return $ prettyMeta id
 
