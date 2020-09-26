@@ -6,8 +6,8 @@ import Data.List
 import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
 import Control.Monad.State.Class
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
+import Data.HashMap.Strict qualified as HashMap
+import Data.HashSet qualified as HashSet
 import Prettyprinter
 
 import Prover.Monad

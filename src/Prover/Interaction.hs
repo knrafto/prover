@@ -3,7 +3,7 @@ module Prover.Interaction where
 
 import Data.Aeson
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 
 import Prover.Monad
 import Prover.Syntax.Abstract

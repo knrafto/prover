@@ -2,20 +2,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Monad
-import           System.Exit
-import           System.IO
+import Control.Monad
+import System.Exit
+import System.IO
 
-import           Data.Aeson
-import qualified Data.ByteString.Lazy.Char8    as B
-import qualified Data.Text.IO                  as Text
+import Data.Aeson
+import Data.ByteString.Lazy.Char8 qualified as B
+import Data.Text.IO qualified as Text
 
 import Prover.Interaction
 import Prover.Monad
 import Prover.Parser
 import Prover.TypeCheck
 
-import qualified Flags
+import Flags qualified
 
 main :: IO ()
 main = do

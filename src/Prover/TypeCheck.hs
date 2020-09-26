@@ -7,15 +7,15 @@ module Prover.TypeCheck where
 import Control.Monad
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
+import Data.HashMap.Strict qualified as HashMap
+import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 import Prettyprinter
 
 import Prover.Monad
 import Prover.Pretty
-import qualified Prover.Syntax.Abstract as A
-import qualified Prover.Syntax.Concrete as C
+import Prover.Syntax.Abstract qualified as A
+import Prover.Syntax.Concrete qualified as C
 import Prover.Syntax.Internal
 import Prover.Syntax.Position
 import Prover.Unify

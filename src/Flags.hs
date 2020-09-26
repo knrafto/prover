@@ -2,10 +2,10 @@
 -- imported qualified.
 module Flags where
 
-import           Data.List
+import Data.List
 
-import           System.Environment
-import           System.IO.Unsafe
+import System.Environment
+import System.IO.Unsafe
 
 commandLine :: [String]
 commandLine = unsafePerformIO getArgs

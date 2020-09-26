@@ -2,18 +2,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Prover.Parser ( parseModule ) where
 
-import           Control.Monad
+import Control.Monad
 
-import           Control.Monad.Combinators.Expr
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Data.Void
-import           Text.Megaparsec
-import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer    as L
+import Control.Monad.Combinators.Expr
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Void
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import Text.Megaparsec.Char.Lexer qualified as L
 
-import           Prover.Syntax.Position
-import           Prover.Syntax.Concrete
+import Prover.Syntax.Position
+import Prover.Syntax.Concrete
 
 type Parser = Parsec Void Text
 

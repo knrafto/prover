@@ -5,9 +5,9 @@ import Data.IORef
 
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
+import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet
+import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 
 import Control.Monad.IO.Class

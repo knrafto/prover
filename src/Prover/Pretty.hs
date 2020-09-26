@@ -6,13 +6,13 @@ import System.IO
 
 import Control.Monad.IO.Class
 import Prettyprinter hiding (Doc, parens)
-import qualified Prettyprinter as PP
+import Prettyprinter qualified as PP
 import Prettyprinter.Render.Text
 import Prover.Monad
-import qualified Prover.Syntax.Abstract as A
+import Prover.Syntax.Abstract qualified as A
 import Prover.Syntax.Internal
 
-import qualified Flags
+import Flags qualified
 
 type Doc = PP.Doc Void
 
