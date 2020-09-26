@@ -19,9 +19,9 @@ newtype MetaId = MetaId Int
 data Head
   -- | A local variable (as a de Bruijn index).
   = Var !Var
-  -- | A defined name.
+  -- | A definition.
   | Def !NameId
-  -- | An assumed name.
+  -- | An axiom.
   | Axiom !NameId
   -- | A metavariable.
   | Meta !MetaId

@@ -1,35 +1,35 @@
 -- Identity types, with based path induction.
-assume Id : Π A. A → A → Type
-assume refl (A : Type) : Π a : A. a = a
-assume Id-ind (A : Type) :
+axiom Id : Π A. A → A → Type
+axiom refl (A : Type) : Π a : A. a = a
+axiom Id-ind (A : Type) :
     Π C : (Π a : A. Π b : A. a = b → Type).
     (Π a. C a a (refl A a)) →
     Π a. Π b. Π p. C a b p
 -- rewrite Id-ind C c (refl a) ≡ c a
 
 -- Empty type.
-assume 0 : Type
-assume 0-ind : Π C : 0 → Type. Π a. C a
+axiom 0 : Type
+axiom 0-ind : Π C : 0 → Type. Π a. C a
 
 -- Unit type.
-assume 1 : Type
-assume tt : 1
-assume 1-ind : Π C : 1 → Type. C tt → Π a. C a
+axiom 1 : Type
+axiom tt : 1
+axiom 1-ind : Π C : 1 → Type. C tt → Π a. C a
 -- rewrite 1-ind C c tt ≡ c
 
 -- Boolean type.
-assume 2 : Type
-assume 0₂ : 2
-assume 1₂ : 2
-assume 2-ind : Π C : 2 → Type. C 0₂ → C 1₂ → Π a. C a
+axiom 2 : Type
+axiom 0₂ : 2
+axiom 1₂ : 2
+axiom 2-ind : Π C : 2 → Type. C 0₂ → C 1₂ → Π a. C a
 -- rewrite 2-ind C c₀ c₁ 0₂ ≡ c₀
 -- rewrite 2-ind C c₀ c₁ 1₂ ≡ c₁
 
 -- Natural numbers.
-assume ℕ : Type
-assume zero : ℕ
-assume suc : ℕ → ℕ
-assume ℕ-ind : Π C : ℕ → Type. C zero → (Π n. C n → C (suc n)) → Π n. C n
+axiom ℕ : Type
+axiom zero : ℕ
+axiom suc : ℕ → ℕ
+axiom ℕ-ind : Π C : ℕ → Type. C zero → (Π n. C n → C (suc n)) → Π n. C n
 -- rewrite ℕ-ind C base step zero ≡ base
 -- rewrite ℕ-ind C base step (suc n) ≡ step n (ℕ-ind C base step n)
 
@@ -61,7 +61,7 @@ define IsSet (A : Type) ≡ Π x : A. Π y : A. IsProp (x = y)
 
 -- define fiber (A : Type) (B : Type) (f : A → B) (b : B) ≡ Σ a : A. f a = b
 -- define IsEquiv (A : Type) (B : Type) (f : A → B) ≡ Π b. IsContr (fiber f b)
-assume IsEquiv (A : Type) (B : Type) (f : A → B) : Type
+axiom IsEquiv (A : Type) (B : Type) (f : A → B) : Type
 
 -- Natural numbers.
 define add
@@ -69,32 +69,32 @@ define add
     ≡ ℕ-ind _ (λ m. m) (λ n. λ rec. λ m. suc (rec m))
 
 -- Propositional truncation.
-assume Trunc : Type → Type
-assume trunc : Π A. A → Trunc A
-assume Trunc-IsProp : Π A. IsProp (Trunc A)
-assume Trunc-rec : Π A. Π B. IsProp B → (A → B) → Trunc A → B
+axiom Trunc : Type → Type
+axiom trunc : Π A. A → Trunc A
+axiom Trunc-IsProp : Π A. IsProp (Trunc A)
+axiom Trunc-rec : Π A. Π B. IsProp B → (A → B) → Trunc A → B
 -- rewrite Trunc-rec A B B-IsProp f (trunc a) ≡ f a
 
 -- Set-quotients.
-assume Quot : Π A : Type. (A → A → Type) → Type
-assume quot : Π A : Type. Π R : A → A → Type. A → Quot A R
-assume Quot-eq : Π A : Type. Π R : A → A → Type. Π x : A. Π y : A. R x y → quot A R x = quot A R y
-assume Quot-IsSet : Π A : Type. Π R : A → A → Type. IsSet (Quot A R)
-assume Quot-ind : Π A. Π R. Π P : Quot A R → Type. (Π q : Quot A R. IsProp (P q)) → (Π a. P (quot A R a)) → Π q : Quot A R. P q
+axiom Quot : Π A : Type. (A → A → Type) → Type
+axiom quot : Π A : Type. Π R : A → A → Type. A → Quot A R
+axiom Quot-eq : Π A : Type. Π R : A → A → Type. Π x : A. Π y : A. R x y → quot A R x = quot A R y
+axiom Quot-IsSet : Π A : Type. Π R : A → A → Type. IsSet (Quot A R)
+axiom Quot-ind : Π A. Π R. Π P : Quot A R → Type. (Π q : Quot A R. IsProp (P q)) → (Π a. P (quot A R a)) → Π q : Quot A R. P q
 -- rewrite Quot-ind A R P P-IsProp f (quot a) = f a
-assume Quot-rec : Π A. Π R. Π B. IsSet B → Π f : A → B. (Π x. Π y. R x y → f x = f y) → Quot A R → B
+axiom Quot-rec : Π A. Π R. Π B. IsSet B → Π f : A → B. (Π x. Π y. R x y → f x = f y) → Quot A R → B
 -- rewrite Quot-rec A R B B-IsSet f f-eq (quot a) = f a
 
 -- The integers.
-assume ℤ : Type
-assume zero : ℤ
-assume suc  : ℤ → ℤ
-assume pred : ℤ → ℤ
-assume ℤ-ind : Π P : ℤ → Type. (Π n. IsProp (P n)) → P zero → (Π n. P n → P (suc n)) → (Π n. P n → P (pred n)) → Π n. P n
+axiom ℤ : Type
+axiom zero : ℤ
+axiom suc  : ℤ → ℤ
+axiom pred : ℤ → ℤ
+axiom ℤ-ind : Π P : ℤ → Type. (Π n. IsProp (P n)) → P zero → (Π n. P n → P (suc n)) → (Π n. P n → P (pred n)) → Π n. P n
 -- rewrite ℤ-ind P P-IsProp z s p zero = z
 -- rewrite ℤ-ind P P-IsProp z s p (suc n) = s n (ℤ-ind P P-IsProp z s p n)
 -- rewrite ℤ-ind P P-IsProp z s p (pred n) = p n (ℤ-ind P P-IsProp z s p n)
-assume ℤ-rec : Π A : Type. A → Π f : A → A. IsEquiv A A f → ℤ → A
+axiom ℤ-rec : Π A : Type. A → Π f : A → A. IsEquiv A A f → ℤ → A
 -- rewrite ℤ-rec A z f f-IsEquiv zero = z
 -- rewrite ℤ-rec A z f f-IsEquiv (suc n) = f (ℤ-rec A z f f-IsEquiv n)
 -- rewrite ℤ-rec A z f f-IsEquiv (pred n) = inv f (ℤ-rec A z f f-IsEquiv n)

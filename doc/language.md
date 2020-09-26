@@ -21,7 +21,7 @@ _
 : ≡
 = → ×
 Π λ Σ
-define assume prove
+define axiom
 ```
 
 # Parentheses
@@ -65,7 +65,7 @@ module = [ statement ]*
 
 statement =
     define name param* [ : expr ] ≡ expr
-    assume name param* : expr
+    axiom name param* : expr
 
 param =
     name

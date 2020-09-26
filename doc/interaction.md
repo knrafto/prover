@@ -70,7 +70,7 @@ grammar ends up being very "top-down" rather than "bottom-up" like Parsec.
 
 Procedure:
 * Tokenization is performed first (and never fails).
-* The tokens `define`, `assume`, and `prove` always denote the start of
+* The tokens `define`, `axiom`, etc always denote the start of
   another statement, no matter where in the parse tree we are. There may be
   an initial error statement.
 * Parentheses are next. Parsing should proceed as if

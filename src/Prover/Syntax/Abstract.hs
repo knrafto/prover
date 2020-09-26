@@ -38,7 +38,7 @@ instance HasRange ExprInfo where
 data Expr
   = Var     ExprInfo Name  -- ^ A bound variable.
   | Def     ExprInfo Name  -- ^ A defined name.
-  | Axiom   ExprInfo Name  -- ^ An assumed name.
+  | Axiom   ExprInfo Name  -- ^ An axiom name.
   | Unbound ExprInfo Text  -- ^ An unbound name.
   | Hole    ExprInfo       -- ^ An underscore hole.
   | Type    ExprInfo

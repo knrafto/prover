@@ -64,8 +64,7 @@ name = lexeme . try $ do
         , "×"
         , "Type"
         , "define"
-        , "assume"
-        , "prove"
+        , "axiom"
         ]
 
 symbol :: Char -> Parser Range
@@ -143,17 +142,17 @@ define =
         <*  reservedWord "≡"
         <*> expr
 
-assume :: Parser Decl
-assume =
+axiom :: Parser Decl
+axiom =
     Assume
-        <$  reservedWord "assume"
+        <$  reservedWord "axiom"
         <*> name
         <*> many telescopeParam
         <*  reservedWord ":"
         <*> expr
 
 decl :: Parser Decl
-decl = define <|> assume
+decl = define <|> axiom
 
 module_ :: Parser Module
 module_ = Module <$ sc <*> many decl <* eof

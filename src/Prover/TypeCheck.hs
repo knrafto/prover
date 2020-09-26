@@ -261,7 +261,7 @@ checkDecl = \case
       }
     return $ A.Define params' def e'
   C.Assume n params ann   -> do
-    debug $ "checking assumption" <+> pretty (C.nameText n) <+> "..."
+    debug $ "checking axiom" <+> pretty (C.nameText n) <+> "..."
     (params', ctx, def) <- checkAssume params (n, Just ann)
     let n' = A.paramName def
         ty = ctxPi ctx (A.paramType def)
