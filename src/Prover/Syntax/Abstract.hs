@@ -42,9 +42,9 @@ data Expr
   | Unbound ExprInfo Text  -- ^ An unbound name.
   | Hole    ExprInfo       -- ^ An underscore hole.
   | Type    ExprInfo
-  | Pi      ExprInfo Binding Expr
-  | Lam     ExprInfo Binding Expr
-  | Sigma   ExprInfo Binding Expr
+  | Pi      ExprInfo Param Expr
+  | Lam     ExprInfo Param Expr
+  | Sigma   ExprInfo Param Expr
   | App     ExprInfo Expr Expr
   | Arrow   ExprInfo Expr Expr
   | Times   ExprInfo Expr Expr
@@ -80,15 +80,15 @@ exprType = exprInfoType . exprInfo
 
 -- | A name that was optionally annotated with a type by the user (but we know
 -- the type now).
-data Binding = Binding
-  { bindingName       :: Name
-  , bindingType       :: Type
-  , bindingAnnotation :: Maybe Expr
+data Param = Param
+  { paramName       :: Name
+  , paramType       :: Type
+  , paramAnnotation :: Maybe Expr
   } deriving (Show)
 
 data Decl
-  = Define Binding Expr
-  | Assume Binding
+  = Define Param Expr
+  | Assume Param
   deriving (Show)
 
 newtype Module = Module [Decl]

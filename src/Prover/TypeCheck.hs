@@ -132,7 +132,7 @@ checkExpr expr expectedTy = case expr of
 
   C.Pi      r p e   -> do
     -- Γ ⊢ A : Type
-    b@(A.Binding n tyA _) <- checkBinding p
+    p'@(A.Param n tyA _) <- checkParam p
 
     -- Γ, x : A ⊢ B : Type
     e' <- extendEnv (Just n) tyA $ checkExpr e Type
@@ -140,11 +140,11 @@ checkExpr expr expectedTy = case expr of
     -- ⟹ Γ ⊢ (Π x : A. B) : Type
     let t   = Pi tyA (A.exprTerm e')
     i <- expect r t Type expectedTy
-    return $ A.Pi i b e'
+    return $ A.Pi i p' e'
 
   C.Lam     r p e   -> do
     -- Γ ⊢ A : Type
-    b@(A.Binding n tyA _) <- checkBinding p
+    p'@(A.Param n tyA _) <- checkParam p
 
     -- Γ, x : A ⊢ e : B
     tyB <- extendEnv (Just n) tyA $ createMeta r Type
@@ -154,7 +154,7 @@ checkExpr expr expectedTy = case expr of
     let t   = Lam (A.exprTerm e')
         ty  = Pi tyA (A.exprType e')
     i <- expect r t ty expectedTy
-    return $ A.Lam i b e'
+    return $ A.Lam i p' e'
 
   C.Sigma   _ _ _   -> error "Σ-types"
 
@@ -203,9 +203,9 @@ checkExpr expr expectedTy = case expr of
 
   C.Pair    _ _  _  -> error "Σ-types"
 
--- | Given (x : A), check Γ ⊢ A : Type and construct a binding for x.
-checkBinding :: C.Param -> M A.Binding
-checkBinding (n, ann) = do
+-- | Given (x : A), check Γ ⊢ A : Type and construct a param for x.
+checkParam :: C.Param -> M A.Param
+checkParam (n, ann) = do
   n' <- createName n
   (ty', ann') <- case ann of
     Nothing -> do
@@ -214,22 +214,22 @@ checkBinding (n, ann) = do
     Just ty -> do
       ty' <- checkExpr ty Type
       return (A.exprTerm ty', Just ty')
-  return $ A.Binding n' ty' ann'
+  return $ A.Param n' ty' ann'
 
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
   C.Define n ann e -> do
     debug $ "checking definition" <+> pretty (C.nameText n) <+> "..."
-    b  <- checkBinding (n, ann)
-    e' <- checkExpr e (A.bindingType b)
-    let n' = A.bindingName b
+    p  <- checkParam (n, ann)
+    e' <- checkExpr e (A.paramType p)
+    let n' = A.paramName p
     modify $ \s -> s
       { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , defNames    = HashMap.insert (A.nameId n') n' (defNames s)
       , defTypes    = HashMap.insert (A.nameId n') (A.exprType e') (defTypes s)
       , defTerms    = HashMap.insert (A.nameId n') (A.exprTerm e') (defTerms s)
       }
-    return $ A.Define b e'
+    return $ A.Define p e'
   C.Assume n ty   -> do
     debug $ "checking assumption" <+> pretty (C.nameText n) <+> "..."
     n'  <- createName n
@@ -239,7 +239,7 @@ checkDecl = \case
       , axiomNames  = HashMap.insert (A.nameId n') n' (axiomNames s)
       , axiomTypes  = HashMap.insert (A.nameId n') (A.exprTerm ty') (axiomTypes s)
       }
-    return $ A.Assume (A.Binding n' (A.exprTerm ty') (Just ty'))
+    return $ A.Assume (A.Param n' (A.exprTerm ty') (Just ty'))
 
 -- TODO: solve constraints after each decl
 checkModule :: C.Module -> M A.Module
