@@ -235,6 +235,16 @@ checkDefine (p:ps) def e = do
   (ps', ctx, def', e') <- localEnv p' $ checkDefine ps def e
   return (p':ps', ctx, def', e')
 
+checkAssume :: [C.Param] -> C.Param -> M ([A.Param], Ctx, A.Param)
+checkAssume [] def = do
+  ctx  <- asks envCtx
+  def' <- checkParam def
+  return ([], ctx, def')
+checkAssume (p:ps) def = do
+  p' <- checkParam p
+  (ps', ctx, def') <- localEnv p' $ checkAssume ps def
+  return (p':ps', ctx, def')
+
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
   C.Define n params ann e -> do
@@ -250,16 +260,17 @@ checkDecl = \case
       , defTerms    = HashMap.insert (A.nameId n') tm (defTerms s)
       }
     return $ A.Define params' def e'
-  C.Assume n ty   -> do
+  C.Assume n params ann   -> do
     debug $ "checking assumption" <+> pretty (C.nameText n) <+> "..."
-    n'  <- createName n
-    ty' <- checkExpr ty Type
+    (params', ctx, def) <- checkAssume params (n, Just ann)
+    let n' = A.paramName def
+        ty = ctxPi ctx (A.paramType def)
     modify $ \s -> s
       { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , axiomNames  = HashMap.insert (A.nameId n') n' (axiomNames s)
-      , axiomTypes  = HashMap.insert (A.nameId n') (A.exprTerm ty') (axiomTypes s)
+      , axiomTypes  = HashMap.insert (A.nameId n') ty (axiomTypes s)
       }
-    return $ A.Assume (A.Param n' (A.exprTerm ty') (Just ty'))
+    return $ A.Assume params' def
 
 -- TODO: solve constraints after each decl
 checkModule :: C.Module -> M A.Module

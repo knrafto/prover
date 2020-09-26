@@ -1,7 +1,7 @@
 -- Identity types, with based path induction.
 assume Id : Π A. A → A → Type
-assume refl : Π A. Π a : A. a = a
-assume Id-ind : Π A.
+assume refl (A : Type) : Π a : A. a = a
+assume Id-ind (A : Type) :
     Π C : (Π a : A. Π b : A. a = b → Type).
     (Π a. C a a (refl A a)) →
     Π a. Π b. Π p. C a b p
@@ -61,7 +61,7 @@ define IsSet (A : Type) ≡ Π x : A. Π y : A. IsProp (x = y)
 
 -- define fiber (A : Type) (B : Type) (f : A → B) (b : B) ≡ Σ a : A. f a = b
 -- define IsEquiv (A : Type) (B : Type) (f : A → B) ≡ Π b. IsContr (fiber f b)
-assume IsEquiv : Π A. Π B. (A → B) → Type
+assume IsEquiv (A : Type) (B : Type) (f : A → B) : Type
 
 -- Natural numbers.
 define add
@@ -86,7 +86,6 @@ assume Quot-rec : Π A. Π R. Π B. IsSet B → Π f : A → B. (Π x. Π y. R x
 -- rewrite Quot-rec A R B B-IsSet f f-eq (quot a) = f a
 
 -- The integers.
-{-
 assume ℤ : Type
 assume zero : ℤ
 assume suc  : ℤ → ℤ
@@ -99,4 +98,3 @@ assume ℤ-rec : Π A : Type. A → Π f : A → A. IsEquiv A A f → ℤ → A
 -- rewrite ℤ-rec A z f f-IsEquiv zero = z
 -- rewrite ℤ-rec A z f f-IsEquiv (suc n) = f (ℤ-rec A z f f-IsEquiv n)
 -- rewrite ℤ-rec A z f f-IsEquiv (pred n) = inv f (ℤ-rec A z f f-IsEquiv n)
--}

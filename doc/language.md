@@ -65,8 +65,7 @@ module = [ statement ]*
 
 statement =
     define name param* [ : expr ] ≡ expr
-    assume name : expr
-    prove name : expr
+    assume name param* : expr
 
 param =
     name

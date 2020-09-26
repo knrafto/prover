@@ -77,8 +77,8 @@ symbol c = lexeme $ do
 binderParam :: Parser Param
 binderParam = (,) <$> name <*> optional (reservedWord ":" *> expr)
 
-defineParam :: Parser Param
-defineParam = explicitParam <|> (\n -> (n, Nothing)) <$> name
+telescopeParam :: Parser Param
+telescopeParam = explicitParam <|> (\n -> (n, Nothing)) <$> name
   where
     explicitParam = (,) <$ symbol '(' <*> name <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
 
@@ -138,14 +138,19 @@ define =
     Define
         <$  reservedWord "define"
         <*> name
-        <*> many defineParam
+        <*> many telescopeParam
         <*> optional (reservedWord ":" *> expr)
         <*  reservedWord "≡"
         <*> expr
 
 assume :: Parser Decl
 assume =
-    Assume <$ reservedWord "assume" <*> name <* reservedWord ":" <*> expr
+    Assume
+        <$  reservedWord "assume"
+        <*> name
+        <*> many telescopeParam
+        <*  reservedWord ":"
+        <*> expr
 
 decl :: Parser Decl
 decl = define <|> assume

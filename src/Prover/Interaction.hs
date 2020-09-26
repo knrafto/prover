@@ -78,7 +78,8 @@ highlightDecl = \case
     concatMap (highlightParam HighlightVarName) params ++
     highlightParam HighlightDefName def ++
     highlightExpr e
-  Assume def ->
+  Assume params def ->
+    concatMap (highlightParam HighlightVarName) params ++
     highlightParam HighlightAxiomName def
 
 highlightModule :: Module -> [HighlightedRange]
