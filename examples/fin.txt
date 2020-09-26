@@ -1,0 +1,69 @@
+_≤_ (m n : ℕ)
+  : Type
+  ≡ Σ k : ℕ. m + k ≡ n
+  -- ≡ fib (m +_) n
+
+prove (m n : ℕ) : IsProp (m ≤ n)
+prove (m n : ℕ) : Dec (m ≤ n)
+prove (m n : ℕ) : (m < n) + (n ≤ m)
+
+_<_ (m n : ℕ)
+  : Type
+  ≡ suc m ≤ n
+
+_-_ (n m : ℕ) {{p : m ≤ n}}
+  : ℕ
+  ≡ fst p
+
+Fin n = { i : ℕ | i < n }
+
+-- A ^ n?
+Vec A n = Fin n → A
+
+-- list notation? [x, y, z]
+
+-- indexing
+_[_] (v : Vec A n) (i : Fin n) : A ≡ v i
+
+-- slicing
+_[_:_] (v : Vec A n) (i : ℕ) (j : ℕ) {{i ≤ j}} {{j ≤ n}}
+  : Vec A (j - i)
+  ≡ λ k. v[i + k]
+
+{-
+elaborates to:
+λ (k : ℕ, _ : k < j - i). v (k + i, _1? : i + k < n)
+
+_1?: have i < n, j < n, k < j - i so i + k < i + (j - i) = j ≤ n
+-}
+
+_[_:] (v : Vec A n) (i : ℕ) {{i ≤ n}}
+  : Vec A (n - i)
+  ≡ v[i:n]
+
+_[:_] (v : Vec A n) (j : ℕ) {{j ≤ n}}
+  : Vec A j
+  ≡ v[0:j]
+
+-- concatenation
+_++_ (xs : Vec A m) (ys : Vec A n)
+  : Vec A (m + n)
+  ≡ λ i. if i < m then xs[i] else ys[i - m]
+
+{-
+elaborates to:
+λ (i : ℕ, _ : i < m + n). case _1? : Dec (i < m) of
+  yes (_ :   i < m) → xs (i, _2? : i < m)
+  no  (_ : ¬ i < m) → let (k, _ : m + k ≡ i) = _3? : m ≤ i in ys (k, _4? : k < n)
+
+_1?: use proof of Dec (m ≤ n)
+_2?: have i < m already
+_3?: need ¬ i < m → m ≤ i. case on dichotomy (i < m) + (m ≤ n), ⊥-rec
+_4?: have m + k ≤ i and i < m + n ⟹ m + k < m + n ⟹ k < n
+-}
+
+{-
+want to automatically prove things like
+[a[0]] ++ a[1:] = a
+a[:i] ++ a[i:] = a
+-}
