@@ -87,7 +87,7 @@ data Param = Param
   } deriving (Show)
 
 data Decl
-  = Define Param Expr
+  = Define [Param] Param Expr
   | Assume Param
   deriving (Show)
 

@@ -77,8 +77,13 @@ symbol c = lexeme $ do
     _ <- char c
     Range s <$> getPosition
 
-param :: Parser Param
-param = (,) <$> name <*> optional (reservedWord ":" *> expr)
+binderParam :: Parser Param
+binderParam = (,) <$> name <*> optional (reservedWord ":" *> expr)
+
+defineParam :: Parser Param
+defineParam = explicitParam <|> (\n -> (n, Nothing)) <$> name
+  where
+    explicitParam = (,) <$ symbol '(' <*> name <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
 
 atom :: Parser Expr
 atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
@@ -93,19 +98,19 @@ atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
         return e
     pi_ = do
         s <- reservedWord "Π"
-        p <- param
+        p <- binderParam
         _ <- symbol '.'
         e <- expr
         return (Pi (rangeSpan s (getRange e)) p e)
     lam = do
         s <- reservedWord "λ"
-        p <- param
+        p <- binderParam
         _ <- symbol '.'
         e <- expr
         return (Lam (rangeSpan s (getRange e)) p e)
     sigma = do
         s <- reservedWord "Σ"
-        p <- param
+        p <- binderParam
         _ <- symbol '.'
         e <- expr
         return (Sigma (rangeSpan s (getRange e)) p e)
@@ -136,6 +141,7 @@ define =
     Define
         <$  reservedWord "define"
         <*> name
+        <*> many defineParam
         <*> optional (reservedWord ":" *> expr)
         <*  reservedWord "≡"
         <*> expr

@@ -39,28 +39,28 @@ assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n. C n
 
 -- Structure of identity types.
 -- TODO: infer C of Id-ind in all cases?
-define ap
-    : Π A : Type. Π B : Type. Π x : A. Π y : A. Π f : A → B. x = y → f x = f y
-    ≡ λ A : Type. λ B : Type. λ x : A. λ y : A. λ f : A → B. Id-ind A (λ x. λ y. λ p. f x = f y) (λ x. refl B (f x)) x y
-define subst
-    : Π A : Type. Π B : A → Type. Π x : A. Π y : A. x = y → B x → B y
-    ≡ λ A : Type. λ B : A → Type. Id-ind A _ (λ x. λ b. b)
-define sym
-    : Π A : Type. Π x : A. Π y : A. x = y → y = x
-    ≡ λ A : Type. Id-ind A _ (λ x. refl A x)
-define trans
-    : Π A : Type. Π x : A. Π y : A. Π z : A. x = y → y = z → x = z
-    ≡ λ A : Type. λ x : A. λ y : A. λ z : A. λ p : x = y. λ q : y = z.
+define ap (A : Type) (B : Type) (x : A) (y : A) (f : A → B)
+    : x = y → f x = f y
+    ≡ Id-ind A (λ x. λ y. λ p. f x = f y) (λ x. refl B (f x)) x y
+define subst (A : Type) (x : A) (y : A) (B : A → Type)
+    : x = y → B x → B y
+    ≡ Id-ind A (λ x. λ y. λ p. B x → B y) (λ x. λ b. b) x y
+define sym (A : Type) (x : A) (y : A)
+    : x = y → y = x
+    ≡ Id-ind A (λ x. λ y. λ p. y = x) (λ x. refl A x) x y
+define trans (A : Type) (x : A) (y : A) (z : A)
+    : x = y → y = z → x = z
+    ≡ λ p : x = y. λ q : y = z.
         Id-ind A (λ x. λ y : A. λ p : x = y. Π z : A. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
 
 -- Function types.
-define happly
-    : Π A : Type. Π B : Type. Π f : A → B. Π g : A → B. f = g → Π x : A. f x = g x
-    ≡ λ A : Type. λ B : Type. Id-ind (A → B) _ (λ f. λ x. refl B (f x))
+define happly (A : Type) (B : Type) (f : A → B) (g : A → B)
+    : f = g → Π x : A. f x = g x
+    ≡ Id-ind (A → B) (λ f. λ g. λ p. Π x : A. f x = g x) (λ f. λ x. refl B (f x)) f g
 
 -- Sets and logic.
--- define IsContr ≡ λ A : Type. Σ a : A. Π x : A. a = x
-define IsProp ≡ λ A : Type. Π x : A. Π y : A. x = y
+-- define IsContr (A : Type) ≡ Σ a : A. Π x : A. a = x
+define IsProp (A : Type) ≡ Π x : A. Π y : A. x = y
 
 -- Natural numbers.
 define add

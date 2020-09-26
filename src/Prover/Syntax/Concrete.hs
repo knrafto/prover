@@ -44,7 +44,7 @@ instance HasRange Expr where
     Pair    r _ _ -> r
 
 data Decl
-  = Define Name (Maybe Expr) Expr
+  = Define Name [Param] (Maybe Expr) Expr
   | Assume Name Expr
   deriving (Show)
 

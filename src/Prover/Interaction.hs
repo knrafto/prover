@@ -59,23 +59,27 @@ highlightExpr = \case
   Unbound i _     -> [HighlightedRange (getRange i) HighlightUnboundName]
   Hole    i       -> [HighlightedRange (getRange i) HighlightHole]
   Type    i       -> [HighlightedRange (getRange i) HighlightType]
-  Pi      _ p e   -> highlightParam p HighlightVarName ++ highlightExpr e
-  Lam     _ p e   -> highlightParam p HighlightVarName ++ highlightExpr e
-  Sigma   _ p e   -> highlightParam p HighlightVarName ++ highlightExpr e
+  Pi      _ p e   -> highlightParam HighlightVarName p ++ highlightExpr e
+  Lam     _ p e   -> highlightParam HighlightVarName p ++ highlightExpr e
+  Sigma   _ p e   -> highlightParam HighlightVarName p ++ highlightExpr e
   App     _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
   Arrow   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
   Times   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
   Equals  _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
   Pair    _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
 
-highlightParam :: Param -> HighlightKind -> [HighlightedRange]
-highlightParam (Param n _ ann) kind =
+highlightParam :: HighlightKind -> Param -> [HighlightedRange]
+highlightParam kind (Param n _ ann) =
   HighlightedRange (nameRange n) kind : foldMap highlightExpr ann
 
 highlightDecl :: Decl -> [HighlightedRange]
 highlightDecl = \case
-  Define p e -> highlightParam p HighlightDefName ++ highlightExpr e
-  Assume p   -> highlightParam p HighlightAxiomName
+  Define params def e ->
+    concatMap (highlightParam HighlightVarName) params ++
+    highlightParam HighlightDefName def ++
+    highlightExpr e
+  Assume def ->
+    highlightParam HighlightAxiomName def
 
 highlightModule :: Module -> [HighlightedRange]
 highlightModule (Module decls) = concatMap highlightDecl decls

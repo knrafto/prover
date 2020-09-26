@@ -47,10 +47,17 @@ createName (C.Name r t) = do
   id <- freshNameId
   return (A.Name id r t)
 
--- | Type-check with a new binding.
-extendEnv :: Maybe A.Name -> Type -> M a -> M a
-extendEnv n ty = local $ \e -> Env
-  { envVarNames = n : envVarNames e
+-- | Add a param to the environment.
+localEnv :: A.Param -> M a -> M a
+localEnv (A.Param n ty _) = local $ \e -> Env
+  { envVarNames = Just n : envVarNames e
+  , envCtx      = envCtx e :> ty
+  }
+
+-- | Add an unnamed param to the environment.
+unnamedLocalEnv :: Type -> M a -> M a
+unnamedLocalEnv ty = local $ \e -> Env
+  { envVarNames = Nothing : envVarNames e
   , envCtx      = envCtx e :> ty
   }
 
@@ -132,27 +139,27 @@ checkExpr expr expectedTy = case expr of
 
   C.Pi      r p e   -> do
     -- Γ ⊢ A : Type
-    p'@(A.Param n tyA _) <- checkParam p
+    p' <- checkParam p
 
     -- Γ, x : A ⊢ B : Type
-    e' <- extendEnv (Just n) tyA $ checkExpr e Type
+    e' <- localEnv p' $ checkExpr e Type
 
     -- ⟹ Γ ⊢ (Π x : A. B) : Type
-    let t   = Pi tyA (A.exprTerm e')
+    let t   = Pi (A.paramType p') (A.exprTerm e')
     i <- expect r t Type expectedTy
     return $ A.Pi i p' e'
 
   C.Lam     r p e   -> do
     -- Γ ⊢ A : Type
-    p'@(A.Param n tyA _) <- checkParam p
+    p' <- checkParam p
 
     -- Γ, x : A ⊢ e : B
-    tyB <- extendEnv (Just n) tyA $ createMeta r Type
-    e'  <- extendEnv (Just n) tyA $ checkExpr e tyB
+    tyB <- localEnv p'  $ createMeta r Type
+    e'  <- localEnv p' $ checkExpr e tyB
 
     -- ⟹ Γ ⊢ (λ x : A. e) : (Π x : A. B)
     let t   = Lam (A.exprTerm e')
-        ty  = Pi tyA (A.exprType e')
+        ty  = Pi (A.paramType p') (A.exprType e')
     i <- expect r t ty expectedTy
     return $ A.Lam i p' e'
 
@@ -164,7 +171,7 @@ checkExpr expr expectedTy = case expr of
     a'  <- checkExpr a tyA
 
     -- Γ ⊢ f : (Π x : A. B)
-    tyB <- extendEnv Nothing tyA (createMeta r Type)
+    tyB <- unnamedLocalEnv tyA $ createMeta r Type
     f'  <- checkExpr f (Pi tyA tyB)
 
     -- ⟹ Γ ⊢ f a : B[a/x]
@@ -216,20 +223,33 @@ checkParam (n, ann) = do
       return (A.exprTerm ty', Just ty')
   return $ A.Param n' ty' ann'
 
+-- We apply the telescope of params when checking a definition.
+checkDefine :: [C.Param] -> C.Param -> C.Expr -> M ([A.Param], Ctx, A.Param, A.Expr)
+checkDefine [] def e = do
+  ctx  <- asks envCtx
+  def' <- checkParam def
+  e'   <- checkExpr e (A.paramType def')
+  return ([], ctx, def', e')
+checkDefine (p:ps) def e = do
+  p' <- checkParam p
+  (ps', ctx, def', e') <- localEnv p' $ checkDefine ps def e
+  return (p':ps', ctx, def', e')
+
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
-  C.Define n ann e -> do
+  C.Define n params ann e -> do
     debug $ "checking definition" <+> pretty (C.nameText n) <+> "..."
-    p  <- checkParam (n, ann)
-    e' <- checkExpr e (A.paramType p)
-    let n' = A.paramName p
+    (params', ctx, def, e') <- checkDefine params (n, ann) e
+    let n' = A.paramName def
+        ty = ctxPi ctx (A.exprType e')
+        tm = ctxLam ctx (A.exprTerm e')
     modify $ \s -> s
       { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , defNames    = HashMap.insert (A.nameId n') n' (defNames s)
-      , defTypes    = HashMap.insert (A.nameId n') (A.exprType e') (defTypes s)
-      , defTerms    = HashMap.insert (A.nameId n') (A.exprTerm e') (defTerms s)
+      , defTypes    = HashMap.insert (A.nameId n') ty (defTypes s)
+      , defTerms    = HashMap.insert (A.nameId n') tm (defTerms s)
       }
-    return $ A.Define p e'
+    return $ A.Define params' def e'
   C.Assume n ty   -> do
     debug $ "checking assumption" <+> pretty (C.nameText n) <+> "..."
     n'  <- createName n

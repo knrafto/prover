@@ -64,29 +64,27 @@ R(a, b) ≡ a < b
 module = [ statement ]*
 
 statement =
-    define name [ : expr ] ≡ expr
+    define name param* [ : expr ] ≡ expr
     assume name : expr
     prove name : expr
 
-param = name [ : expr ]
+param =
+    name
+    ( name : expr )
 
-atom =
+expr =
     _
     name
     Type
     ( expr )
-
-apps = [ apps ] atom
-equals = apps [ = apps ]
-times = equals [ × times ]
-arrow = times [ → arrow ]
-tuple = arrow [ , tuple ]
-binder =
-    tuple
-    Π param . binder
-    λ param . binder
-    Σ param . binder
-expr = binder
+    expr expr
+    expr = expr
+    expr × expr
+    expr → expr
+    expr , expr
+    Π name [ : expr ] . binder
+    λ name [ : expr ] . binder
+    Σ name [ : expr ] . binder
 ```
 
 # Type theory
