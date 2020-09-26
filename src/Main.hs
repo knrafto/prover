@@ -9,7 +9,6 @@ import           System.IO
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8    as B
 import qualified Data.Text.IO                  as Text
-import           Text.Megaparsec               hiding (Token, tokens)
 
 import Prover.Interaction
 import Prover.Monad
@@ -25,8 +24,8 @@ main = do
     _      -> die "usage: prover FILE"
   withFile path ReadMode $ \handle -> do
     input <- Text.hGetContents handle
-    concrete <- case parse module_ path input of
-      Left  e -> die (errorBundlePretty e)
+    concrete <- case parseModule path input of
+      Left  s -> die s
       Right x -> return x
     (m, state) <- runM $ checkModule concrete
     let r = Response

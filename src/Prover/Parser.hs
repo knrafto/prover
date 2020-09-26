@@ -1,15 +1,12 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Prover.Parser
-    ( module_
-    )
-where
+module Prover.Parser ( parseModule ) where
 
 import           Control.Monad
 
 import           Control.Monad.Combinators.Expr
 import           Data.Text                      ( Text )
-import qualified Data.Text                     as Text
+import qualified Data.Text                     as T
 import           Data.Void
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
@@ -48,7 +45,7 @@ name = lexeme . try $ do
     w <- takeWhile1P (Just "word character") isWordChar
     when (w `elem` reservedWords) $ fail
         (  "keyword "
-        ++ Text.unpack w
+        ++ T.unpack w
         ++ " is reserved and cgetRangeot be used as a name"
         )
     e <- getPosition
@@ -155,3 +152,8 @@ decl = define <|> assume
 
 module_ :: Parser Module
 module_ = Module <$ sc <*> many decl <* eof
+
+parseModule :: FilePath -> Text -> Either String Module
+parseModule path input = case parse module_ path input of
+    Left  e -> Left (errorBundlePretty e)
+    Right m -> Right m
