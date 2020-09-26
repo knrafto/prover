@@ -38,9 +38,10 @@ assume ℕ-ind-zero : Π C : ℕ → Type. Π base : C zero. Π step : (Π n. C 
 assume ℕ-ind-suc : Π C : ℕ → Type. Π base : C zero. Π step : (Π n. C n → C (suc n)). Π n. ℕ-ind C base step (suc n) = step n (ℕ-ind C base step n)
 
 -- Structure of identity types.
+-- TODO: infer C of Id-ind in all cases?
 define ap
     : Π A : Type. Π B : Type. Π x : A. Π y : A. Π f : A → B. x = y → f x = f y
-    ≡ λ A : Type. λ B : Type. λ x : A. λ y : A. λ f : A → B. Id-ind A _ (λ x. refl B (f x)) x y
+    ≡ λ A : Type. λ B : Type. λ x : A. λ y : A. λ f : A → B. Id-ind A (λ x. λ y. λ p. f x = f y) (λ x. refl B (f x)) x y
 define subst
     : Π A : Type. Π B : A → Type. Π x : A. Π y : A. x = y → B x → B y
     ≡ λ A : Type. λ B : A → Type. Id-ind A _ (λ x. λ b. b)
@@ -65,15 +66,3 @@ define IsProp ≡ λ A : Type. Π x : A. Π y : A. x = y
 define add
     : ℕ → ℕ → ℕ
     ≡ ℕ-ind _ (λ m. m) (λ n. λ rec. λ m. suc (rec m))
-
-define zero-+
-    : Π n. add zero n = n
-    ≡ happly _ _ _ _ (ℕ-ind-zero _ _ _)
-
-define suc-+
-    : Π n. Π m. add (suc n) m = suc (add n m)
-    ≡ λ n. happly _ _ _ _ (ℕ-ind-suc _ _ _ _)
-
-define +-zero
-    : Π n. add n zero = n
-    ≡ ℕ-ind _ (zero-+ _) (λ n. λ add-n-zero=n. trans _ _ _ _ (suc-+ _ _) (ap _ _ _ _ suc add-n-zero=n))
