@@ -65,6 +65,8 @@ name = lexeme . try $ do
         , "Type"
         , "define"
         , "axiom"
+        , "rewrite"
+        , "where"
         ]
 
 symbol :: Char -> Parser Range
@@ -76,10 +78,10 @@ symbol c = lexeme $ do
 binderParam :: Parser Param
 binderParam = (,) <$> name <*> optional (reservedWord ":" *> expr)
 
-telescopeParam :: Parser Param
-telescopeParam = explicitParam <|> (\n -> (n, Nothing)) <$> name
+explicitParam :: Parser Param
+explicitParam = annotated <|> (\n -> (n, Nothing)) <$> name
   where
-    explicitParam = (,) <$ symbol '(' <*> name <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
+    annotated = (,) <$ symbol '(' <*> name <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
 
 atom :: Parser Expr
 atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
@@ -133,26 +135,34 @@ expr = makeExprParser
     where binop c e1 e2 = c (rangeSpan (getRange e1) (getRange e2)) e1 e2
 
 define :: Parser Decl
-define =
-    Define
-        <$  reservedWord "define"
-        <*> name
-        <*> many telescopeParam
-        <*> optional (reservedWord ":" *> expr)
-        <*  reservedWord "≡"
-        <*> expr
+define = Define
+    <$  reservedWord "define"
+    <*> name
+    <*> many explicitParam
+    <*> optional (reservedWord ":" *> expr)
+    <*  reservedWord "≡"
+    <*> expr
 
 axiom :: Parser Decl
-axiom =
-    Assume
-        <$  reservedWord "axiom"
-        <*> name
-        <*> many telescopeParam
-        <*  reservedWord ":"
-        <*> expr
+axiom = Assume
+    <$  reservedWord "axiom"
+    <*> name
+    <*> many explicitParam
+    <*  reservedWord ":"
+    <*> expr
+
+rewrite :: Parser Decl
+rewrite = Rewrite
+    <$  reservedWord "rewrite"
+    <*> name
+    <*> many explicitParam
+    <*  reservedWord "where"
+    <*> expr
+    <*  reservedWord "≡"
+    <*> expr
 
 decl :: Parser Decl
-decl = define <|> axiom
+decl = define <|> axiom <|> rewrite
 
 module_ :: Parser Module
 module_ = Module <$ sc <*> many decl <* eof

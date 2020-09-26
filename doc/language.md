@@ -21,7 +21,7 @@ _
 : ≡
 = → ×
 Π λ Σ
-define axiom
+define axiom rewrite where
 ```
 
 # Parentheses
@@ -66,6 +66,7 @@ module = [ statement ]*
 statement =
     define name param* [ : expr ] ≡ expr
     axiom name param* : expr
+    rewrite name param* where expr ≡ expr
 
 param =
     name

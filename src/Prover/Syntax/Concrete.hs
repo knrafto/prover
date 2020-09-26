@@ -46,6 +46,7 @@ instance HasRange Expr where
 data Decl
   = Define Name [Param] (Maybe Expr) Expr
   | Assume Name [Param] Expr
+  | Rewrite Name [Param] Expr Expr
   deriving (Show)
 
 newtype Module = Module [Decl]

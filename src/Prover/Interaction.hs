@@ -22,6 +22,7 @@ data HighlightKind
   = HighlightVarName
   | HighlightDefName
   | HighlightAxiomName
+  | HighlightRewriteName
   | HighlightUnboundName
   | HighlightHole
   | HighlightType
@@ -32,6 +33,7 @@ instance ToJSON HighlightKind where
     HighlightVarName      -> "var_name"
     HighlightDefName      -> "def_name"
     HighlightAxiomName    -> "axiom_name"
+    HighlightRewriteName  -> "rewrite_name"
     HighlightUnboundName  -> "unbound_name"
     HighlightHole         -> "hole"
     HighlightType         -> "type"
@@ -81,6 +83,11 @@ highlightDecl = \case
   Assume params def ->
     concatMap (highlightParam HighlightVarName) params ++
     highlightParam HighlightAxiomName def
+  Rewrite params def lhs rhs ->
+    concatMap (highlightParam HighlightVarName) params ++
+    highlightParam HighlightRewriteName def ++
+    highlightExpr lhs ++
+    highlightExpr rhs
 
 highlightModule :: Module -> [HighlightedRange]
 highlightModule (Module decls) = concatMap highlightDecl decls

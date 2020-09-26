@@ -38,7 +38,7 @@
         "keywords": {
             "patterns": [
                 {
-                    "match": "(?<![^(),.\\s])(define|axiom)(?![^(),.\\s])",
+                    "match": "(?<![^(),.\\s])(define|axiom|rewrite|where)(?![^(),.\\s])",
                     "name": "keyword.control"
                 }
             ]

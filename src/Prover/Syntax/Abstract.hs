@@ -89,6 +89,7 @@ data Param = Param
 data Decl
   = Define [Param] Param Expr
   | Assume [Param] Param
+  | Rewrite [Param] Param Expr Expr
   deriving (Show)
 
 newtype Module = Module [Decl]

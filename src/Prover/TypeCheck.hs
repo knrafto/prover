@@ -48,15 +48,20 @@ createName (C.Name r t) = do
   return (A.Name id r t)
 
 -- | Add a param to the environment.
-localEnv :: A.Param -> M a -> M a
-localEnv (A.Param n ty _) = local $ \e -> Env
+localParam :: A.Param -> M a -> M a
+localParam (A.Param n ty _) = local $ \e -> Env
   { envVarNames = Just n : envVarNames e
   , envCtx      = envCtx e :> ty
   }
 
+-- | Add a param to the environment.
+localParams :: [A.Param] -> M a -> M a
+localParams []     m = m
+localParams (p:ps) m = localParam p $ localParams ps m
+
 -- | Add an unnamed param to the environment.
-unnamedLocalEnv :: Type -> M a -> M a
-unnamedLocalEnv ty = local $ \e -> Env
+localUnnamed :: Type -> M a -> M a
+localUnnamed ty = local $ \e -> Env
   { envVarNames = Nothing : envVarNames e
   , envCtx      = envCtx e :> ty
   }
@@ -142,7 +147,7 @@ checkExpr expr expectedTy = case expr of
     p' <- checkParam p
 
     -- Γ, x : A ⊢ B : Type
-    e' <- localEnv p' $ checkExpr e Type
+    e' <- localParam p' $ checkExpr e Type
 
     -- ⟹ Γ ⊢ (Π x : A. B) : Type
     let t   = Pi (A.paramType p') (A.exprTerm e')
@@ -154,8 +159,8 @@ checkExpr expr expectedTy = case expr of
     p' <- checkParam p
 
     -- Γ, x : A ⊢ e : B
-    tyB <- localEnv p'  $ createMeta r Type
-    e'  <- localEnv p' $ checkExpr e tyB
+    tyB <- localParam p'  $ createMeta r Type
+    e'  <- localParam p' $ checkExpr e tyB
 
     -- ⟹ Γ ⊢ (λ x : A. e) : (Π x : A. B)
     let t   = Lam (A.exprTerm e')
@@ -171,7 +176,7 @@ checkExpr expr expectedTy = case expr of
     a'  <- checkExpr a tyA
 
     -- Γ ⊢ f : (Π x : A. B)
-    tyB <- unnamedLocalEnv tyA $ createMeta r Type
+    tyB <- localUnnamed tyA $ createMeta r Type
     f'  <- checkExpr f (Pi tyA tyB)
 
     -- ⟹ Γ ⊢ f a : B[a/x]
@@ -223,33 +228,23 @@ checkParam (n, ann) = do
       return (A.exprTerm ty', Just ty')
   return $ A.Param n' ty' ann'
 
--- We apply the telescope of params when checking a definition.
-checkDefine :: [C.Param] -> C.Param -> C.Expr -> M ([A.Param], Ctx, A.Param, A.Expr)
-checkDefine [] def e = do
-  ctx  <- asks envCtx
-  def' <- checkParam def
-  e'   <- checkExpr e (A.paramType def')
-  return ([], ctx, def', e')
-checkDefine (p:ps) def e = do
+checkParams :: [C.Param] -> M [A.Param]
+checkParams [] = return []
+checkParams (p:ps) = do
   p' <- checkParam p
-  (ps', ctx, def', e') <- localEnv p' $ checkDefine ps def e
-  return (p':ps', ctx, def', e')
-
-checkAssume :: [C.Param] -> C.Param -> M ([A.Param], Ctx, A.Param)
-checkAssume [] def = do
-  ctx  <- asks envCtx
-  def' <- checkParam def
-  return ([], ctx, def')
-checkAssume (p:ps) def = do
-  p' <- checkParam p
-  (ps', ctx, def') <- localEnv p' $ checkAssume ps def
-  return (p':ps', ctx, def')
+  ps' <- localParam p' $ checkParams ps
+  return (p':ps')
 
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
   C.Define n params ann e -> do
     debug $ "checking definition" <+> pretty (C.nameText n) <+> "..."
-    (params', ctx, def, e') <- checkDefine params (n, ann) e
+    params' <- checkParams params
+    (ctx, def, e') <- localParams params' $ do
+      ctx <- asks envCtx
+      def <- checkParam (n, ann)
+      e'  <- checkExpr e (A.paramType def)
+      return (ctx, def, e')
     let n' = A.paramName def
         ty = ctxPi ctx (A.exprType e')
         tm = ctxLam ctx (A.exprTerm e')
@@ -260,9 +255,13 @@ checkDecl = \case
       , defTerms    = HashMap.insert (A.nameId n') tm (defTerms s)
       }
     return $ A.Define params' def e'
-  C.Assume n params ann   -> do
+  C.Assume n params ann -> do
     debug $ "checking axiom" <+> pretty (C.nameText n) <+> "..."
-    (params', ctx, def) <- checkAssume params (n, Just ann)
+    params' <- checkParams params
+    (ctx, def) <- localParams params' $ do
+      ctx <- asks envCtx
+      def <- checkParam (n, Just ann)
+      return (ctx, def)
     let n' = A.paramName def
         ty = ctxPi ctx (A.paramType def)
     modify $ \s -> s
@@ -271,6 +270,18 @@ checkDecl = \case
       , axiomTypes  = HashMap.insert (A.nameId n') ty (axiomTypes s)
       }
     return $ A.Assume params' def
+  C.Rewrite n params lhs rhs -> do
+    debug $ "checking rewrite" <+> pretty (C.nameText n) <+> "..."
+    params' <- checkParams params
+    (_, def, lhs', rhs') <- localParams params' $ do
+      ctx  <- asks envCtx
+      def  <- checkParam (n, Nothing)
+      lhs' <- checkExpr lhs (A.paramType def)
+      rhs' <- checkExpr rhs (A.paramType def)
+      return (ctx, def, lhs', rhs')
+    -- TODO: validate LHS pattern
+    -- TODO: add to state
+    return $ A.Rewrite params' def lhs' rhs'
 
 -- TODO: solve constraints after each decl
 checkModule :: C.Module -> M A.Module
