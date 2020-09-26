@@ -37,28 +37,66 @@ assume ℕ-ind : Π C : ℕ → Type. C zero → (Π n. C n → C (suc n)) → �
 -- TODO: infer C of Id-ind in all cases?
 define ap (A : Type) (B : Type) (x : A) (y : A) (f : A → B)
     : x = y → f x = f y
-    ≡ Id-ind A (λ x. λ y. λ p. f x = f y) (λ x. refl B (f x)) x y
+    ≡ Id-ind _ (λ x. λ y. λ p. f x = f y) (λ x. refl B (f x)) x y
 define subst (A : Type) (x : A) (y : A) (B : A → Type)
     : x = y → B x → B y
-    ≡ Id-ind A (λ x. λ y. λ p. B x → B y) (λ x. λ b. b) x y
+    ≡ Id-ind _ (λ x. λ y. λ p. B x → B y) (λ x. λ b. b) x y
 define sym (A : Type) (x : A) (y : A)
     : x = y → y = x
     ≡ Id-ind A (λ x. λ y. λ p. y = x) (λ x. refl A x) x y
 define trans (A : Type) (x : A) (y : A) (z : A)
     : x = y → y = z → x = z
     ≡ λ p : x = y. λ q : y = z.
-        Id-ind A (λ x. λ y : A. λ p : x = y. Π z : A. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
+        Id-ind _ (λ x. λ y : A. λ p : x = y. Π z : A. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
 
 -- Function types.
 define happly (A : Type) (B : Type) (f : A → B) (g : A → B)
     : f = g → Π x : A. f x = g x
-    ≡ Id-ind (A → B) (λ f. λ g. λ p. Π x : A. f x = g x) (λ f. λ x. refl B (f x)) f g
+    ≡ Id-ind _ (λ f. λ g. λ p. Π x : A. f x = g x) (λ f. λ x. refl B (f x)) f g
 
 -- Sets and logic.
 -- define IsContr (A : Type) ≡ Σ a : A. Π x : A. a = x
 define IsProp (A : Type) ≡ Π x : A. Π y : A. x = y
+define IsSet (A : Type) ≡ Π x : A. Π y : A. IsProp (x = y)
+
+-- define fiber (A : Type) (B : Type) (f : A → B) (b : B) ≡ Σ a : A. f a = b
+-- define IsEquiv (A : Type) (B : Type) (f : A → B) ≡ Π b. IsContr (fiber f b)
+assume IsEquiv : Π A. Π B. (A → B) → Type
 
 -- Natural numbers.
 define add
     : ℕ → ℕ → ℕ
     ≡ ℕ-ind _ (λ m. m) (λ n. λ rec. λ m. suc (rec m))
+
+-- Propositional truncation.
+assume Trunc : Type → Type
+assume trunc : Π A. A → Trunc A
+assume Trunc-IsProp : Π A. IsProp (Trunc A)
+assume Trunc-rec : Π A. Π B. IsProp B → (A → B) → Trunc A → B
+-- rewrite Trunc-rec A B B-IsProp f (trunc a) ≡ f a
+
+-- Set-quotients.
+assume Quot : Π A : Type. (A → A → Type) → Type
+assume quot : Π A : Type. Π R : A → A → Type. A → Quot A R
+assume Quot-eq : Π A : Type. Π R : A → A → Type. Π x : A. Π y : A. R x y → quot A R x = quot A R y
+assume Quot-IsSet : Π A : Type. Π R : A → A → Type. IsSet (Quot A R)
+assume Quot-ind : Π A. Π R. Π P : Quot A R → Type. (Π q : Quot A R. IsProp (P q)) → (Π a. P (quot A R a)) → Π q : Quot A R. P q
+-- rewrite Quot-ind A R P P-IsProp f (quot a) = f a
+assume Quot-rec : Π A. Π R. Π B. IsSet B → Π f : A → B. (Π x. Π y. R x y → f x = f y) → Quot A R → B
+-- rewrite Quot-rec A R B B-IsSet f f-eq (quot a) = f a
+
+-- The integers.
+{-
+assume ℤ : Type
+assume zero : ℤ
+assume suc  : ℤ → ℤ
+assume pred : ℤ → ℤ
+assume ℤ-ind : Π P : ℤ → Type. (Π n. IsProp (P n)) → P zero → (Π n. P n → P (suc n)) → (Π n. P n → P (pred n)) → Π n. P n
+-- rewrite ℤ-ind P P-IsProp z s p zero = z
+-- rewrite ℤ-ind P P-IsProp z s p (suc n) = s n (ℤ-ind P P-IsProp z s p n)
+-- rewrite ℤ-ind P P-IsProp z s p (pred n) = p n (ℤ-ind P P-IsProp z s p n)
+assume ℤ-rec : Π A : Type. A → Π f : A → A. IsEquiv A A f → ℤ → A
+-- rewrite ℤ-rec A z f f-IsEquiv zero = z
+-- rewrite ℤ-rec A z f f-IsEquiv (suc n) = f (ℤ-rec A z f f-IsEquiv n)
+-- rewrite ℤ-rec A z f f-IsEquiv (pred n) = inv f (ℤ-rec A z f f-IsEquiv n)
+-}
