@@ -1,12 +1,37 @@
-The core language is based on univalent type theory (see HoTT book).
+The core language is based on dependent type theory (see HoTT book).
 
-# Lexical structure
+# Features
+
+TODO: overview of define and axiom syntax.
+
+## Rewrite rules
+
+To quickly experiment with new types, one can define "rewrite rules" in order to
+postulate new judgemental equalities. For example, the natural numbers are
+postulated as:
+
+```
+axiom ℕ : Type
+axiom zero : ℕ
+axiom suc : ℕ → ℕ
+axiom ℕ-ind : Π C : ℕ → Type. C zero → (Π n. C n → C (suc n)) → Π n. C n
+rewrite ℕ-ind-zero C base step
+    where ℕ-ind C base step zero ≡ base
+rewrite ℕ-ind-suc C base step n
+    where ℕ-ind C base step (suc n) ≡ step n (ℕ-ind C base step n)
+```
+
+The LHS in these rules must be a "pattern": either a parameter, or an axiom
+applied to more patterns. The reduction algorithm will try to replace the LHS
+with the RHS when it appears at the head of a term.
+
+# Syntax
+
+## Lexical structure
 
 Whitespace are space, tab, newline, carriage return, form feed, and vertical
 tab. Line comments start with `--`. Block comments are delimited with `{-` and
-`-}`.
-
-TODO: allow nested block comments.
+`-}`. Block comments may be nested.
 
 The symbols `(`, `)`, `,`, and `.` are "punctuation", and are always
 treated as a token by themselves.
@@ -24,41 +49,7 @@ _
 define axiom rewrite where
 ```
 
-# Parentheses
-
-Parentheses are matched in a "greedy" fashion. Unmatched left parens are
-terminated at EOF; right parens are ignored (and of course these are both
-errors).
-
-# Operators
-
-`= → ×` are operators. From tightest to least tight:
-* = (non-associative)
-* × (right-associative)
-* → (right-associative)
-
-These work by splitting the token stream (not looking inside of parentheses)
-into parts and proceeding on those.
-
-# Binders
-
-`Π λ Σ` are binders, which act like prefix operators. They expect a
-parenthesized group of "params", which are `name : type` pairs.
-
-# Function application
-
-The remaining tokens are atoms
-
-Juxtaposition represents function application, like `f x`. If the argument
-requires parentheses, we write it with no space like `f(x)`.
-
-Multi-argument functions can be written using 
-```
-R : A × A → Type
-R(a, b) ≡ a < b
-```
-
-# Grammar
+## Pseudo-grammar
 
 ```
 module = [ statement ]*
@@ -86,9 +77,3 @@ expr =
     λ name [ : expr ] . binder
     Σ name [ : expr ] . binder
 ```
-
-# Type theory
-
-Dependent type theory. Type : Type for now.
-
-`_` is a "hole" that will be filled in by the compiler.
