@@ -25,6 +25,9 @@ The LHS in these rules must be a "pattern": either a parameter, or an axiom
 applied to more patterns. The reduction algorithm will try to replace the LHS
 with the RHS when it appears at the head of a term.
 
+We only verify that the rewrite rule is correctly typed. We make no attempt to
+verify that the rewrite rules are confluent or terminating.
+
 # Syntax
 
 ## Lexical structure
