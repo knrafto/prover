@@ -4,6 +4,12 @@ The core language is based on dependent type theory (see HoTT book).
 
 TODO: overview of define and axiom syntax.
 
+## Implicit parameters
+
+Implicit parameters are written with curly braces. Currently, implicit
+parameters must come before any explicit ones, so they can be automatically
+filled with holes each time the name is used.
+
 ## Rewrite rules
 
 To quickly experiment with new types, one can define "rewrite rules" in order to
@@ -50,7 +56,7 @@ Whitespace are space, tab, newline, carriage return, form feed, and vertical
 tab. Line comments start with `--`. Block comments are delimited with `{-` and
 `-}`. Block comments may be nested.
 
-The symbols `(`, `)`, `,`, and `.` are "punctuation", and are always
+The symbols `(`, `)`, `{`, `}`, `,`, and `.` are "punctuation", and are always
 treated as a token by themselves.
 
 Any other contiguous sequence of non-whitespace, non-punctuation Unicode
@@ -72,11 +78,17 @@ define axiom rewrite where
 module = [ statement ]*
 
 statement =
-    define name param* [ : expr ] ≡ expr
-    axiom name param* : expr
-    rewrite name param* where expr ≡ expr
+    define name params [ : expr ] ≡ expr
+    axiom name params : expr
+    rewrite name params where expr ≡ expr
 
-param =
+params = implicit_param* explicit_param*
+
+implicit_param =
+    { name }
+    { name : expr }
+
+explicit_param =
     name
     ( name : expr )
 

@@ -52,9 +52,9 @@ createName (C.Name r t) = do
 
 -- | Add a param to the environment.
 localParam :: A.Param -> M a -> M a
-localParam (A.Param n ty _) = local $ \e -> Env
-  { envVarNames = Just n : envVarNames e
-  , envCtx      = envCtx e :> ty
+localParam p = local $ \e -> Env
+  { envVarNames = Just (A.paramName p) : envVarNames e
+  , envCtx      = envCtx e :> A.paramType p
   }
 
 -- | Add a param to the environment.
@@ -220,7 +220,7 @@ checkExpr expr expectedTy = case expr of
 
 -- | Given (x : A), check Γ ⊢ A : Type and construct a param for x.
 checkParam :: C.Param -> M A.Param
-checkParam (n, ann) = do
+checkParam (C.Param implicit n ann) = do
   n' <- createName n
   (ty', ann') <- case ann of
     Nothing -> do
@@ -229,7 +229,7 @@ checkParam (n, ann) = do
     Just ty -> do
       ty' <- checkExpr ty Type
       return (A.exprTerm ty', Just ty')
-  return $ A.Param n' ty' ann'
+  return $ A.Param implicit n' ty' ann'
 
 checkParams :: [C.Param] -> M [A.Param]
 checkParams [] = return []
@@ -251,7 +251,7 @@ checkDecl = \case
     params' <- checkParams params
     (ctx, def, e') <- localParams params' $ do
       ctx <- asks envCtx
-      def <- checkParam (n, ann)
+      def <- checkParam (C.Param Explicit n ann)
       e'  <- checkExpr e (A.paramType def)
       return (ctx, def, e')
     solveConstraints
@@ -270,7 +270,7 @@ checkDecl = \case
     params' <- checkParams params
     (ctx, def) <- localParams params' $ do
       ctx <- asks envCtx
-      def <- checkParam (n, Just ann)
+      def <- checkParam (C.Param Explicit n (Just ann))
       return (ctx, def)
     solveConstraints
     let n' = A.paramName def
@@ -286,7 +286,7 @@ checkDecl = \case
     params' <- checkParams params
     (ctx, def, lhs', rhs') <- localParams params' $ do
       ctx  <- asks envCtx
-      def  <- checkParam (n, Nothing)
+      def  <- checkParam (C.Param Explicit n Nothing)
       lhs' <- checkExpr lhs (A.paramType def)
       rhs' <- checkExpr rhs (A.paramType def)
       return (ctx, def, lhs', rhs')

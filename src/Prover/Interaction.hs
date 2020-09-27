@@ -71,8 +71,8 @@ highlightExpr = \case
   Pair    _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
 
 highlightParam :: HighlightKind -> Param -> [HighlightedRange]
-highlightParam kind (Param n _ ann) =
-  HighlightedRange (nameRange n) kind : foldMap highlightExpr ann
+highlightParam kind p =
+  HighlightedRange (nameRange (paramName p)) kind : foldMap highlightExpr (paramAnnotation p)
 
 highlightDecl :: Decl -> [HighlightedRange]
 highlightDecl = \case

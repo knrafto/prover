@@ -81,11 +81,13 @@ exprType = exprInfoType . exprInfo
 -- | A name that was optionally annotated with a type by the user (but we know
 -- the type now).
 data Param = Param
-  { paramName       :: Name
-  , paramType       :: Type
-  , paramAnnotation :: Maybe Expr
+  { paramImplicitness :: Implicitness
+  , paramName         :: Name
+  , paramType         :: Type
+  , paramAnnotation   :: Maybe Expr
   } deriving (Show)
 
+-- TODO: it doesn't really make sense to use Param for the actual name?
 data Decl
   = Define [Param] Param Expr
   | Assume [Param] Param

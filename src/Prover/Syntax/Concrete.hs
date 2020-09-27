@@ -27,7 +27,11 @@ data Expr
   | Equals  Range Expr Expr
   deriving (Show)
 
-type Param = (Name, Maybe Expr)
+data Param = Param
+  { paramImplicitness :: Implicitness
+  , paramName         :: Name
+  , paramAnnotation   :: Maybe Expr
+  } deriving (Show)
 
 instance HasRange Expr where
   getRange = \case

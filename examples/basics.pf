@@ -1,12 +1,10 @@
 -- Identity types.
 axiom Id : Π A. A → A → Type
-axiom refl A : Π a : A. a = a
-axiom Id-ind A :
-    Π C : (Π a : A. Π b : A. a = b → Type).
-    (Π a. C a a (refl A a)) →
-    Π a. Π b. Π p. C a b p
-rewrite Id-ind-refl A C c a
-    where Id-ind A C c _ _ (refl _ a) ≡ c a
+axiom refl {A} (a : A) : a = a
+axiom Id-ind {A} (C : Π a : A. Π b : A. a = b → Type) (c : Π a. C a a (refl A a))
+    : Π a. Π b. Π p. C a b p
+rewrite Id-ind-refl {A} (C : Π a : A. Π b : A. a = b → Type) c a
+    where Id-ind _ C c _ _ (refl _ a) ≡ c a
 
 -- Empty type.
 axiom 0 : Type
