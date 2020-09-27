@@ -1,4 +1,4 @@
--- Identity types, with based path induction.
+-- Identity types.
 axiom Id : Π A. A → A → Type
 axiom refl A : Π a : A. a = a
 axiom Id-ind A :
