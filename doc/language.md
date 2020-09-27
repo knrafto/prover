@@ -21,12 +21,26 @@ rewrite ℕ-ind-suc C base step n
     where ℕ-ind C base step (suc n) ≡ step n (ℕ-ind C base step n)
 ```
 
-The LHS in these rules must be a "pattern": either a parameter, or an axiom
+The LHS in these rules must be a "pattern": either a parameter name, or an axiom
 applied to more patterns. The reduction algorithm will try to replace the LHS
 with the RHS when it appears at the head of a term.
 
-We only verify that the rewrite rule is correctly typed. We make no attempt to
-verify that the rewrite rules are confluent or terminating.
+The current rewrite rules are very easy to abuse. We make no attempt to verify
+that the rewrite rules are confluent or terminating. If a parameter name appears
+more than once in the pattern (as in the J rule) one is used arbitrarily without
+checking whether the two terms are equal during reduction. For example:
+
+```
+axiom foo : Π A : Type. Π x : A. Π y : A. x = y
+rewrite foo-rule A a
+    where foo A a a = refl A a
+```
+
+Now `foo A a b : a = b` will be rewritten to either `refl A a : a = a` or
+`refl A b : b = b`, both of which have the wrong type.
+
+Despite these dangers, computation rules for most "nice" types can be defined
+safely using rewrite rules.
 
 # Syntax
 
