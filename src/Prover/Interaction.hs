@@ -98,7 +98,9 @@ quote t = "'" ++ Text.unpack t ++ "'"
 -- TODO: Move Error type into Prover.Errors, provide getRange and errorMessage
 diagnoseError :: Error -> Diagnostic
 diagnoseError = \case
-  UnboundName r n       -> Diagnostic r $ "unbound name " ++ quote n
-  TypeError r           -> Diagnostic r $ "type error"
-  UnsolvedConstraint r  -> Diagnostic r $ "unsolved constraint"
-  UnsolvedMeta r _      -> Diagnostic r $ "unsolved meta"
+  UnboundName r n          -> Diagnostic r $ "unbound name " ++ quote n
+  TypeError r              -> Diagnostic r $ "type error"
+  UnsolvedConstraint r     -> Diagnostic r $ "unsolved constraint"
+  UnsolvedMeta r _         -> Diagnostic r $ "unsolved meta"
+  BadPattern r             -> Diagnostic r $ "expression not allowed in pattern"
+  MissingPatternVariable r -> Diagnostic r $ "missing variable in pattern"

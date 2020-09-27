@@ -14,6 +14,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 
+import Prover.Pattern
 import Prover.Syntax.Abstract
 import Prover.Syntax.Internal
 import Prover.Syntax.Position
@@ -29,6 +30,10 @@ data Error
   | UnsolvedConstraint Range
   -- | An unsolved meta.
   | UnsolvedMeta Range MetaId
+  -- | An expression that can't be used as a pattern.
+  | BadPattern Range
+  -- | Some parameter can't be determined by the pattern.
+  | MissingPatternVariable Range
   deriving (Show)
 
 -- | Read-only environment used for local variables.
@@ -75,9 +80,10 @@ data State = State
   , defNames          :: HashMap NameId Name
   , defTypes          :: HashMap NameId Type
   , defTerms          :: HashMap NameId Term
-    -- | Assumptions.
+    -- | Axioms.
   , axiomNames        :: HashMap NameId Name
   , axiomTypes        :: HashMap NameId Type
+  , axiomRules        :: HashMap NameId Rule
     -- | Metavariables.
   , metaRanges        :: HashMap MetaId Range
   , metaTypes         :: HashMap MetaId Type
@@ -102,6 +108,7 @@ initialState = State
   , defTerms          = HashMap.empty
   , axiomNames        = HashMap.empty
   , axiomTypes        = HashMap.empty
+  , axiomRules        = HashMap.empty
   , metaRanges        = HashMap.empty
   , metaTypes         = HashMap.empty
   , metaTerms         = HashMap.empty

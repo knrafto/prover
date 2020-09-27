@@ -19,17 +19,15 @@ data Rule = Rule
 
 -- | A compiled pattern argument.
 data Pattern
-  = VarArg !Int
-  | IgnoreArg
-  | AxiomArg NameId [Pattern]
+  = VarPat !Int
+  | AxiomPat NameId [Pattern]
   deriving (Show)
 
 -- | Collect the vars assigned by a pattern.
 patternVars :: Pattern -> IntSet
 patternVars = \case
-  VarArg i        -> IntSet.singleton i
-  IgnoreArg       -> IntSet.empty
-  AxiomArg _ args -> IntSet.unions (map patternVars args)
+  VarPat i        -> IntSet.singleton i
+  AxiomPat _ args -> IntSet.unions (map patternVars args)
 
 -- | Returns whether a rule can extract all variables in the context.
 matchable :: Rule -> Bool
@@ -40,9 +38,8 @@ matchable rule =
 
 match :: Pattern -> Term -> Maybe (IntMap Term)
 match arg t = case arg of
-  VarArg i         -> Just (IntMap.singleton i t)
-  IgnoreArg        -> Just IntMap.empty
-  AxiomArg id args -> case t of
+  VarPat i         -> Just (IntMap.singleton i t)
+  AxiomPat id args -> case t of
     App (Axiom h) termArgs | h == id && length args == length termArgs ->
       IntMap.unions <$> mapM (uncurry match) (zip args termArgs)
     _ -> Nothing

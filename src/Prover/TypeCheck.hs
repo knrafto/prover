@@ -7,12 +7,15 @@ module Prover.TypeCheck where
 import Control.Monad
 import Control.Monad.Reader.Class
 import Control.Monad.State.Class
+import Control.Monad.Trans
+import Control.Monad.Trans.Maybe
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 import Prettyprinter
 
 import Prover.Monad
+import Prover.Pattern
 import Prover.Pretty
 import Prover.Syntax.Abstract qualified as A
 import Prover.Syntax.Concrete qualified as C
@@ -235,6 +238,12 @@ checkParams (p:ps) = do
   ps' <- localParam p' $ checkParams ps
   return (p':ps')
 
+termToPattern :: Term -> MaybeT M Pattern
+termToPattern t = lift (whnf t) >>= \case
+  App (Var i) []     -> return (VarPat i)
+  App (Axiom i) args -> AxiomPat i <$> mapM termToPattern args
+  _ -> mzero
+
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
   C.Define n params ann e -> do
@@ -245,6 +254,7 @@ checkDecl = \case
       def <- checkParam (n, ann)
       e'  <- checkExpr e (A.paramType def)
       return (ctx, def, e')
+    solveConstraints
     let n' = A.paramName def
         ty = ctxPi ctx (A.exprType e')
         tm = ctxLam ctx (A.exprTerm e')
@@ -262,6 +272,7 @@ checkDecl = \case
       ctx <- asks envCtx
       def <- checkParam (n, Just ann)
       return (ctx, def)
+    solveConstraints
     let n' = A.paramName def
         ty = ctxPi ctx (A.paramType def)
     modify $ \s -> s
@@ -273,21 +284,31 @@ checkDecl = \case
   C.Rewrite n params lhs rhs -> do
     debug $ "checking rewrite" <+> pretty (C.nameText n) <+> "..."
     params' <- checkParams params
-    (_, def, lhs', rhs') <- localParams params' $ do
+    (ctx, def, lhs', rhs') <- localParams params' $ do
       ctx  <- asks envCtx
       def  <- checkParam (n, Nothing)
       lhs' <- checkExpr lhs (A.paramType def)
       rhs' <- checkExpr rhs (A.paramType def)
       return (ctx, def, lhs', rhs')
-    -- TODO: validate LHS pattern
-    -- TODO: add to state
+    solveConstraints
+    runMaybeT (termToPattern (A.exprTerm lhs')) >>= \case
+      Just (AxiomPat h args) -> do
+        let rule = Rule
+              { ruleCtxLength = ctxLength ctx
+              , ruleHead      = h
+              , ruleArgs      = args
+              , ruleRhs       = ctxLam ctx (A.exprTerm rhs')
+              }
+        if matchable rule then
+          -- TODO: validate is matchable
+          modify $ \s -> s
+            { axiomRules = HashMap.insert (ruleHead rule) rule (axiomRules s)
+            }
+        else
+          emitError $ MissingPatternVariable (getRange lhs')
+      _ -> emitError $ BadPattern (getRange lhs')
+
     return $ A.Rewrite params' def lhs' rhs'
 
--- TODO: solve constraints after each decl
 checkModule :: C.Module -> M A.Module
-checkModule (C.Module decls) = do
-   decls' <- forM decls $ \decl -> do
-     decl' <- checkDecl decl
-     solveConstraints
-     return decl'
-   return (A.Module decls')
+checkModule (C.Module decls) = A.Module <$> mapM checkDecl decls
