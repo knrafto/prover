@@ -302,7 +302,7 @@ checkDecl = \case
         if matchable rule then
           -- TODO: validate is matchable
           modify $ \s -> s
-            { axiomRules = HashMap.insert (ruleHead rule) rule (axiomRules s)
+            { axiomRules = HashMap.insertWith (++) (ruleHead rule) [rule] (axiomRules s)
             }
         else
           emitError $ MissingPatternVariable (getRange lhs')

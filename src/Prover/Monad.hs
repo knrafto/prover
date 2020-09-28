@@ -83,7 +83,7 @@ data State = State
     -- | Axioms.
   , axiomNames        :: HashMap NameId Name
   , axiomTypes        :: HashMap NameId Type
-  , axiomRules        :: HashMap NameId Rule
+  , axiomRules        :: HashMap NameId [Rule]
     -- | Metavariables.
   , metaRanges        :: HashMap MetaId Range
   , metaTypes         :: HashMap MetaId Type
