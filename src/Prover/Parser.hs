@@ -46,7 +46,7 @@ name = lexeme . try $ do
     when (w `elem` reservedWords) $ fail
         (  "keyword "
         ++ T.unpack w
-        ++ " is reserved and cgetRangeot be used as a name"
+        ++ " is reserved and cannot be used as a name"
         )
     e <- getPosition
     return (Name (Range s e) w)
