@@ -7,7 +7,7 @@ import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 
-import Prover.Syntax.Internal
+import Prover.Term
 
 -- | A compiled pattern of a rewrite rule.
 data Rule = Rule

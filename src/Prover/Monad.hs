@@ -16,8 +16,8 @@ import Control.Monad.State.Class
 
 import Prover.Pattern
 import Prover.Syntax.Abstract
-import Prover.Syntax.Internal
 import Prover.Syntax.Position
+import Prover.Term
 
 data Error
   -- | A name could not be resolved.

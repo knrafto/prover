@@ -12,7 +12,7 @@ import Prettyprinter
 
 import Prover.Monad
 import Prover.Pretty
-import Prover.Syntax.Internal
+import Prover.Term
 
 -- | Try to solve all constraints.
 solveConstraints :: M ()

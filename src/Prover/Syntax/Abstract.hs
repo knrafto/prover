@@ -6,8 +6,8 @@ module Prover.Syntax.Abstract where
 
 import Data.Text (Text)
 
-import Prover.Syntax.Internal (NameId, Term, Type)
 import Prover.Syntax.Position
+import Prover.Term (NameId, Term, Type)
 
 -- | An occurence of a name.
 data Name = Name

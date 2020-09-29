@@ -10,7 +10,7 @@ import Prettyprinter qualified as PP
 import Prettyprinter.Render.Text
 import Prover.Monad
 import Prover.Syntax.Abstract qualified as A
-import Prover.Syntax.Internal
+import Prover.Term
 
 import Flags qualified
 

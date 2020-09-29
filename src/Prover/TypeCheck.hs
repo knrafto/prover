@@ -19,8 +19,8 @@ import Prover.Pattern
 import Prover.Pretty
 import Prover.Syntax.Abstract qualified as A
 import Prover.Syntax.Concrete qualified as C
-import Prover.Syntax.Internal
 import Prover.Syntax.Position
+import Prover.Term
 import Prover.Unify
 
 -- | Create a metavariable with the given type in the given context.

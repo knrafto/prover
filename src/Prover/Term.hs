@@ -1,5 +1,5 @@
--- | The syntax of the raw type theory.
-module Prover.Syntax.Internal where
+-- | Raw type theory.
+module Prover.Term where
 
 import Data.Hashable
 

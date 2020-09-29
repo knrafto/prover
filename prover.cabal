@@ -31,8 +31,8 @@ executable prover
       Prover.Pretty
       Prover.Syntax.Abstract
       Prover.Syntax.Concrete
-      Prover.Syntax.Internal
       Prover.Syntax.Position
+      Prover.Term
       Prover.TypeCheck
       Prover.Unify
       Flags
