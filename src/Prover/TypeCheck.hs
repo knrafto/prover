@@ -102,6 +102,16 @@ expect r t ty expectedTy = do
   addConstraint r m expectedTy t ty
   return (A.ExprInfo r m expectedTy)
 
+-- | Apply a term to metavariables to fill implicit parameters.
+expandImplicits :: Range -> Int -> Term -> Type -> M (Term, Type)
+expandImplicits _ 0 t ty = return (t, ty)
+expandImplicits r n t ty = do
+  (a, b) <- case ty of
+    Pi a b -> return (a, b)
+    _ -> error "expandImplicits: not a Π-type"
+  arg <- createMeta r a
+  expandImplicits r (n - 1) (applyTerm t [arg]) (instantiate b arg)
+
 -- | Producing a judgement Γ ⊢ t : A.
 checkExpr :: C.Expr -> Type -> M A.Expr
 checkExpr expr expectedTy = case expr of
@@ -120,16 +130,20 @@ checkExpr expr expectedTy = case expr of
 
       _ | Just id <- HashMap.lookup s (globalNames state)
         , Just ty <- HashMap.lookup id (defTypes state) -> do
-          let t    = App (Def id) []
-              n'   = A.Name id r s
-          i <- expect r t ty expectedTy
+          implicits <- getState id defImplicits
+          let n' = A.Name id r s
+              t  = App (Def id) []
+          (t', ty') <- expandImplicits r implicits t ty
+          i <- expect r t' ty' expectedTy
           return $ A.Def i n'
 
       _ | Just id <- HashMap.lookup s (globalNames state)
         , Just ty <- HashMap.lookup id (axiomTypes state) -> do
-          let t    = App (Axiom id) []
-              n'   = A.Name id r s
-          i <- expect r t ty expectedTy
+          implicits <- getState id axiomImplicits
+          let n' = A.Name id r s
+              t  = App (Axiom id) []
+          (t', ty') <- expandImplicits r implicits t ty
+          i <- expect r t' ty' expectedTy
           return $ A.Axiom i n'
 
       _ -> do

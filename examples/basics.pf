@@ -1,10 +1,10 @@
 -- Identity types.
 axiom Id : Π A. A → A → Type
 axiom refl {A} (a : A) : a = a
-axiom Id-ind {A} (C : Π a : A. Π b : A. a = b → Type) (c : Π a. C a a (refl A a))
+axiom Id-ind {A} (C : Π a : A. Π b : A. a = b → Type) (c : Π a. C a a (refl a))
     : Π a. Π b. Π p. C a b p
 rewrite Id-ind-refl {A} (C : Π a : A. Π b : A. a = b → Type) c a
-    where Id-ind _ C c _ _ (refl _ a) ≡ c a
+    where Id-ind C c _ _ (refl a) ≡ c a
 
 -- Empty type.
 axiom 0 : Type
@@ -38,22 +38,22 @@ rewrite ℕ-ind-suc C base step n
 -- TODO: infer C of Id-ind in all cases?
 define ap (A : Type) (B : Type) (x : A) (y : A) (f : A → B)
     : x = y → f x = f y
-    ≡ Id-ind _ (λ x. λ y. λ p. f x = f y) (λ x. refl B (f x)) x y
+    ≡ Id-ind (λ x. λ y. λ p. f x = f y) (λ x. refl (f x)) x y
 define subst (A : Type) (x : A) (y : A) (B : A → Type)
     : x = y → B x → B y
-    ≡ Id-ind _ (λ x. λ y. λ p. B x → B y) (λ x. λ b. b) x y
+    ≡ Id-ind (λ x. λ y. λ p. B x → B y) (λ x. λ b. b) x y
 define sym (A : Type) (x : A) (y : A)
     : x = y → y = x
-    ≡ Id-ind A (λ x. λ y. λ p. y = x) (λ x. refl A x) x y
+    ≡ Id-ind (λ x. λ y. λ p. y = x) (λ x. refl x) x y
 define trans (A : Type) (x : A) (y : A) (z : A)
     : x = y → y = z → x = z
     ≡ λ p : x = y. λ q : y = z.
-        Id-ind _ (λ x. λ y : A. λ p : x = y. Π z : A. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
+        Id-ind (λ x. λ y : A. λ p : x = y. Π z : A. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
 
 -- Function types.
 define happly (A : Type) (B : Type) (f : A → B) (g : A → B)
     : f = g → Π x : A. f x = g x
-    ≡ Id-ind _ (λ f. λ g. λ p. Π x : A. f x = g x) (λ f. λ x. refl B (f x)) f g
+    ≡ Id-ind (λ f. λ g. λ p. Π x : A. f x = g x) (λ f. λ x. refl (f x)) f g
 
 -- Sets and logic.
 -- define IsContr (A : Type) ≡ Σ a : A. Π x : A. a = x
