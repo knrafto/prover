@@ -42,8 +42,7 @@ instance HasRange Expr where
     Pair    r _ _ -> r
 
 data Param = Param
-  { paramImplicitness :: Implicitness
-  , paramName         :: Name
+  { paramName         :: Name
   , paramAnnotation   :: Maybe Expr
   } deriving (Show)
 
@@ -52,8 +51,8 @@ instance HasRange Param where
   getRange = getRange . paramName
 
 data Decl
-  = Define Name [Param] (Maybe Expr) Expr
-  | Assume Name [Param] Expr
+  = Define Name [Param] [Param] (Maybe Expr) Expr
+  | Assume Name [Param] [Param] Expr
   | Rewrite Name [Param] Expr Expr
   deriving (Show)
 

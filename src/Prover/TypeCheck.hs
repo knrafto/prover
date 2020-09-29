@@ -234,7 +234,7 @@ checkExpr expr expectedTy = case expr of
 
 -- | Given (x : A), check Γ ⊢ A : Type and construct a param for x.
 checkParam :: C.Param -> M A.Param
-checkParam (C.Param implicit n ann) = do
+checkParam (C.Param n ann) = do
   n' <- createName n
   (ty', ann') <- case ann of
     Nothing -> do
@@ -243,7 +243,7 @@ checkParam (C.Param implicit n ann) = do
     Just ty -> do
       ty' <- checkExpr ty Type
       return (A.exprTerm ty', Just ty')
-  return $ A.Param implicit n' ty' ann'
+  return $ A.Param n' ty' ann'
 
 checkParams :: [C.Param] -> M [A.Param]
 checkParams [] = return []
@@ -258,55 +258,42 @@ termToPattern t = lift (whnf t) >>= \case
   App (Axiom i) args -> AxiomPat i <$> mapM termToPattern args
   _ -> mzero
 
--- | Count the number of implicit parameters, and error if there are any
--- implicit parameters that aren't at the beginning.
-validateImplicitParams :: [A.Param] -> M Int
-validateImplicitParams ps = do
-  let (implicits, rest) = span isImplicit ps
-  forM_ (filter isImplicit rest) $ \p ->
-    emitError $ LateImplicitParam (getRange p) p
-  return $ length implicits
-  where
-    isImplicit p = A.paramImplicitness p == Implicit
-
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
-  C.Define n params ann e -> do
+  C.Define n implicits explicits ann e -> do
     debug $ "checking definition" <+> pretty (C.nameText n) <+> "..."
-    params' <- checkParams params
+    params' <- checkParams (implicits ++ explicits)
     (ctx, def, e') <- localParams params' $ do
       ctx <- asks envCtx
-      def <- checkParam (C.Param Explicit n ann)
+      def <- checkParam (C.Param n ann)
       e'  <- checkExpr e (A.paramType def)
       return (ctx, def, e')
     solveConstraints
     let n' = A.paramName def
         ty = ctxPi ctx (A.exprType e')
         tm = ctxLam ctx (A.exprTerm e')
-    implicits <- validateImplicitParams params'
     modify $ \s -> s
       { globalNames  = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , defNames     = HashMap.insert (A.nameId n') n' (defNames s)
-      , defImplicits = HashMap.insert (A.nameId n') implicits (defImplicits s)
+      , defImplicits = HashMap.insert (A.nameId n') (length implicits) (defImplicits s)
       , defTypes     = HashMap.insert (A.nameId n') ty (defTypes s)
       , defTerms     = HashMap.insert (A.nameId n') tm (defTerms s)
       }
     return $ A.Define params' def e'
-  C.Assume n params ann -> do
+  C.Assume n implicits explicits ann -> do
     debug $ "checking axiom" <+> pretty (C.nameText n) <+> "..."
-    params' <- checkParams params
+    params' <- checkParams (implicits ++ explicits)
     (ctx, def) <- localParams params' $ do
       ctx <- asks envCtx
-      def <- checkParam (C.Param Explicit n (Just ann))
+      def <- checkParam (C.Param n (Just ann))
       return (ctx, def)
     solveConstraints
     let n' = A.paramName def
         ty = ctxPi ctx (A.paramType def)
-    implicits <- validateImplicitParams params'
     modify $ \s -> s
       { globalNames    = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , axiomNames     = HashMap.insert (A.nameId n') n' (axiomNames s)
-      , axiomImplicits = HashMap.insert (A.nameId n') implicits (axiomImplicits s)
+      , axiomImplicits = HashMap.insert (A.nameId n') (length implicits) (axiomImplicits s)
       , axiomTypes     = HashMap.insert (A.nameId n') ty (axiomTypes s)
       }
     return $ A.Assume params' def
@@ -315,7 +302,7 @@ checkDecl = \case
     params' <- checkParams params
     (ctx, def, lhs', rhs') <- localParams params' $ do
       ctx  <- asks envCtx
-      def  <- checkParam (C.Param Explicit n Nothing)
+      def  <- checkParam (C.Param n Nothing)
       lhs' <- checkExpr lhs (A.paramType def)
       rhs' <- checkExpr rhs (A.paramType def)
       return (ctx, def, lhs', rhs')

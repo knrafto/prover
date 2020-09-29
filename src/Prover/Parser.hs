@@ -75,8 +75,14 @@ symbol c = lexeme $ do
     _ <- char c
     Range s <$> getPosition
 
-binderParam :: Parser Param
-binderParam = Param Explicit <$> name <*> optional (reservedWord ":" *> expr)
+implicitParam :: Parser Param
+implicitParam = Param <$ symbol '{' <*> name <*> optional (reservedWord ":" *> expr) <* symbol '}'
+
+explicitParam :: Parser Param
+explicitParam = annotated <|> bare
+  where
+    annotated = Param <$ symbol '(' <*> name <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
+    bare      = (\n -> Param n Nothing) <$> name
 
 atom :: Parser Expr
 atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
@@ -91,19 +97,19 @@ atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
         return e
     pi_ = do
         s <- reservedWord "Π"
-        p <- binderParam
+        p <- explicitParam
         _ <- symbol '.'
         e <- expr
         return (Pi (rangeSpan s (getRange e)) p e)
     lam = do
         s <- reservedWord "λ"
-        p <- binderParam
+        p <- explicitParam
         _ <- symbol '.'
         e <- expr
         return (Lam (rangeSpan s (getRange e)) p e)
     sigma = do
         s <- reservedWord "Σ"
-        p <- binderParam
+        p <- explicitParam
         _ <- symbol '.'
         e <- expr
         return (Sigma (rangeSpan s (getRange e)) p e)
@@ -129,23 +135,12 @@ expr = makeExprParser
     ]
     where binop c e1 e2 = c (rangeSpan (getRange e1) (getRange e2)) e1 e2
 
-implicitParam :: Parser Param
-implicitParam = Param Implicit <$ symbol '{' <*> name <*> optional (reservedWord ":" *> expr) <* symbol '}'
-
-explicitParam :: Parser Param
-explicitParam = annotated <|> bare
-  where
-    annotated = Param Explicit <$ symbol '(' <*> name <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
-    bare      = (\n -> Param Explicit n Nothing) <$> name
-
-params :: Parser [Param]
-params = many (implicitParam <|> explicitParam)
-
 define :: Parser Decl
 define = Define
     <$  reservedWord "define"
     <*> name
-    <*> params
+    <*> many implicitParam
+    <*> many explicitParam
     <*> optional (reservedWord ":" *> expr)
     <*  reservedWord "≡"
     <*> expr
@@ -154,7 +149,8 @@ axiom :: Parser Decl
 axiom = Assume
     <$  reservedWord "axiom"
     <*> name
-    <*> params
+    <*> many implicitParam
+    <*> many explicitParam
     <*  reservedWord ":"
     <*> expr
 
@@ -162,7 +158,7 @@ rewrite :: Parser Decl
 rewrite = Rewrite
     <$  reservedWord "rewrite"
     <*> name
-    <*> params
+    <*> many explicitParam
     <*  reservedWord "where"
     <*> expr
     <*  reservedWord "≡"

@@ -81,8 +81,7 @@ exprType = exprInfoType . exprInfo
 -- | A name that was optionally annotated with a type by the user (but we know
 -- the type now).
 data Param = Param
-  { paramImplicitness :: Implicitness
-  , paramName         :: Name
+  { paramName         :: Name
   , paramType         :: Type
   , paramAnnotation   :: Maybe Expr
   } deriving (Show)

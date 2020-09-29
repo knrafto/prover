@@ -1,26 +1,26 @@
 -- Identity types.
 axiom Id : Π A. A → A → Type
 axiom refl {A} (a : A) : a = a
-axiom Id-ind {A} (C : Π a : A. Π b : A. a = b → Type) (c : Π a. C a a (refl a))
+axiom Id-ind {A} (C : Π (a : A). Π (b : A). a = b → Type) (c : Π a. C a a (refl a))
     : Π a. Π b. Π p. C a b p
-rewrite Id-ind-refl {A} (C : Π a : A. Π b : A. a = b → Type) c a
+rewrite Id-ind-refl A (C : Π (a : A). Π (b : A). a = b → Type) c a
     where Id-ind C c _ _ (refl a) ≡ c a
 
 -- Empty type.
 axiom 0 : Type
-axiom 0-ind : Π C : 0 → Type. Π a. C a
+axiom 0-ind : Π (C : 0 → Type). Π a. C a
 
 -- Unit type.
 axiom 1 : Type
 axiom tt : 1
-axiom 1-ind : Π C : 1 → Type. C tt → Π a. C a
+axiom 1-ind : Π (C : 1 → Type). C tt → Π a. C a
 rewrite 1-ind-tt C c where 1-ind C c tt ≡ c
 
 -- Boolean type.
 axiom 2 : Type
 axiom 0₂ : 2
 axiom 1₂ : 2
-axiom 2-ind : Π C : 2 → Type. C 0₂ → C 1₂ → Π a. C a
+axiom 2-ind : Π (C : 2 → Type). C 0₂ → C 1₂ → Π a. C a
 rewrite 2-ind-0₂ C c₀ c₁ where 2-ind C c₀ c₁ 0₂ ≡ c₀
 rewrite 2-ind-1₂ C c₀ c₁ where 2-ind C c₀ c₁ 1₂ ≡ c₁
 
@@ -28,7 +28,7 @@ rewrite 2-ind-1₂ C c₀ c₁ where 2-ind C c₀ c₁ 1₂ ≡ c₁
 axiom ℕ : Type
 axiom zero : ℕ
 axiom suc : ℕ → ℕ
-axiom ℕ-ind : Π C : ℕ → Type. C zero → (Π n. C n → C (suc n)) → Π n. C n
+axiom ℕ-ind : Π (C : ℕ → Type). C zero → (Π n. C n → C (suc n)) → Π n. C n
 rewrite ℕ-ind-zero C base step
     where ℕ-ind C base step zero ≡ base
 rewrite ℕ-ind-suc C base step n
@@ -47,18 +47,18 @@ define sym (A : Type) (x : A) (y : A)
     ≡ Id-ind (λ x. λ y. λ p. y = x) (λ x. refl x) x y
 define trans (A : Type) (x : A) (y : A) (z : A)
     : x = y → y = z → x = z
-    ≡ λ p : x = y. λ q : y = z.
-        Id-ind (λ x. λ y : A. λ p : x = y. Π z : A. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
+    ≡ λ (p : x = y). λ (q : y = z).
+        Id-ind (λ x. λ y. λ p. Π z. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
 
 -- Function types.
 define happly (A : Type) (B : Type) (f : A → B) (g : A → B)
-    : f = g → Π x : A. f x = g x
-    ≡ Id-ind (λ f. λ g. λ p. Π x : A. f x = g x) (λ f. λ x. refl (f x)) f g
+    : f = g → Π x. f x = g x
+    ≡ Id-ind (λ f. λ g. λ p. Π x. f x = g x) (λ f. λ x. refl (f x)) f g
 
 -- Sets and logic.
 -- define IsContr (A : Type) ≡ Σ a : A. Π x : A. a = x
-define IsProp (A : Type) ≡ Π x : A. Π y : A. x = y
-define IsSet (A : Type) ≡ Π x : A. Π y : A. IsProp (x = y)
+define IsProp (A : Type) ≡ Π (x : A). Π (y : A). x = y
+define IsSet  (A : Type) ≡ Π (x : A). Π (y : A). IsProp (x = y)
 
 -- define fiber (A : Type) (B : Type) (f : A → B) (b : B) ≡ Σ a : A. f a = b
 -- define IsEquiv (A : Type) (B : Type) (f : A → B) ≡ Π b. IsContr (fiber f b)
@@ -78,14 +78,14 @@ rewrite Trunc-rec-trunc A B B-IsProp f a
     where Trunc-rec A B B-IsProp f (trunc _ a) ≡ f a
 
 -- Set-quotients.
-axiom Quot : Π A : Type. (A → A → Type) → Type
-axiom quot : Π A : Type. Π R : A → A → Type. A → Quot A R
-axiom Quot-= : Π A : Type. Π R : A → A → Type. Π x : A. Π y : A. R x y → quot A R x = quot A R y
-axiom Quot-IsSet : Π A : Type. Π R : A → A → Type. IsSet (Quot A R)
-axiom Quot-ind : Π A. Π R. Π P : Quot A R → Type. (Π q : Quot A R. IsProp (P q)) → (Π a. P (quot A R a)) → Π q : Quot A R. P q
+axiom Quot : Π (A : Type). (A → A → Type) → Type
+axiom quot : Π (A : Type). Π (R : A → A → Type). A → Quot A R
+axiom Quot-= : Π (A : Type). Π (R : A → A → Type). Π (x : A). Π (y : A). R x y → quot A R x = quot A R y
+axiom Quot-IsSet : Π (A : Type). Π (R : A → A → Type). IsSet (Quot A R)
+axiom Quot-ind : Π A. Π R. Π (P : Quot A R → Type). (Π (q : Quot A R). IsProp (P q)) → (Π a. P (quot A R a)) → Π q. P q
 rewrite Quot-ind-quot A R P P-IsProp f a
     where Quot-ind A R P P-IsProp f (quot _ _ a) ≡ f a
-axiom Quot-rec : Π A. Π R. Π B. IsSet B → Π f : A → B. (Π x. Π y. R x y → f x = f y) → Quot A R → B
+axiom Quot-rec : Π A. Π R. Π B. IsSet B → Π (f : A → B). (Π x. Π y. R x y → f x = f y) → Quot A R → B
 rewrite Quot-rec-quote A R B B-IsSet f f-= a
     where Quot-rec A R B B-IsSet f f-= (quot _ _ a) ≡ f a
 
@@ -94,14 +94,14 @@ axiom ℤ : Type
 axiom zero : ℤ
 axiom suc  : ℤ → ℤ
 axiom pred : ℤ → ℤ
-axiom ℤ-ind : Π P : ℤ → Type. (Π n. IsProp (P n)) → P zero → (Π n. P n → P (suc n)) → (Π n. P n → P (pred n)) → Π n. P n
+axiom ℤ-ind : Π (P : ℤ → Type). (Π n. IsProp (P n)) → P zero → (Π n. P n → P (suc n)) → (Π n. P n → P (pred n)) → Π n. P n
 rewrite ℤ-ind-zero P P-IsProp z s p
     where ℤ-ind P P-IsProp z s p zero ≡ z
 rewrite ℤ-ind-suc P P-IsProp z s p n
     where ℤ-ind P P-IsProp z s p (suc n) ≡ s n (ℤ-ind P P-IsProp z s p n)
 rewrite ℤ-ind-pred P P-IsProp z s p n
     where ℤ-ind P P-IsProp z s p (pred n) ≡ p n (ℤ-ind P P-IsProp z s p n)
-axiom ℤ-rec : Π A : Type. A → Π f : A → A. IsEquiv A A f → ℤ → A
+axiom ℤ-rec : Π (A : Type). A → Π (f : A → A). IsEquiv A A f → ℤ → A
 rewrite ℤ-rec-zero A z f f-IsEquiv
     where ℤ-rec A z f f-IsEquiv zero ≡ z
 rewrite ℤ-rec-suc A z f f-IsEquiv n

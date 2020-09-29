@@ -43,7 +43,3 @@ rangeSpan (Range s _) (Range _ e) = Range s e
 
 class HasRange a where
   getRange :: a -> Range
-
--- TODO: this should go in a "common syntax" module.
-data Implicitness = Implicit | Explicit
-  deriving (Eq, Show)

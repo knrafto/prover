@@ -102,7 +102,7 @@ expr =
     expr × expr
     expr → expr
     expr , expr
-    Π name [ : expr ] . binder
-    λ name [ : expr ] . binder
-    Σ name [ : expr ] . binder
+    Π explicit_param . binder
+    λ explicit_param . binder
+    Σ explicit_param . binder
 ```
