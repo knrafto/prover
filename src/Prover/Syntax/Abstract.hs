@@ -42,9 +42,9 @@ data Expr
   | Unbound ExprInfo Text  -- ^ An unbound name.
   | Hole    ExprInfo       -- ^ An underscore hole.
   | Type    ExprInfo
-  | Pi      ExprInfo Param Expr
-  | Lam     ExprInfo Param Expr
-  | Sigma   ExprInfo Param Expr
+  | Pi      ExprInfo [ParamGroup] Expr
+  | Lam     ExprInfo [ParamGroup] Expr
+  | Sigma   ExprInfo [ParamGroup] Expr
   | App     ExprInfo Expr Expr
   | Arrow   ExprInfo Expr Expr
   | Times   ExprInfo Expr Expr
@@ -81,20 +81,22 @@ exprType = exprInfoType . exprInfo
 -- | A name that was optionally annotated with a type by the user (but we know
 -- the type now).
 data Param = Param
-  { paramName         :: Name
-  , paramType         :: Type
-  , paramAnnotation   :: Maybe Expr
+  { paramName :: Name
+  , paramType :: Type
   } deriving (Show)
 
 instance HasRange Param where
   -- TODO: store full range including annotation (and parens)?
   getRange = getRange . paramName
 
+data ParamGroup = ParamGroup [Param] (Maybe Expr)
+  deriving (Show)
+
 -- TODO: it doesn't really make sense to use Param for the actual name?
 data Decl
-  = Define [Param] Param Expr
-  | Assume [Param] Param
-  | Rewrite [Param] Param Expr Expr
+  = Define [ParamGroup] Param (Maybe Expr) Expr
+  | Assume [ParamGroup] Param Expr
+  | Rewrite [ParamGroup] Param Expr Expr
   deriving (Show)
 
 newtype Module = Module [Decl]

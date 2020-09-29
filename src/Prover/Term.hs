@@ -129,10 +129,14 @@ ctxPi :: Ctx -> Type -> Type
 ctxPi C0          t = t
 ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
 
+-- | Add n lambdas to a term.
+makeLam :: Int -> Term -> Term
+makeLam 0 t = t
+makeLam n t = makeLam (n - 1) (Lam t)
+
 -- | Construct a lambda out of a context with the given body.
 ctxLam :: Ctx -> Term -> Term
-ctxLam C0         t = t
-ctxLam (ctx :> _) t = ctxLam ctx (Lam t)
+ctxLam ctx = makeLam (ctxLength ctx)
 
 -- | Returns all the bound variables of a context, in the same order as ctxPi
 -- e.g. v₃ v₂ v₁ v₀.

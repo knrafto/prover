@@ -78,19 +78,21 @@ define axiom rewrite where
 module = [ statement ]*
 
 statement =
-    define name params [ : expr ] ≡ expr
-    axiom name params : expr
-    rewrite name params where expr ≡ expr
+    define name implicit_params explicit_params [ : expr ] ≡ expr
+    axiom name implicit_params explicit_params : expr
+    rewrite name explicit_params where expr ≡ expr
 
-params = implicit_param* explicit_param*
+implicit_params = implicit_param_group*
 
-implicit_param =
+implicit_param_group =
     { name }
-    { name : expr }
+    { name+ : expr }
 
-explicit_param =
+explicit_params = explicit_param_group*
+
+explicit_param_group =
     name
-    ( name : expr )
+    ( name+ : expr )
 
 expr =
     _
@@ -102,7 +104,7 @@ expr =
     expr × expr
     expr → expr
     expr , expr
-    Π explicit_param . binder
-    λ explicit_param . binder
-    Σ explicit_param . binder
+    Π explicit_params . binder
+    λ explicit_params . binder
+    Σ explicit_params . binder
 ```

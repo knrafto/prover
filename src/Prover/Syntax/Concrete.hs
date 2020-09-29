@@ -17,9 +17,9 @@ data Expr
   = Id      Name
   | Hole    Range
   | Type    Range
-  | Pi      Range Param Expr
-  | Lam     Range Param Expr
-  | Sigma   Range Param Expr
+  | Pi      Range [ParamGroup] Expr
+  | Lam     Range [ParamGroup] Expr
+  | Sigma   Range [ParamGroup] Expr
   | App     Range Expr Expr
   | Arrow   Range Expr Expr
   | Times   Range Expr Expr
@@ -41,19 +41,13 @@ instance HasRange Expr where
     Equals  r _ _ -> r
     Pair    r _ _ -> r
 
-data Param = Param
-  { paramName         :: Name
-  , paramAnnotation   :: Maybe Expr
-  } deriving (Show)
-
-instance HasRange Param where
-  -- TODO: store full range including annotation (and parens)?
-  getRange = getRange . paramName
+data ParamGroup = ParamGroup [Name] (Maybe Expr)
+  deriving (Show)
 
 data Decl
-  = Define Name [Param] [Param] (Maybe Expr) Expr
-  | Assume Name [Param] [Param] Expr
-  | Rewrite Name [Param] Expr Expr
+  = Define Name [ParamGroup] [ParamGroup] (Maybe Expr) Expr
+  | Assume Name [ParamGroup] [ParamGroup] Expr
+  | Rewrite Name [ParamGroup] Expr Expr
   deriving (Show)
 
 newtype Module = Module [Decl]

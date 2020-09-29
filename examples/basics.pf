@@ -1,9 +1,9 @@
 -- Identity types.
 axiom Id : Π A. A → A → Type
 axiom refl {A} (a : A) : a = a
-axiom Id-ind {A} (C : Π (a : A). Π (b : A). a = b → Type) (c : Π a. C a a (refl a))
-    : Π a. Π b. Π p. C a b p
-rewrite Id-ind-refl A (C : Π (a : A). Π (b : A). a = b → Type) c a
+axiom Id-ind {A} (C : Π (a b : A). a = b → Type) (c : Π a. C a a (refl a))
+    : Π a b p. C a b p
+rewrite Id-ind-refl A (C : Π (a b : A). a = b → Type) c a
     where Id-ind C c _ _ (refl a) ≡ c a
 
 -- Empty type.
@@ -36,56 +36,56 @@ rewrite ℕ-ind-suc C base step n
 
 -- Structure of identity types.
 -- TODO: infer C of Id-ind in all cases?
-define ap (A : Type) (B : Type) (x : A) (y : A) (f : A → B)
+define ap (A B : Type) (x y : A) (f : A → B)
     : x = y → f x = f y
-    ≡ Id-ind (λ x. λ y. λ p. f x = f y) (λ x. refl (f x)) x y
-define subst (A : Type) (x : A) (y : A) (B : A → Type)
+    ≡ Id-ind (λ x y p. f x = f y) (λ x. refl (f x)) x y
+define subst (A : Type) (x y : A) (B : A → Type)
     : x = y → B x → B y
-    ≡ Id-ind (λ x. λ y. λ p. B x → B y) (λ x. λ b. b) x y
-define sym (A : Type) (x : A) (y : A)
+    ≡ Id-ind (λ x y p. B x → B y) (λ x b. b) x y
+define sym (A : Type) (x y : A)
     : x = y → y = x
-    ≡ Id-ind (λ x. λ y. λ p. y = x) (λ x. refl x) x y
-define trans (A : Type) (x : A) (y : A) (z : A)
+    ≡ Id-ind (λ x y p. y = x) (λ x. refl x) x y
+define trans (A : Type) (x y z : A)
     : x = y → y = z → x = z
     ≡ λ (p : x = y). λ (q : y = z).
-        Id-ind (λ x. λ y. λ p. Π z. y = z → x = z) (λ x. λ z. λ p. p) x y p z q
+        Id-ind (λ x y p. Π z. y = z → x = z) (λ x z p. p) x y p z q
 
 -- Function types.
-define happly (A : Type) (B : Type) (f : A → B) (g : A → B)
+define happly (A B : Type) (f g : A → B)
     : f = g → Π x. f x = g x
-    ≡ Id-ind (λ f. λ g. λ p. Π x. f x = g x) (λ f. λ x. refl (f x)) f g
+    ≡ Id-ind (λ f g p. Π x. f x = g x) (λ f x. refl (f x)) f g
 
 -- Sets and logic.
 -- define IsContr (A : Type) ≡ Σ a : A. Π x : A. a = x
-define IsProp (A : Type) ≡ Π (x : A). Π (y : A). x = y
-define IsSet  (A : Type) ≡ Π (x : A). Π (y : A). IsProp (x = y)
+define IsProp (A : Type) ≡ Π (x y : A). x = y
+define IsSet  (A : Type) ≡ Π (x y : A). IsProp (x = y)
 
--- define fiber (A : Type) (B : Type) (f : A → B) (b : B) ≡ Σ a : A. f a = b
--- define IsEquiv (A : Type) (B : Type) (f : A → B) ≡ Π b. IsContr (fiber f b)
-axiom IsEquiv (A : Type) (B : Type) (f : A → B) : Type
+-- define fiber (A B : Type) (f : A → B) (b : B) ≡ Σ a : A. f a = b
+-- define IsEquiv (A B : Type) (f : A → B) ≡ Π b. IsContr (fiber f b)
+axiom IsEquiv (A B : Type) (f : A → B) : Type
 
 -- Natural numbers.
 define add
     : ℕ → ℕ → ℕ
-    ≡ ℕ-ind _ (λ m. m) (λ n. λ rec. λ m. suc (rec m))
+    ≡ ℕ-ind _ (λ m. m) (λ n rec m. suc (rec m))
 
 -- Propositional truncation.
 axiom Trunc : Type → Type
 axiom trunc : Π A. A → Trunc A
 axiom Trunc-IsProp : Π A. IsProp (Trunc A)
-axiom Trunc-rec : Π A. Π B. IsProp B → (A → B) → Trunc A → B
+axiom Trunc-rec : Π A B. IsProp B → (A → B) → Trunc A → B
 rewrite Trunc-rec-trunc A B B-IsProp f a
     where Trunc-rec A B B-IsProp f (trunc _ a) ≡ f a
 
 -- Set-quotients.
 axiom Quot : Π (A : Type). (A → A → Type) → Type
-axiom quot : Π (A : Type). Π (R : A → A → Type). A → Quot A R
-axiom Quot-= : Π (A : Type). Π (R : A → A → Type). Π (x : A). Π (y : A). R x y → quot A R x = quot A R y
-axiom Quot-IsSet : Π (A : Type). Π (R : A → A → Type). IsSet (Quot A R)
-axiom Quot-ind : Π A. Π R. Π (P : Quot A R → Type). (Π (q : Quot A R). IsProp (P q)) → (Π a. P (quot A R a)) → Π q. P q
+axiom quot : Π (A : Type) (R : A → A → Type). A → Quot A R
+axiom Quot-= : Π (A : Type) (R : A → A → Type) (x y : A). R x y → quot A R x = quot A R y
+axiom Quot-IsSet : Π (A : Type) (R : A → A → Type). IsSet (Quot A R)
+axiom Quot-ind : Π A R (P : Quot A R → Type). (Π (q : Quot A R). IsProp (P q)) → (Π a. P (quot A R a)) → Π q. P q
 rewrite Quot-ind-quot A R P P-IsProp f a
     where Quot-ind A R P P-IsProp f (quot _ _ a) ≡ f a
-axiom Quot-rec : Π A. Π R. Π B. IsSet B → Π (f : A → B). (Π x. Π y. R x y → f x = f y) → Quot A R → B
+axiom Quot-rec : Π A R B. IsSet B → Π (f : A → B). (Π x. Π y. R x y → f x = f y) → Quot A R → B
 rewrite Quot-rec-quote A R B B-IsSet f f-= a
     where Quot-rec A R B B-IsSet f f-= (quot _ _ a) ≡ f a
 
