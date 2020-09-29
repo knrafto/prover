@@ -46,4 +46,4 @@ class HasRange a where
 
 -- TODO: this should go in a "common syntax" module.
 data Implicitness = Implicit | Explicit
-  deriving (Show)
+  deriving (Eq, Show)

@@ -244,6 +244,17 @@ termToPattern t = lift (whnf t) >>= \case
   App (Axiom i) args -> AxiomPat i <$> mapM termToPattern args
   _ -> mzero
 
+-- | Count the number of implicit parameters, and error if there are any
+-- implicit parameters that aren't at the beginning.
+validateImplicitParams :: [A.Param] -> M Int
+validateImplicitParams ps = do
+  let (implicits, rest) = span isImplicit ps
+  forM_ (filter isImplicit rest) $ \p ->
+    emitError $ LateImplicitParam (getRange p) p
+  return $ length implicits
+  where
+    isImplicit p = A.paramImplicitness p == Implicit
+
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
   C.Define n params ann e -> do
@@ -258,11 +269,13 @@ checkDecl = \case
     let n' = A.paramName def
         ty = ctxPi ctx (A.exprType e')
         tm = ctxLam ctx (A.exprTerm e')
+    implicits <- validateImplicitParams params'
     modify $ \s -> s
-      { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
-      , defNames    = HashMap.insert (A.nameId n') n' (defNames s)
-      , defTypes    = HashMap.insert (A.nameId n') ty (defTypes s)
-      , defTerms    = HashMap.insert (A.nameId n') tm (defTerms s)
+      { globalNames  = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
+      , defNames     = HashMap.insert (A.nameId n') n' (defNames s)
+      , defImplicits = HashMap.insert (A.nameId n') implicits (defImplicits s)
+      , defTypes     = HashMap.insert (A.nameId n') ty (defTypes s)
+      , defTerms     = HashMap.insert (A.nameId n') tm (defTerms s)
       }
     return $ A.Define params' def e'
   C.Assume n params ann -> do
@@ -275,10 +288,12 @@ checkDecl = \case
     solveConstraints
     let n' = A.paramName def
         ty = ctxPi ctx (A.paramType def)
+    implicits <- validateImplicitParams params'
     modify $ \s -> s
-      { globalNames = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
-      , axiomNames  = HashMap.insert (A.nameId n') n' (axiomNames s)
-      , axiomTypes  = HashMap.insert (A.nameId n') ty (axiomTypes s)
+      { globalNames    = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
+      , axiomNames     = HashMap.insert (A.nameId n') n' (axiomNames s)
+      , axiomImplicits = HashMap.insert (A.nameId n') implicits (axiomImplicits s)
+      , axiomTypes     = HashMap.insert (A.nameId n') ty (axiomTypes s)
       }
     return $ A.Assume params' def
   C.Rewrite n params lhs rhs -> do

@@ -27,12 +27,6 @@ data Expr
   | Equals  Range Expr Expr
   deriving (Show)
 
-data Param = Param
-  { paramImplicitness :: Implicitness
-  , paramName         :: Name
-  , paramAnnotation   :: Maybe Expr
-  } deriving (Show)
-
 instance HasRange Expr where
   getRange = \case
     Id      n     -> getRange n
@@ -46,6 +40,16 @@ instance HasRange Expr where
     Times   r _ _ -> r
     Equals  r _ _ -> r
     Pair    r _ _ -> r
+
+data Param = Param
+  { paramImplicitness :: Implicitness
+  , paramName         :: Name
+  , paramAnnotation   :: Maybe Expr
+  } deriving (Show)
+
+instance HasRange Param where
+  -- TODO: store full range including annotation (and parens)?
+  getRange = getRange . paramName
 
 data Decl
   = Define Name [Param] (Maybe Expr) Expr

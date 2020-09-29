@@ -104,3 +104,4 @@ diagnoseError = \case
   UnsolvedMeta r _         -> Diagnostic r $ "unsolved meta"
   BadPattern r             -> Diagnostic r $ "expression not allowed in pattern"
   MissingPatternVariable r -> Diagnostic r $ "missing variable in pattern"
+  LateImplicitParam r _    -> Diagnostic r $ "implicit parameters must precede any explicit parameters"

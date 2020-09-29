@@ -34,6 +34,8 @@ data Error
   | BadPattern Range
   -- | Some parameter can't be determined by the pattern.
   | MissingPatternVariable Range
+  -- | An implicit parameter that doesn't appear at the front.
+  | LateImplicitParam Range Param
   deriving (Show)
 
 -- | Read-only environment used for local variables.
@@ -76,15 +78,17 @@ data State = State
   , nextMetaId        :: !MetaId
     -- | Globally-defined names.
   , globalNames       :: HashMap Text NameId
-    -- | Definitions.
+    -- | Definitions. TODO: use a record?
   , defNames          :: HashMap NameId Name
+  , defImplicits      :: HashMap NameId Int
   , defTypes          :: HashMap NameId Type
   , defTerms          :: HashMap NameId Term
-    -- | Axioms.
+    -- | Axioms. TODO: use a record?
   , axiomNames        :: HashMap NameId Name
+  , axiomImplicits    :: HashMap NameId Int
   , axiomTypes        :: HashMap NameId Type
   , axiomRules        :: HashMap NameId [Rule]
-    -- | Metavariables.
+    -- | Metavariables. TODO: use a record?
   , metaRanges        :: HashMap MetaId Range
   , metaTypes         :: HashMap MetaId Type
   , metaTerms         :: HashMap MetaId Term
@@ -104,9 +108,11 @@ initialState = State
   , nextMetaId        = MetaId 0
   , globalNames       = HashMap.empty
   , defNames          = HashMap.empty
+  , defImplicits      = HashMap.empty
   , defTypes          = HashMap.empty
   , defTerms          = HashMap.empty
   , axiomNames        = HashMap.empty
+  , axiomImplicits    = HashMap.empty
   , axiomTypes        = HashMap.empty
   , axiomRules        = HashMap.empty
   , metaRanges        = HashMap.empty

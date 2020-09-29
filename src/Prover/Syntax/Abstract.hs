@@ -87,6 +87,10 @@ data Param = Param
   , paramAnnotation   :: Maybe Expr
   } deriving (Show)
 
+instance HasRange Param where
+  -- TODO: store full range including annotation (and parens)?
+  getRange = getRange . paramName
+
 -- TODO: it doesn't really make sense to use Param for the actual name?
 data Decl
   = Define [Param] Param Expr
