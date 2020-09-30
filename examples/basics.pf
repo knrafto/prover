@@ -1,14 +1,16 @@
+-- Functions.
 infixr 0 _→_
-define _→_ (A B : Type) ≡ Π (a : A). B
+define _→_ A B ≡ Π (a : A). B
 
+-- Cartesian product.
 infixr 5 _×_
-define _×_ (A B : Type) ≡ Σ (a : A). B
+define _×_ A B ≡ Σ (a : A). B
 
--- Identity types.
-axiom Id : Π A. A → A → Type
+-- Martin-Löf identity type.
+axiom Id A : A → A → Type
 
 infix 4 _=_
-define _=_ {A : Type} (a b : A) ≡ Id A a b
+define _=_ {A} (a b : A) ≡ Id A a b
 
 axiom refl {A} {a : A} : a = a
 axiom Id-ind {A} (C : Π (a b : A). a = b → Type) (c : Π a. C a a refl)
