@@ -82,6 +82,15 @@ paramsPi (A.ParamGroup ps _ : rest) ty = paramListPi ps $ paramsPi rest ty
     paramListPi [] ty  = ty
     paramListPi (p:ps) ty = Pi (A.paramType p) (paramListPi ps ty)
 
+-- | Desugar parameters into a bunch of Σ binders.
+paramsSigma :: [A.ParamGroup] -> Type -> Type
+paramsSigma [] ty = ty
+paramsSigma (A.ParamGroup ps _ : rest) ty = paramListSigma ps $ paramsSigma rest ty
+  where
+    paramListSigma :: [A.Param] -> Type -> Type
+    paramListSigma [] ty  = ty
+    paramListSigma (p:ps) ty = Sigma (A.paramType p) (paramListSigma ps ty)
+
 -- | Desugar parameters into a bunch of λ binders.
 paramsLam :: [A.ParamGroup] -> Term -> Term
 paramsLam ps = makeLam (paramsLength ps)
@@ -209,7 +218,17 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t ty expectedTy
     return $ A.Lam i ps' e'
 
-  C.Sigma   _ _ _   -> error "Σ-types"
+  C.Sigma   r ps e  -> do
+    -- Γ ⊢ A : Type
+    ps' <- checkParams ps
+
+    -- Γ, x : A ⊢ B : Type
+    e' <- localParams ps' $ checkExpr e Type
+
+    -- ⟹ Γ ⊢ (Σ x : A. B) : Type
+    let t = paramsSigma ps' (A.exprTerm e')
+    i <- expect r t Type expectedTy
+    return $ A.Sigma i ps' e'
 
   C.App     r f a   -> do
     -- Γ ⊢ a : A
@@ -227,6 +246,7 @@ checkExpr expr expectedTy = case expr of
         ty = instantiate tyB (A.exprTerm a') 
     i <- expect r t ty expectedTy
     return $ A.App i f' a'
+
   C.Arrow   r e1 e2 ->  do
     -- Γ ⊢ A : Type
     e1' <- checkExpr e1 Type
@@ -239,7 +259,17 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t Type expectedTy
     return $ A.Arrow i e1' e2'
 
-  C.Times   _ _  _  -> error "Σ-types"
+  C.Times   r e1  e2  -> do
+    -- Γ ⊢ A : Type
+    e1' <- checkExpr e1 Type
+
+    -- Γ ⊢ B : Type
+    e2' <- checkExpr e2 Type
+
+    -- ⟹ Γ ⊢ (Σ _ : A. B) : Type
+    let t = Sigma (A.exprTerm e1') (weaken (A.exprTerm e2'))
+    i <- expect r t Type expectedTy
+    return $ A.Times i e1' e2'
 
   C.Equals  r e1 e2 -> do
     -- Desugar a = b to Id (_ : Type) a b
@@ -254,7 +284,7 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t Type expectedTy
     return $ A.Equals i e1' e2'
 
-  C.Pair    _ _  _  -> error "Σ-types"
+  C.Pair    _ _  _  -> error "pair"
 
 -- | Given (x : A), check Γ ⊢ A : Type and construct a param for x.
 checkParamNames :: [C.Name] -> Type -> M [A.Param]

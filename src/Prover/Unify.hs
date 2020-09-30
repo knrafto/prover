@@ -156,25 +156,8 @@ unify ctx ty t1 t2 = do
     (Pi a b, t, Lam e)       -> unify (ctx :> a) b (applyTerm (weaken t) [var 0]) e
 
     (Type, Type, Type) -> return $ Solved True
-    (Type, Pi a1 b1, Pi a2 b2) ->
-      -- If B does not depend on A in one of the function types, then we don't
-      -- have to wait for A to be checked before checking B.
-      case (strengthen b1, strengthen b2) of
-        (Nothing , Nothing ) ->
-          -- We must have a1 ≡ a2 before b1 ≡ b2 makes sense.
-          guarded (TermEq ctx Type a1 a2) (TermEq (ctx :> a1) Type b1 b2)
-          -- If b1 does not depend on a1, then we can also treat b1 as belong to
-          -- context (ctx :> a2), so we don't have to depend on the first
-          -- equality.
-        (Just _  , Nothing ) ->
-          simplify $ And [TermEq ctx Type a1 a2, TermEq (ctx :> a2) Type b1 b2]
-        (Nothing , Just _  ) ->
-          -- flipped version of previous case
-          simplify $ And [TermEq ctx Type a1 a2, TermEq (ctx :> a1) Type b1 b2]
-          -- If neither b1 nor b2 depend on a, then we can check the equality of
-          -- the strengthened versions.
-        (Just b1', Just b2') ->
-          simplify $ And [TermEq ctx Type a1 a2, TermEq ctx Type b1' b2']
+    (Type, Pi a1 b1, Pi a2 b2) -> unifyDependentTypes ctx a1 b1 a2 b2
+    (Type, Sigma a1 b1, Sigma a2 b2) -> unifyDependentTypes ctx a1 b1 a2 b2
         
     _ -> return $ Solved False
 
@@ -195,6 +178,28 @@ unifySpine ctx ty ((arg1, arg2):rest) = do
   case strengthen b of
     Nothing -> guarded (TermEq ctx a arg1 arg2) (SpineEq ctx (instantiate b arg1) rest)
     Just b' -> simplify $ And [TermEq ctx a arg1 arg2, SpineEq ctx b' rest]
+
+-- | Unifies A₁ with A₂, and B₁ with B₂ (over the first equality).
+unifyDependentTypes :: Ctx -> Type -> Type -> Type -> Type -> M Constraint
+unifyDependentTypes ctx a1 b1 a2 b2 =
+  -- If B does not depend on A in one of the types, then we don't have to
+  -- wait for A to be checked before checking B.
+  case (strengthen b1, strengthen b2) of
+    (Nothing , Nothing ) ->
+      -- We must have a1 ≡ a2 before b1 ≡ b2 makes sense.
+      guarded (TermEq ctx Type a1 a2) (TermEq (ctx :> a1) Type b1 b2)
+      -- If b1 does not depend on a1, then we can also treat b1 as belong to
+      -- context (ctx :> a2), so we don't have to depend on the first
+      -- equality.
+    (Just _  , Nothing ) ->
+      simplify $ And [TermEq ctx Type a1 a2, TermEq (ctx :> a2) Type b1 b2]
+    (Nothing , Just _  ) ->
+      -- flipped version of previous case
+      simplify $ And [TermEq ctx Type a1 a2, TermEq (ctx :> a1) Type b1 b2]
+      -- If neither b1 nor b2 depend on a, then we can check the equality of
+      -- the strengthened versions.
+    (Just b1', Just b2') ->
+      simplify $ And [TermEq ctx Type a1 a2, TermEq ctx Type b1' b2']
 
 -- | Try both ways.
 flexFlex :: Ctx -> Type -> MetaId -> [Term] -> MetaId -> [Term] -> M Constraint
@@ -263,3 +268,4 @@ invertVarSubst σ t = do
     Lam b -> Lam <$> invertVarSubst (liftVarSubst σ) b
     Type -> return Type
     Pi a b -> Pi <$> invertVarSubst σ a <*> invertVarSubst (liftVarSubst σ) b
+    Sigma a b -> Sigma <$> invertVarSubst σ a <*> invertVarSubst (liftVarSubst σ) b

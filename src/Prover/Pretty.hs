@@ -77,14 +77,18 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
         hDoc     <- prettyHead k h
         argsDocs <- mapM (prettyPrec k (appPrec + 1)) args
         return $ hsep (hDoc : argsDocs)
-      Type        -> return "Type"
-      Pi a b  -> parens (d > binderPrec) $ do
-        aDoc <- prettyPrec k (appPrec + 1) a
-        bDoc <- prettyPrec (k + 1) binderPrec b
-        return $ "Π" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
       Lam b       -> parens (d > binderPrec) $ do
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "λ" <+> prettyVar k <> "." <+> bDoc
+      Type        -> return "Type"
+      Pi a b      -> parens (d > binderPrec) $ do
+        aDoc <- prettyPrec k (appPrec + 1) a
+        bDoc <- prettyPrec (k + 1) binderPrec b
+        return $ "Π" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
+      Sigma a b   -> parens (d > binderPrec) $ do
+        aDoc <- prettyPrec k (appPrec + 1) a
+        bDoc <- prettyPrec (k + 1) binderPrec b
+        return $ "Σ" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
 
     prettyHead :: Int -> Head -> M Doc
     prettyHead k = \case

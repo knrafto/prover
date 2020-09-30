@@ -1,10 +1,8 @@
 infixr 0 _→_
 define _→_ (A B : Type) ≡ Π (a : A). B
 
-{-
 infixr 5 _×_
 define _×_ (A B : Type) ≡ Σ (a : A). B
--}
 
 -- Identity types.
 axiom Id : Π A. A → A → Type
@@ -68,13 +66,12 @@ define happly (A B : Type) (f g : A → B)
     ≡ Id-ind (λ f g p. Π x. f x = g x) (λ f x. refl) f g
 
 -- Sets and logic.
--- define IsContr (A : Type) ≡ Σ a : A. Π x : A. a = x
-define IsProp (A : Type) ≡ Π (x y : A). x = y
-define IsSet  (A : Type) ≡ Π (x y : A). IsProp (x = y)
+define IsContr (A : Type) ≡ Σ (a : A). Π (x : A). a = x
+define IsProp  (A : Type) ≡ Π (x y : A). x = y
+define IsSet   (A : Type) ≡ Π (x y : A). IsProp (x = y)
 
--- define fiber (A B : Type) (f : A → B) (b : B) ≡ Σ a : A. f a = b
--- define IsEquiv (A B : Type) (f : A → B) ≡ Π b. IsContr (fiber f b)
-axiom IsEquiv (A B : Type) (f : A → B) : Type
+define fiber   (A B : Type) (f : A → B) (b : B) ≡ Σ (a : A). f a = b
+define IsEquiv (A B : Type) (f : A → B) ≡ Π (b : B). IsContr (fiber A B f b)
 
 -- Natural numbers.
 define add

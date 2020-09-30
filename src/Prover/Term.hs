@@ -37,12 +37,14 @@ data Head
 data Term
   -- | A neutral term application.
   = App !Head [Term]
+  -- | A lambda function.
+  | Lam Term
   -- | A universe.
   | Type
   -- | A Π-type.
   | Pi Term Term
-  -- | A lambda function.
-  | Lam Term
+  -- | A Σ-type.
+  | Sigma Term Term
   deriving (Show)
 
 type Type = Term
@@ -86,9 +88,10 @@ applySubst subst = \case
   App (Var v) args -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
   -- All other heads are closed.
   App h       args -> App h (map (applySubst subst) args)
+  Lam b            -> Lam (applySubst (SubstLift subst) b)
   Type             -> Type
   Pi a b           -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
-  Lam b            -> Lam (applySubst (SubstLift subst) b)
+  Sigma a b        -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
 
 -- TODO: comment
 weaken :: Term -> Term
@@ -105,9 +108,10 @@ strengthen = go 0
       | otherwise    -> App (Var (j - 1)) <$> traverse (go i) args
     -- All other heads are closed.
     App h       args -> App h <$> traverse (go i) args
+    Lam b            -> Lam <$> go (i + 1) b
     Type             -> return Type
     Pi a b           -> Pi <$> go i a <*> go (i + 1) b
-    Lam b            -> Lam <$> go (i + 1) b
+    Sigma a b        -> Sigma <$> go i a <*> go (i + 1) b
 
 -- TODO: comment
 instantiate :: Term -> Term -> Term
