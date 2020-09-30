@@ -1,6 +1,8 @@
 -- | Source locations and ranges.
 module Prover.Syntax.Position where
 
+import Data.Char
+
 import Data.Aeson
 import Prettyprinter
 
@@ -14,15 +16,26 @@ data Position = Position
     -- except for tab (which takes 8 columns) and newline (which starts a new
     -- line).
   , positionColumn  :: !Int
-    -- | 0-indexed file offset, in Unicode characters.
-  , positionOffset  :: !Int
+    -- | 0-indexed file offset, in UTF-16(!) code units for VS Code.
+  , positionUtf16Offset  :: !Int
   } deriving (Eq, Show)
 
 instance Pretty Position where
   pretty p = pretty (positionLine p) <> ":" <> pretty (positionColumn p)
 
 instance ToJSON Position where
-  toJSON p = toJSON (positionOffset p)
+  toJSON p = toJSON (positionUtf16Offset p)
+
+startPosition :: Position
+startPosition = Position 1 1 0
+
+utf16Length :: Char -> Int
+utf16Length c = if ord c <= 0xFFFF then 1 else 2
+
+advancePosition :: Char -> Position -> Position
+advancePosition '\t' (Position l c o) = Position l (c + 8) (o + 1)
+advancePosition '\n' (Position l _ o) = Position (l + 1) 1 (o + 1)
+advancePosition a    (Position l c o) = Position l (c + 1) (o + utf16Length a)
 
 -- | An interval of text in the source file, represented by two positions.
 data Range = Range
