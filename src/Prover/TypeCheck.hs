@@ -365,8 +365,9 @@ checkDecl = \case
         else
           emitError $ MissingPatternVariable (getRange lhs')
       _ -> emitError $ BadPattern (getRange lhs')
-
     return $ A.Rewrite params' def lhs' rhs'
+  C.Fixity fixity i n -> do
+    return $ A.Fixity fixity i (C.nameText n)
 
 checkModule :: C.Module -> M A.Module
 checkModule (C.Module decls) = A.Module <$> mapM checkDecl decls

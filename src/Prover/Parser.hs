@@ -67,7 +67,17 @@ name = lexeme . try $ do
         , "axiom"
         , "rewrite"
         , "where"
+        , "infix"
+        , "infixl"
+        , "infixr"
         ]
+
+number :: Parser Int
+number = do
+    Name _ s <- name
+    case reads (T.unpack s) of
+        [(i, "")] -> return i
+        _         -> fail $ T.unpack s ++ " is not a number"
 
 symbol :: Char -> Parser Range
 symbol c = lexeme $ do
@@ -165,8 +175,16 @@ rewrite = Rewrite
     <*  reservedWord "≡"
     <*> expr
 
+fixity :: Parser Decl
+fixity = Fixity
+    <$> (Infix  <$ reservedWord "infix"  <|>
+         Infixl <$ reservedWord "infixl" <|>
+         Infixr <$ reservedWord "infixr")
+    <*> number
+    <*> name
+
 decl :: Parser Decl
-decl = define <|> axiom <|> rewrite
+decl = define <|> axiom <|> rewrite <|> fixity
 
 module_ :: Parser Module
 module_ = Module <$ sc <*> many decl <* eof

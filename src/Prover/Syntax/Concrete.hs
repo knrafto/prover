@@ -48,6 +48,7 @@ data Decl
   = Define Name [ParamGroup] [ParamGroup] (Maybe Expr) Expr
   | Assume Name [ParamGroup] [ParamGroup] Expr
   | Rewrite Name [ParamGroup] Expr Expr
+  | Fixity Fixity Int Name
   deriving (Show)
 
 newtype Module = Module [Decl]

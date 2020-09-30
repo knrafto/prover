@@ -69,7 +69,7 @@ _
 : ≡
 = → ×
 Π λ Σ
-define axiom rewrite where
+define axiom rewrite where infix infixl infixr
 ```
 
 ## Pseudo-grammar
@@ -78,6 +78,7 @@ define axiom rewrite where
 module = [ statement ]*
 
 statement =
+    fixity number name
     define name implicit_params explicit_params [ : expr ] ≡ expr
     axiom name implicit_params explicit_params : expr
     rewrite name explicit_params where expr ≡ expr
@@ -93,6 +94,11 @@ explicit_params = explicit_param_group*
 explicit_param_group =
     name
     ( name+ : expr )
+
+fixity =
+    infix
+    infixl
+    infixr
 
 expr =
     _

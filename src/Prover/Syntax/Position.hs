@@ -43,3 +43,8 @@ rangeSpan (Range s _) (Range _ e) = Range s e
 
 class HasRange a where
   getRange :: a -> Range
+
+-- TODO: does this really belong here? Maybe rename "Prover.Syntax.Position" to
+-- "Prover.Syntax.Common" or something
+data Fixity = Infix | Infixl | Infixr
+  deriving (Eq, Show)

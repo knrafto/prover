@@ -97,6 +97,7 @@ data Decl
   = Define [ParamGroup] Param (Maybe Expr) Expr
   | Assume [ParamGroup] Param Expr
   | Rewrite [ParamGroup] Param Expr Expr
+  | Fixity Fixity Int Text
   deriving (Show)
 
 newtype Module = Module [Decl]

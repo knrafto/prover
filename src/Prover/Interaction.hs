@@ -96,6 +96,7 @@ highlightDecl = \case
     highlightParam HighlightRewriteName def ++
     highlightExpr lhs ++
     highlightExpr rhs
+  Fixity _ _ _ -> []  -- TODO: highlight?
 
 highlightModule :: Module -> [HighlightedRange]
 highlightModule (Module decls) = concatMap highlightDecl decls
