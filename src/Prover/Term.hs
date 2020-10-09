@@ -15,18 +15,6 @@ newtype NameId = NameId Int
 newtype MetaId = MetaId Int
   deriving (Eq, Ord, Show, Enum, Hashable)
 
--- | The head of a neutral term.
-data Head
-  -- | A local variable (as a de Bruijn index).
-  = Var !Var
-  -- | A definition.
-  | Def !NameId
-  -- | An axiom.
-  | Axiom !NameId
-  -- | A metavariable.
-  | Meta !MetaId
-  deriving (Show)
-
 -- | A term in some context of some type. Terms are kept in
 -- almost-but-not-quite-normal form with variables represented by de Bruijn
 -- indices. The term can only be reduced by substituting for the head of a
@@ -34,9 +22,17 @@ data Head
 --
 -- A useful property of this representation that we can (ab)use is that a closed
 -- term can be used in any context without explicitly applying a substitution.
+--
+-- TODO: having both BlockedAxiom and Axiom is very confusing.
 data Term
-  -- | A neutral term application.
-  = App !Head [Term]
+  -- | A metavariable applied to args.
+  = BlockedMeta !MetaId [Term]
+  -- | An axiom applied to args that may be reduced when more metas are solved.
+  | BlockedAxiom !NameId [Term]
+  -- | A neutral axiom applied to args.
+  | Axiom !NameId [Term]
+  -- | A de Bruijn variable applied to args.
+  | Var !Var [Term]
   -- | A lambda function.
   | Lam Term
   -- | A universe.
@@ -66,15 +62,18 @@ data Subst
 
 -- | Construct a bound variable.
 var :: Int -> Term
-var i = App (Var i) []
+var i = Var i []
 
 -- | Apply a term to more terms.
 applyTerm :: Term -> [Term] -> Term
 applyTerm t [] = t
 applyTerm t args@(arg:rest) = case t of
-  App h args' -> App h (args' ++ args)
-  Lam b       -> applyTerm (instantiate b arg) rest
-  _           -> error "applyTerm"
+  BlockedMeta m args'   -> BlockedMeta m (args' ++ args)
+  BlockedAxiom n args'  -> BlockedAxiom n (args' ++ args)
+  Axiom n args'         -> Axiom n (args' ++ args)
+  Var v args'           -> Var v (args' ++ args)
+  Lam b                 -> applyTerm (instantiate b arg) rest
+  _                     -> error "applyTerm"
 
 lookupVar :: Subst -> Var -> Term
 lookupVar (SubstWeaken k)    i = var (i + k)
@@ -85,13 +84,14 @@ lookupVar (SubstTerm _)      i = var (i - 1)
 
 applySubst :: Subst -> Term -> Term
 applySubst subst = \case
-  App (Var v) args -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
-  -- All other heads are closed.
-  App h       args -> App h (map (applySubst subst) args)
-  Lam b            -> Lam (applySubst (SubstLift subst) b)
-  Type             -> Type
-  Pi a b           -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
-  Sigma a b        -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
+  BlockedMeta m args  -> BlockedMeta m (map (applySubst subst) args)
+  BlockedAxiom n args -> BlockedAxiom n (map (applySubst subst) args)
+  Axiom n args        -> Axiom n (map (applySubst subst) args)
+  Var v args          -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
+  Lam b               -> Lam (applySubst (SubstLift subst) b)
+  Type                -> Type
+  Pi a b              -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
+  Sigma a b           -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
 
 -- TODO: comment
 weaken :: Term -> Term
@@ -102,16 +102,17 @@ strengthen = go 0
   where
   go :: Int -> Term -> Maybe Term
   go i = \case
-    App (Var j) args
-      | j < i        -> App (Var j) <$> traverse (go i) args
-      | j == i       -> Nothing
-      | otherwise    -> App (Var (j - 1)) <$> traverse (go i) args
-    -- All other heads are closed.
-    App h       args -> App h <$> traverse (go i) args
-    Lam b            -> Lam <$> go (i + 1) b
-    Type             -> return Type
-    Pi a b           -> Pi <$> go i a <*> go (i + 1) b
-    Sigma a b        -> Sigma <$> go i a <*> go (i + 1) b
+    BlockedMeta m args  -> BlockedMeta m <$> traverse (go i) args
+    BlockedAxiom n args -> BlockedAxiom n <$> traverse (go i) args
+    Axiom n args        -> Axiom n <$> traverse (go i) args
+    Var j args
+      | j < i           -> Var j <$> traverse (go i) args
+      | j == i          -> Nothing
+      | otherwise       -> Var (j - 1) <$> traverse (go i) args
+    Lam b               -> Lam <$> go (i + 1) b
+    Type                -> return Type
+    Pi a b              -> Pi <$> go i a <*> go (i + 1) b
+    Sigma a b           -> Sigma <$> go i a <*> go (i + 1) b
 
 -- TODO: comment
 instantiate :: Term -> Term -> Term

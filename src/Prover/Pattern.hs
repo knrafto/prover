@@ -1,9 +1,5 @@
 module Prover.Pattern where
 
-import Control.Monad
-
-import Data.IntMap (IntMap)
-import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 
@@ -35,28 +31,3 @@ matchable rule =
   let n    = ruleCtxLength rule
       vars = IntSet.unions (map patternVars (ruleArgs rule))
   in all (`IntSet.member` vars) [0..n-1]
-
-match :: Pattern -> Term -> Maybe (IntMap Term)
-match arg t = case arg of
-  VarPat i         -> Just (IntMap.singleton i t)
-  AxiomPat id args -> case t of
-    App (Axiom h) termArgs | h == id && length args == length termArgs ->
-      IntMap.unions <$> mapM (uncurry match) (zip args termArgs)
-    _ -> Nothing
-
--- | Match a rule's pattern against a term, extract a term for the RHS if successful.
-tryRewrite :: Term -> Rule -> Maybe Term
-tryRewrite t rule = case t of
-  App (Axiom h) termArgs
-    | h == ruleHead rule && length (ruleArgs rule) <= length termArgs -> do
-      let args = ruleArgs rule
-      vars <- IntMap.unions <$> mapM (uncurry match) (zip args termArgs)
-      let n          = ruleCtxLength rule
-          ctxTerms   = [vars IntMap.! i | i <- [0..n-1]]
-          extraTerms = drop (length args) termArgs
-      return $ applyTerm (ruleRhs rule) (ctxTerms ++ extraTerms)
-  _ -> Nothing
-
--- Match the first successful rule.
-tryRewrites :: Term -> [Rule] -> Maybe Term
-tryRewrites t = msum . map (tryRewrite t)

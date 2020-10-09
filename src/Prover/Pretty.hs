@@ -8,7 +8,7 @@ import Control.Monad.IO.Class
 import Prettyprinter hiding (Doc, parens)
 import Prettyprinter qualified as PP
 import Prettyprinter.Render.Text
-import Prover.Monad
+import Prover.Monad ( getState, M, State(axiomNames) )
 import Prover.Syntax.Abstract qualified as A
 import Prover.Term
 
@@ -72,34 +72,32 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
 
     prettyPrec :: Int -> Int -> Term -> M Doc
     prettyPrec k d = \case
-      App h []    -> prettyHead k h
-      App h args  -> parens (d > appPrec) $ do
-        hDoc     <- prettyHead k h
-        argsDocs <- mapM (prettyPrec k (appPrec + 1)) args
-        return $ hsep (hDoc : argsDocs)
-      Lam b       -> parens (d > binderPrec) $ do
+      BlockedMeta m args   -> app k d (prettyMeta m) args
+      BlockedAxiom n args  -> do
+        n <- getState n axiomNames
+        app k d (pretty (A.nameText n)) args
+      Axiom n args         -> do
+        n <- getState n axiomNames
+        app k d (pretty (A.nameText n)) args
+      Var i args           -> app k d (prettyVar (k - i - 1)) args
+      Lam b                -> parens (d > binderPrec) $ do
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "λ" <+> prettyVar k <> "." <+> bDoc
-      Type        -> return "Type"
-      Pi a b      -> parens (d > binderPrec) $ do
+      Type                 -> return "Type"
+      Pi a b               -> parens (d > binderPrec) $ do
         aDoc <- prettyPrec k (appPrec + 1) a
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "Π" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
-      Sigma a b   -> parens (d > binderPrec) $ do
+      Sigma a b            -> parens (d > binderPrec) $ do
         aDoc <- prettyPrec k (appPrec + 1) a
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "Σ" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
 
-    prettyHead :: Int -> Head -> M Doc
-    prettyHead k = \case
-      Var i    -> return $ prettyVar (k - i - 1)
-      Def id   -> do
-        n <- getState id defNames
-        return $ pretty (A.nameText n)
-      Axiom id -> do
-        n <- getState id axiomNames
-        return $ pretty (A.nameText n)
-      Meta id  -> return $ prettyMeta id
+    app :: Int -> Int -> Doc -> [Term] -> M Doc
+    app _ _ h []   = return h
+    app k d h args = parens (d > appPrec) $ do
+        argsDocs <- mapM (prettyPrec k (appPrec + 1)) args
+        return $ hsep (h : argsDocs)
 
 -- | Pretty-print a context.
 prettyCtx :: Ctx -> M Doc

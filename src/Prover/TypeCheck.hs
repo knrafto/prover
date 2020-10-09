@@ -42,7 +42,7 @@ createMeta r ty = do
     , "ctx"  |: prettyCtx ctx
     , "type" |: prettyTerm ctx ty
     ]
-  return $ App (Meta id) (ctxVars ctx)
+  return $ BlockedMeta id (ctxVars ctx)
 
 -- | Create a new name.
 createName :: C.Name -> M A.Name
@@ -155,7 +155,7 @@ checkExpr expr expectedTy = case expr of
     state <- get
     case () of
       _ | Just (v, n) <- lookupLocal s (envVarNames e) -> do
-          let t    = App (Var v) []
+          let t    = var v
               ty   = ctxLookup (envCtx e) v
               n'   = A.Name (A.nameId n) r s
           i <- expect r t ty expectedTy
@@ -164,8 +164,8 @@ checkExpr expr expectedTy = case expr of
       _ | Just id <- HashMap.lookup s (globalNames state)
         , Just ty <- HashMap.lookup id (defTypes state) -> do
           implicits <- getState id defImplicits
+          t <- getState id defTerms
           let n' = A.Name id r s
-              t  = App (Def id) []
           (t', ty') <- expandImplicits r implicits t ty
           i <- expect r t' ty' expectedTy
           return $ A.Def i n'
@@ -174,7 +174,7 @@ checkExpr expr expectedTy = case expr of
         , Just ty <- HashMap.lookup id (axiomTypes state) -> do
           implicits <- getState id axiomImplicits
           let n' = A.Name id r s
-              t  = App (Axiom id) []
+              t  = BlockedAxiom id []
           (t', ty') <- expandImplicits r implicits t ty
           i <- expect r t' ty' expectedTy
           return $ A.Axiom i n'
@@ -280,7 +280,7 @@ checkExpr expr expectedTy = case expr of
     tyA <- createMeta r Type
     e1' <- checkExpr e1 tyA
     e2' <- checkExpr e2 tyA
-    let t   = App (Axiom id) [tyA, A.exprTerm e1', A.exprTerm e2']
+    let t   = BlockedAxiom id [tyA, A.exprTerm e1', A.exprTerm e2']
     i <- expect r t Type expectedTy
     return $ A.Equals i e1' e2'
 
@@ -318,9 +318,9 @@ checkParams (p:ps) = do
 
 termToPattern :: Term -> MaybeT M Pattern
 termToPattern t = lift (whnf t) >>= \case
-  App (Var i) []     -> return (VarPat i)
-  App (Axiom i) args -> AxiomPat i <$> mapM termToPattern args
-  _ -> mzero
+  Var i []     -> return (VarPat i)
+  Axiom i args -> AxiomPat i <$> mapM termToPattern args
+  _            -> mzero
 
 checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
