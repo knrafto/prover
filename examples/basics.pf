@@ -85,9 +85,29 @@ define fiber   (A B : Type) (f : A → B) (b : B) ≡ Σ (a : A). f a = b
 define IsEquiv (A B : Type) (f : A → B) ≡ Π (b : B). IsContr (fiber A B f b)
 
 -- Natural numbers.
-define add
-    : ℕ → ℕ → ℕ
-    ≡ ℕ-ind _ (λ m. m) (λ n rec m. suc (rec m))
+define ℕ-rec {A} (z : A) (s : A → A)
+    : ℕ → A
+    ≡ ℕ-ind (λ n. A) z (λ n. s)
+
+define one   ≡ suc zero
+define two   ≡ suc one
+define three ≡ suc two
+define four  ≡ suc three
+define five  ≡ suc four
+define six   ≡ suc five
+define seven ≡ suc six
+define eight ≡ suc seven
+define nine  ≡ suc eight
+define ten   ≡ suc nine
+
+-- TODO: these match Agda's definitions, but we should consider flipping them
+-- around.
+define add (m n : ℕ)
+    : ℕ
+    ≡ ℕ-rec n suc m
+define mul (m n : ℕ)
+    : ℕ
+    ≡ ℕ-rec zero (add n) m
 
 -- Propositional truncation.
 axiom Trunc : Type → Type
