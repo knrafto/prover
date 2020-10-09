@@ -75,9 +75,9 @@ define axiom rewrite where infix infixl infixr
 ## Pseudo-grammar
 
 ```
-module = [ statement ]*
+module = [ decl ]*
 
-statement =
+decl =
     fixity number name
     define name implicit_params explicit_params [ : expr ] ≡ expr
     axiom name implicit_params explicit_params : expr
