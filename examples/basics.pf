@@ -18,6 +18,19 @@ axiom Id-ind {A} (C : Π (a b : A). a = b → Type) (c : Π a. C a a refl)
 rewrite Id-ind-refl A (C : Π (a b : A). a = b → Type) c a
     where Id-ind C c _ _ refl ≡ c a
 
+axiom Sigma (A : Type) (B : A → Type) : Type
+axiom pair {A} {B} (a : A) (b : B a) : Sigma A B
+axiom Sigma-ind A B (C : Sigma A B → Type) : (Π a b. C (pair a b)) → Π x. C x
+rewrite Sigma-ind-pair (A : Type) (B : A → Type) (C : Sigma A B → Type) (f : Π a b. C (pair a b)) (a : A) (b : B a)
+    where Sigma-ind A B C f (pair a b) ≡ f a b
+
+define fst {A} {B} (p : Sigma A B)
+    : A
+    ≡ Sigma-ind A B _ (λ a b. a) p
+define snd {A} {B} (p : Sigma A B)
+    : B (fst p)
+    ≡ Sigma-ind A B (λ p. B (fst p)) (λ a b. b) p
+
 -- Empty type.
 axiom 0 : Type
 axiom 0-ind : Π (C : 0 → Type). Π a. C a
