@@ -14,12 +14,13 @@ import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 import Prettyprinter
 
+import Prover.InfixParser
 import Prover.Monad
 import Prover.Pattern
 import Prover.Pretty
 import Prover.Syntax.Abstract qualified as A
 import Prover.Syntax.Concrete qualified as C
-import Prover.Syntax.Position
+import Prover.Syntax.Position ( HasRange(getRange), Range )
 import Prover.Term
 import Prover.Unify
 
@@ -230,14 +231,21 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t Type expectedTy
     return $ A.Sigma i ps' e'
 
-  C.App     r f a   -> do
+  C.Apps    r es    -> do
+    tree <- parseInfixOperators r es
+    checkInfixTree tree expectedTy
+
+checkInfixTree :: InfixTree -> Type -> M A.Expr
+checkInfixTree tree expectedTy = case tree of
+  Atom e    -> checkExpr e expectedTy
+  App r f a -> do
     -- Γ ⊢ a : A
     tyA <- createMeta r Type
-    a'  <- checkExpr a tyA
+    a'  <- checkInfixTree a tyA
 
     -- Γ ⊢ f : (Π x : A. B)
     tyB <- localUnnamed tyA $ createMeta r Type
-    f'  <- checkExpr f (Pi tyA tyB)
+    f'  <- checkInfixTree f (Pi tyA tyB)
 
     -- ⟹ Γ ⊢ f a : B[a/x]
     -- TODO: a chained application is currently quadratic in the number of
@@ -246,45 +254,6 @@ checkExpr expr expectedTy = case expr of
         ty = instantiate tyB (A.exprTerm a') 
     i <- expect r t ty expectedTy
     return $ A.App i f' a'
-
-  C.Arrow   r e1 e2 ->  do
-    -- Γ ⊢ A : Type
-    e1' <- checkExpr e1 Type
-
-    -- Γ ⊢ B : Type
-    e2' <- checkExpr e2 Type
-
-    -- ⟹ Γ ⊢ (Π _ : A. B) : Type
-    let t = Pi (A.exprTerm e1') (weaken (A.exprTerm e2'))
-    i <- expect r t Type expectedTy
-    return $ A.Arrow i e1' e2'
-
-  C.Times   r e1  e2  -> do
-    -- Γ ⊢ A : Type
-    e1' <- checkExpr e1 Type
-
-    -- Γ ⊢ B : Type
-    e2' <- checkExpr e2 Type
-
-    -- ⟹ Γ ⊢ (Σ _ : A. B) : Type
-    let t = Sigma (A.exprTerm e1') (weaken (A.exprTerm e2'))
-    i <- expect r t Type expectedTy
-    return $ A.Times i e1' e2'
-
-  C.Equals  r e1 e2 -> do
-    -- Desugar a = b to Id (_ : Type) a b
-    -- TODO: check type of Id is correct! 
-    id  <- lookupState "Id" globalNames >>= \case
-      Nothing -> error "missing builtin Id"
-      Just id -> return id
-    tyA <- createMeta r Type
-    e1' <- checkExpr e1 tyA
-    e2' <- checkExpr e2 tyA
-    let t   = BlockedAxiom id [tyA, A.exprTerm e1', A.exprTerm e2']
-    i <- expect r t Type expectedTy
-    return $ A.Equals i e1' e2'
-
-  C.Pair    _ _  _  -> error "pair"
 
 -- | Given (x : A), check Γ ⊢ A : Type and construct a param for x.
 checkParamNames :: [C.Name] -> Type -> M [A.Param]
@@ -396,8 +365,9 @@ checkDecl = \case
           emitError $ MissingPatternVariable (getRange lhs')
       _ -> emitError $ BadPattern (getRange lhs')
     return $ A.Rewrite params' def lhs' rhs'
-  C.Fixity fixity i n -> do
-    return $ A.Fixity fixity i (C.nameText n)
+  C.Fixity fixity prec n -> do
+    modify $ \s -> s { fixities = HashMap.insert n (fixity, prec) (fixities s) }
+    return $ A.Fixity fixity prec n
 
 checkModule :: C.Module -> M A.Module
 checkModule (C.Module decls) = A.Module <$> mapM checkDecl decls

@@ -76,6 +76,8 @@ data State = State
   , nextNameId        :: !NameId
     -- | For generating fresh MetaIds.
   , nextMetaId        :: !MetaId
+    -- | Fixity declarations.
+  , fixities          :: HashMap Text (Fixity, Int)
     -- | Globally-defined names.
   , globalNames       :: HashMap Text NameId
     -- | Definitions. TODO: use a record?
@@ -106,6 +108,7 @@ initialState = State
   { errors            = []
   , nextNameId        = NameId 0
   , nextMetaId        = MetaId 0
+  , fixities          = HashMap.empty
   , globalNames       = HashMap.empty
   , defNames          = HashMap.empty
   , defImplicits      = HashMap.empty

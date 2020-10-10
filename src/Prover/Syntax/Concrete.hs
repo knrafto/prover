@@ -20,11 +20,7 @@ data Expr
   | Pi      Range [ParamGroup] Expr
   | Lam     Range [ParamGroup] Expr
   | Sigma   Range [ParamGroup] Expr
-  | App     Range Expr Expr
-  | Arrow   Range Expr Expr
-  | Times   Range Expr Expr
-  | Pair    Range Expr Expr
-  | Equals  Range Expr Expr
+  | Apps    Range [Expr]
   deriving (Show)
 
 instance HasRange Expr where
@@ -35,11 +31,7 @@ instance HasRange Expr where
     Pi      r _ _ -> r
     Lam     r _ _ -> r
     Sigma   r _ _ -> r
-    App     r _ _ -> r
-    Arrow   r _ _ -> r
-    Times   r _ _ -> r
-    Equals  r _ _ -> r
-    Pair    r _ _ -> r
+    Apps    r _   -> r
 
 data ParamGroup = ParamGroup [Name] (Maybe Expr)
   deriving (Show)
@@ -48,7 +40,7 @@ data Decl
   = Define Name [ParamGroup] [ParamGroup] (Maybe Expr) Expr
   | Assume Name [ParamGroup] [ParamGroup] Expr
   | Rewrite Name [ParamGroup] Expr Expr
-  | Fixity Fixity Int Name
+  | Fixity Fixity Int Text
   deriving (Show)
 
 newtype Module = Module [Decl]

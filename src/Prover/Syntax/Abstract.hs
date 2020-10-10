@@ -46,10 +46,6 @@ data Expr
   | Lam     ExprInfo [ParamGroup] Expr
   | Sigma   ExprInfo [ParamGroup] Expr
   | App     ExprInfo Expr Expr
-  | Arrow   ExprInfo Expr Expr
-  | Times   ExprInfo Expr Expr
-  | Equals  ExprInfo Expr Expr
-  | Pair    ExprInfo Expr Expr
   deriving (Show)
 
 exprInfo :: Expr -> ExprInfo
@@ -64,10 +60,6 @@ exprInfo = \case
   Lam     i _ _ -> i
   Sigma   i _ _ -> i
   App     i _ _ -> i
-  Arrow   i _ _ -> i
-  Times   i _ _ -> i
-  Equals  i _ _ -> i
-  Pair    i _ _ -> i
 
 instance HasRange Expr where
   getRange = exprInfoRange . exprInfo

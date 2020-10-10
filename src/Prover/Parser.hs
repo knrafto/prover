@@ -4,7 +4,6 @@ module Prover.Parser ( parseModule ) where
 
 import Control.Monad
 
-import Control.Monad.Combinators.Expr
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Void
@@ -40,15 +39,15 @@ reservedWord w = lexeme . try $ do
     Range s <$> getPosition
 
 name :: Parser Name
-name = lexeme . try $ do
+name = lexeme. try $ do
     s <- getPosition
     w <- takeWhile1P (Just "word character") isWordChar
+    e <- getPosition
     when (w `elem` reservedWords) $ fail
         (  "keyword "
         ++ T.unpack w
         ++ " is reserved and cannot be used as a name"
         )
-    e <- getPosition
     return (Name (Range s e) w)
   where
     reservedWords :: [Text]
@@ -56,12 +55,9 @@ name = lexeme . try $ do
         [ "_"
         , ":"
         , "≡"
-        , "="
         , "Σ"
         , "Π"
         , "λ"
-        , "→"
-        , "×"
         , "Type"
         , "define"
         , "axiom"
@@ -72,9 +68,14 @@ name = lexeme . try $ do
         , "infixr"
         ]
 
+text :: Parser Text
+text = do
+    Name _ s <- name
+    return s
+
 number :: Parser Int
 number = do
-    Name _ s <- name
+    s <- text
     case reads (T.unpack s) of
         [(i, "")] -> return i
         _         -> fail $ T.unpack s ++ " is not a number"
@@ -125,26 +126,14 @@ atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
         e <- expr
         return (Sigma (rangeSpan s (getRange e)) p e)
 
-apps :: Parser Expr
-apps = do
-    x <- atom
-    rest x
-  where
-    rest x = app x <|> return x
-
-    app x = do
-        arg <- atom
-        rest (App (rangeSpan (getRange x) (getRange arg)) x arg)
-
 expr :: Parser Expr
-expr = makeExprParser
-    apps
-    [ [InfixR (binop Times  <$ reservedWord "×")]
-    , [InfixN (binop Equals <$ reservedWord "=")]
-    , [InfixR (binop Arrow  <$ reservedWord "→")]
-    , [InfixR (binop Pair   <$ symbol       ',')]
-    ]
-    where binop c e1 e2 = c (rangeSpan (getRange e1) (getRange e2)) e1 e2
+expr = do
+    es <- some atom
+    case es of
+        [e] -> return e
+        _   -> do
+            let r = foldr1 rangeSpan (map getRange es)
+            return (Apps r es)
 
 define :: Parser Decl
 define = Define
@@ -181,7 +170,7 @@ fixity = Fixity
          Infixl <$ reservedWord "infixl" <|>
          Infixr <$ reservedWord "infixr")
     <*> number
-    <*> name
+    <*> text
 
 decl :: Parser Decl
 decl = define <|> axiom <|> rewrite <|> fixity

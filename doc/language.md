@@ -48,6 +48,11 @@ Now `foo A a b : a = b` will be rewritten to either `refl A a : a = a` or
 Despite these dangers, computation rules for most "nice" types can be defined
 safely using rewrite rules.
 
+## Infix operators
+
+Infix operators can be declared using `infix`, `infixl`, and `infixr`, similar
+to Haskell or Agda.
+
 # Syntax
 
 ## Lexical structure
@@ -67,7 +72,6 @@ specially in the syntax:
 Type
 _
 : ≡
-= → ×
 Π λ Σ
 define axiom rewrite where infix infixl infixr
 ```
@@ -106,9 +110,6 @@ expr =
     Type
     ( expr )
     expr expr
-    expr = expr
-    expr × expr
-    expr → expr
     expr , expr
     Π explicit_params . binder
     λ explicit_params . binder

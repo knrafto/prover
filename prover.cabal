@@ -24,6 +24,7 @@ source-repository head
 executable prover
   main-is: Main.hs
   other-modules:
+      Prover.InfixParser
       Prover.Interaction
       Prover.Monad
       Prover.Parser

@@ -1,16 +1,16 @@
 -- Functions.
-infixr 0 _→_
-define _→_ A B ≡ Π (a : A). B
+infixr 0 →
+define → A B ≡ Π (a : A). B
 
 -- Cartesian product.
-infixr 5 _×_
-define _×_ A B ≡ Σ (a : A). B
+infixr 5 ×
+define × A B ≡ Σ (a : A). B
 
 -- Martin-Löf identity type.
 axiom Id A : A → A → Type
 
-infix 4 _=_
-define _=_ {A} (a b : A) ≡ Id A a b
+infix 4 =
+define = {A} (a b : A) ≡ Id A a b
 
 axiom refl {A} {a : A} : a = a
 axiom Id-ind {A} (C : Π (a b : A). a = b → Type) (c : Π a. C a a refl)
@@ -80,8 +80,8 @@ define id {A}
     : A → A
     ≡ λ x. x
 
-infixr 9 _∘_
-define _∘_ {A} {B} {C}
+infixr 9 ∘
+define ∘ {A} {B} {C}
     : (B → C) → (A → B) → (A → C)
     ≡ λ g f. λ x. g (f x)
 
@@ -115,12 +115,15 @@ define ten   ≡ suc nine
 
 -- TODO: these match Agda's definitions, but we should consider flipping them
 -- around.
-define add (m n : ℕ)
+infixl 6 +
+define + (m n : ℕ)
     : ℕ
     ≡ ℕ-rec n suc m
-define mul (m n : ℕ)
+
+infixl 7 *
+define * (m n : ℕ)
     : ℕ
-    ≡ ℕ-rec zero (add n) m
+    ≡ ℕ-rec zero (λ k. n + k) m
 
 -- Propositional truncation.
 axiom Trunc : Type → Type
