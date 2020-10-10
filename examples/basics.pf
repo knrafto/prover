@@ -125,6 +125,28 @@ define * (m n : ℕ)
     : ℕ
     ≡ ℕ-rec zero (λ k. n + k) m
 
+-- Properties of addition.
+--
+-- TODO: Agda defines these to (generally) induct on the first argument, but
+-- maybe it would be more natural to induct on the last one. Should we change
+-- the types to match?
+
+define +-zero (n : ℕ)
+    : n + zero = n
+    ≡ ℕ-ind (λ n. n + zero = n) refl (λ n p. ap _ _ _ _ suc p) n
+
+define +-suc (m n : ℕ)
+    : m + suc n = suc (m + n)
+    ≡ ℕ-ind (λ m. m + suc n = suc (m + n)) refl (λ n p. ap _ _ _ _ suc p) m
+
+define +-comm (m n : ℕ)
+    : m + n = n + m
+    ≡ ℕ-ind (λ n. m + n = n + m) (+-zero m) (λ n p. trans _ _ _ _ (+-suc m n) (ap _ _ _ _ suc p)) n
+
+define +-assoc (m n o : ℕ)
+   : m + (n + o) = (m + n) + o
+   ≡ ℕ-ind (λ m. m + (n + o) = (m + n) + o) refl (λ m p. ap _ _ _ _ suc p) m
+
 -- Propositional truncation.
 axiom Trunc : Type → Type
 axiom trunc : Π A. A → Trunc A
