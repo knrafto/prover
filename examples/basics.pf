@@ -120,33 +120,49 @@ define eight ≡ suc seven
 define nine  ≡ suc eight
 define ten   ≡ suc nine
 
--- TODO: these match Agda's definitions, but we should consider flipping them
--- around.
+-- Addition. Flipped from Agda's version.
+-- TODO: is this a good idea?
+
+define add : ℕ → ℕ → ℕ
+    ≡ λ m. ℕ-rec m suc
 infixl 6 +
-define + (m n : ℕ) : ℕ
-    ≡ ℕ-rec n suc m
+define + ≡ add
+
+define +-zero : Π n. n + zero = n
+    ≡ λ n. refl
+
+define +-suc : Π m n. m + suc n = suc (m + n)
+    ≡ λ n m. refl
+
+define zero-+ : Π n. zero + n = n
+    ≡ ℕ-ind _ refl (λ n p. ap _ _ _ _ suc p)
+
+define suc-+ : Π m n. suc m + n = suc (m + n)
+    ≡ λ m. ℕ-ind _ refl (λ n p. ap _ _ _ _ suc p)
+
+define +-comm : Π m n. n + m = m + n
+    ≡ λ m. ℕ-ind _ (zero-+ m) (λ n p. trans _ _ _ _ (suc-+ n m) (ap _ _ _ _ suc p))
+
+-- TODO: which way should this go?
+define +-assoc : Π a b c. (a + b) + c = a + (b + c)
+   ≡ λ a b. ℕ-ind _ refl (λ c p. ap _ _ _ _ suc p)
+
+-- Multiplication. Also different from Agda's version.
+
+define mul : ℕ → ℕ → ℕ
+    ≡ λ m. ℕ-rec zero (add m)
 
 infixl 7 *
-define * (m n : ℕ) : ℕ
-    ≡ ℕ-rec zero (λ k. n + k) m
+define * ≡ mul
 
--- Properties of addition.
---
--- TODO: Agda defines these to (generally) induct on the first argument, but
--- maybe it would be more natural to induct on the last one. Should we change
--- the types to match?
+define *-zero : Π n. n * zero = zero
+    ≡ λ n. refl
 
-define +-zero (n : ℕ) : n + zero = n
-    ≡ ℕ-ind (λ n. n + zero = n) refl (λ n p. ap _ _ _ _ suc p) n
+define *-suc : Π m n. m * suc n = m + m * n
+    ≡ λ m n. refl
 
-define +-suc (m n : ℕ) : m + suc n = suc (m + n)
-    ≡ ℕ-ind (λ m. m + suc n = suc (m + n)) refl (λ n p. ap _ _ _ _ suc p) m
-
-define +-comm (m n : ℕ) : m + n = n + m
-    ≡ ℕ-ind (λ n. m + n = n + m) (+-zero m) (λ n p. trans _ _ _ _ (+-suc m n) (ap _ _ _ _ suc p)) n
-
-define +-assoc (m n o : ℕ) : m + (n + o) = (m + n) + o
-   ≡ ℕ-ind (λ m. m + (n + o) = (m + n) + o) refl (λ m p. ap _ _ _ _ suc p) m
+define zero-* : Π n. zero * n = zero
+    ≡ ℕ-ind _ refl (λ n p. ap _ _ _ _ (add zero) p)
 
 -- Propositional truncation.
 axiom Trunc : Type → Type
