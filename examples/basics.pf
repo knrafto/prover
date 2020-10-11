@@ -47,6 +47,18 @@ axiom 2-ind : Π (C : 2 → Type). C 0₂ → C 1₂ → Π a. C a
 rewrite 2-ind-0₂ C c₀ c₁ where 2-ind C c₀ c₁ 0₂ ≡ c₀
 rewrite 2-ind-1₂ C c₀ c₁ where 2-ind C c₀ c₁ 1₂ ≡ c₁
 
+-- Coproduct type.
+-- TODO: use +?
+infixr 1 ⊎
+axiom ⊎ : Type → Type → Type
+axiom inl {A} {B} : A → A ⊎ B
+axiom inr {A} {B} : B → A ⊎ B
+axiom ⊎-ind A B : Π (C : A ⊎ B → Type). (Π a. C (inl a)) → (Π b. C (inr b)) → Π x. C x
+rewrite ⊎-ind-inl A B C l r a
+    where ⊎-ind A B C l r (inl a) ≡ l a
+rewrite ⊎-ind-inr A B C l r b
+    where ⊎-ind A B C l r (inr b) ≡ r b
+
 -- Natural numbers.
 axiom ℕ : Type
 axiom zero : ℕ
