@@ -13,8 +13,7 @@ infix 4 =
 define = {A} (a b : A) ≡ Id A a b
 
 axiom refl {A} {a : A} : a = a
-axiom Id-ind {A} (C : Π (a b : A). a = b → Type) (c : Π a. C a a refl)
-    : Π a b p. C a b p
+axiom Id-ind {A} (C : Π (a b : A). a = b → Type) (c : Π a. C a a refl) : Π a b p. C a b p
 rewrite Id-ind-refl A (C : Π (a b : A). a = b → Type) c a
     where Id-ind C c _ _ refl ≡ c a
 
@@ -71,32 +70,25 @@ rewrite ℕ-ind-suc C base step n
 
 -- Structure of identity types.
 -- TODO: infer C of Id-ind in all cases?
-define ap (A B : Type) (x y : A) (f : A → B)
-    : x = y → f x = f y
+define ap (A B : Type) (x y : A) (f : A → B) : x = y → f x = f y
     ≡ Id-ind (λ x y p. f x = f y) (λ x. refl) x y
-define subst (A : Type) (x y : A) (B : A → Type)
-    : x = y → B x → B y
+define subst (A : Type) (x y : A) (B : A → Type) : x = y → B x → B y
     ≡ Id-ind (λ x y p. B x → B y) (λ x b. b) x y
-define sym (A : Type) (x y : A)
-    : x = y → y = x
+define sym (A : Type) (x y : A) : x = y → y = x
     ≡ Id-ind (λ x y p. y = x) (λ x. refl) x y
-define trans (A : Type) (x y z : A)
-    : x = y → y = z → x = z
+define trans (A : Type) (x y z : A) : x = y → y = z → x = z
     ≡ λ (p : x = y). λ (q : y = z).
         Id-ind (λ x y p. Π z. y = z → x = z) (λ x z p. p) x y p z q
 
 -- Functions.
-define id {A}
-    : A → A
+define id {A} : A → A
     ≡ λ x. x
 
 infixr 9 ∘
-define ∘ {A} {B} {C}
-    : (B → C) → (A → B) → (A → C)
+define ∘ {A} {B} {C} : (B → C) → (A → B) → (A → C)
     ≡ λ g f. λ x. g (f x)
 
-define happly (A B : Type) (f g : A → B)
-    : f = g → Π x. f x = g x
+define happly (A B : Type) (f g : A → B) : f = g → Π x. f x = g x
     ≡ Id-ind (λ f g p. Π x. f x = g x) (λ f x. refl) f g
 
 -- Sets and logic.
@@ -114,8 +106,7 @@ axiom inv {A} {B} (f : A → B) (f-IsEquiv : IsEquiv A B f) : B → A
 --    ≡ λ b. fst (fst (f-IsEquiv b))
 
 -- Natural numbers.
-define ℕ-rec {A} (z : A) (s : A → A)
-    : ℕ → A
+define ℕ-rec {A} (z : A) (s : A → A) : ℕ → A
     ≡ ℕ-ind (λ n. A) z (λ n. s)
 
 define one   ≡ suc zero
@@ -132,13 +123,11 @@ define ten   ≡ suc nine
 -- TODO: these match Agda's definitions, but we should consider flipping them
 -- around.
 infixl 6 +
-define + (m n : ℕ)
-    : ℕ
+define + (m n : ℕ) : ℕ
     ≡ ℕ-rec n suc m
 
 infixl 7 *
-define * (m n : ℕ)
-    : ℕ
+define * (m n : ℕ) : ℕ
     ≡ ℕ-rec zero (λ k. n + k) m
 
 -- Properties of addition.
@@ -147,20 +136,16 @@ define * (m n : ℕ)
 -- maybe it would be more natural to induct on the last one. Should we change
 -- the types to match?
 
-define +-zero (n : ℕ)
-    : n + zero = n
+define +-zero (n : ℕ) : n + zero = n
     ≡ ℕ-ind (λ n. n + zero = n) refl (λ n p. ap _ _ _ _ suc p) n
 
-define +-suc (m n : ℕ)
-    : m + suc n = suc (m + n)
+define +-suc (m n : ℕ) : m + suc n = suc (m + n)
     ≡ ℕ-ind (λ m. m + suc n = suc (m + n)) refl (λ n p. ap _ _ _ _ suc p) m
 
-define +-comm (m n : ℕ)
-    : m + n = n + m
+define +-comm (m n : ℕ) : m + n = n + m
     ≡ ℕ-ind (λ n. m + n = n + m) (+-zero m) (λ n p. trans _ _ _ _ (+-suc m n) (ap _ _ _ _ suc p)) n
 
-define +-assoc (m n o : ℕ)
-   : m + (n + o) = (m + n) + o
+define +-assoc (m n o : ℕ) : m + (n + o) = (m + n) + o
    ≡ ℕ-ind (λ m. m + (n + o) = (m + n) + o) refl (λ m p. ap _ _ _ _ suc p) m
 
 -- Propositional truncation.
