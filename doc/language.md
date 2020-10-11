@@ -71,7 +71,7 @@ specially in the syntax:
 ```
 Type
 _
-: ≡
+: ≡ →
 Π λ Σ
 define axiom rewrite where infix infixl infixr
 ```
@@ -110,6 +110,7 @@ expr =
     Type
     ( expr )
     expr expr
+    expr → expr
     expr , expr
     Π explicit_params . binder
     λ explicit_params . binder

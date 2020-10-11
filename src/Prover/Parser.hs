@@ -4,6 +4,7 @@ module Prover.Parser ( parseModule ) where
 
 import Control.Monad
 
+import Control.Monad.Combinators.Expr
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Void
@@ -39,15 +40,15 @@ reservedWord w = lexeme . try $ do
     Range s <$> getPosition
 
 name :: Parser Name
-name = lexeme. try $ do
+name = lexeme . try $ do
     s <- getPosition
     w <- takeWhile1P (Just "word character") isWordChar
-    e <- getPosition
     when (w `elem` reservedWords) $ fail
         (  "keyword "
         ++ T.unpack w
         ++ " is reserved and cannot be used as a name"
         )
+    e <- getPosition
     return (Name (Range s e) w)
   where
     reservedWords :: [Text]
@@ -58,6 +59,7 @@ name = lexeme. try $ do
         , "Σ"
         , "Π"
         , "λ"
+        , "→"
         , "Type"
         , "define"
         , "axiom"
@@ -126,14 +128,22 @@ atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
         e <- expr
         return (Sigma (rangeSpan s (getRange e)) p e)
 
-expr :: Parser Expr
-expr = do
+apps :: Parser Expr
+apps = do
     es <- some atom
     case es of
         [e] -> return e
         _   -> do
             let r = foldr1 rangeSpan (map getRange es)
             return (Apps r es)
+
+expr :: Parser Expr
+expr = makeExprParser
+    apps
+    [ [InfixR (binop Arrow  <$ reservedWord "→")]
+    , [InfixR (binop Pair   <$ symbol       ',')]
+    ]
+    where binop c e1 e2 = c (rangeSpan (getRange e1) (getRange e2)) e1 e2
 
 define :: Parser Decl
 define = Define

@@ -1,7 +1,3 @@
--- Functions.
-infixr 0 →
-define → A B ≡ Π (a : A). B
-
 -- Cartesian product.
 infixr 5 ×
 define × A B ≡ Σ (a : A). B

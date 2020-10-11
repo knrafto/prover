@@ -21,6 +21,8 @@ data Expr
   | Lam     Range [ParamGroup] Expr
   | Sigma   Range [ParamGroup] Expr
   | Apps    Range [Expr]
+  | Arrow   Range Expr Expr
+  | Pair    Range Expr Expr
   deriving (Show)
 
 instance HasRange Expr where
@@ -32,6 +34,8 @@ instance HasRange Expr where
     Lam     r _ _ -> r
     Sigma   r _ _ -> r
     Apps    r _   -> r
+    Arrow   r _ _ -> r
+    Pair    r _ _ -> r
 
 data ParamGroup = ParamGroup [Name] (Maybe Expr)
   deriving (Show)

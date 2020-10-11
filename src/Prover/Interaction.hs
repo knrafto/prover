@@ -65,6 +65,8 @@ highlightExpr = \case
   Lam     _ ps e  -> highlightParams HighlightVarName ps ++ highlightExpr e
   Sigma   _ ps e  -> highlightParams HighlightVarName ps ++ highlightExpr e
   App     _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  Arrow   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  Pair    _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
 
 highlightParam :: HighlightKind -> Param -> [HighlightedRange]
 highlightParam kind p = [HighlightedRange (nameRange (paramName p)) kind]

@@ -20,7 +20,7 @@ import Prover.Pattern
 import Prover.Pretty
 import Prover.Syntax.Abstract qualified as A
 import Prover.Syntax.Concrete qualified as C
-import Prover.Syntax.Position ( HasRange(getRange), Range )
+import Prover.Syntax.Position
 import Prover.Term
 import Prover.Unify
 
@@ -234,6 +234,20 @@ checkExpr expr expectedTy = case expr of
   C.Apps    r es    -> do
     tree <- parseInfixOperators r es
     checkInfixTree tree expectedTy
+
+  C.Arrow   r e1 e2 ->  do
+    -- Γ ⊢ A : Type
+    e1' <- checkExpr e1 Type
+
+    -- Γ ⊢ B : Type
+    e2' <- checkExpr e2 Type
+
+    -- ⟹ Γ ⊢ (Π _ : A. B) : Type
+    let t = Pi (A.exprTerm e1') (weaken (A.exprTerm e2'))
+    i <- expect r t Type expectedTy
+    return $ A.Arrow i e1' e2'
+
+  C.Pair    _ _  _  -> error "pair"
 
 checkInfixTree :: InfixTree -> Type -> M A.Expr
 checkInfixTree tree expectedTy = case tree of
