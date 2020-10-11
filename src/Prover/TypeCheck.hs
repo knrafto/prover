@@ -210,7 +210,7 @@ checkExpr expr expectedTy = case expr of
     ps' <- checkParams ps
 
     -- Γ, x : A ⊢ e : B
-    tyB <- localParams ps'  $ createMeta r Type
+    tyB <- localParams ps' $ createMeta r Type
     e'  <- localParams ps' $ checkExpr e tyB
 
     -- ⟹ Γ ⊢ (λ x : A. e) : (Π x : A. B)
@@ -235,7 +235,7 @@ checkExpr expr expectedTy = case expr of
     tree <- parseInfixOperators r es
     checkInfixTree tree expectedTy
 
-  C.Arrow   r e1 e2 ->  do
+  C.Arrow   r e1 e2 -> do
     -- Γ ⊢ A : Type
     e1' <- checkExpr e1 Type
 
@@ -247,7 +247,20 @@ checkExpr expr expectedTy = case expr of
     i <- expect r t Type expectedTy
     return $ A.Arrow i e1' e2'
 
-  C.Pair    _ _  _  -> error "pair"
+  C.Pair    r a  b  -> do
+    -- Γ ⊢ a : A
+    tyA <- createMeta r Type
+    a' <- checkExpr a tyA
+
+    -- Γ ⊢ b : B a
+    tyB <- localUnnamed tyA $ createMeta r Type
+    b' <- checkExpr b (instantiate tyB (A.exprTerm a'))
+
+    -- ⟹ Γ ⊢ (a, b) : Σ _ : A. B
+    let t  = Pair (A.exprTerm a') (A.exprTerm b')
+        ty = Sigma tyA tyB
+    i <- expect r t ty expectedTy
+    return $ A.Pair i a' b'
 
 checkInfixTree :: InfixTree -> Type -> M A.Expr
 checkInfixTree tree expectedTy = case tree of
@@ -303,6 +316,7 @@ termToPattern :: Term -> MaybeT M Pattern
 termToPattern t = lift (whnf t) >>= \case
   Var i []     -> return (VarPat i)
   Axiom i args -> AxiomPat i <$> mapM termToPattern args
+  Pair a b     -> PairPat <$> termToPattern a <*> termToPattern b
   _            -> mzero
 
 checkDecl :: C.Decl -> M A.Decl

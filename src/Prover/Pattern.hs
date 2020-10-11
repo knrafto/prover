@@ -17,6 +17,7 @@ data Rule = Rule
 data Pattern
   = VarPat !Int
   | AxiomPat NameId [Pattern]
+  | PairPat Pattern Pattern
   deriving (Show)
 
 -- | Collect the vars assigned by a pattern.
@@ -24,6 +25,7 @@ patternVars :: Pattern -> IntSet
 patternVars = \case
   VarPat i        -> IntSet.singleton i
   AxiomPat _ args -> IntSet.unions (map patternVars args)
+  PairPat a b     -> IntSet.union (patternVars a) (patternVars b)
 
 -- | Returns whether a rule can extract all variables in the context.
 matchable :: Rule -> Bool

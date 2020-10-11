@@ -35,6 +35,8 @@ data Term
   | Var !Var [Term]
   -- | A lambda function.
   | Lam Term
+  -- | A dependent pair.
+  | Pair Term Term
   -- | A universe.
   | Type
   -- | A Π-type.
@@ -89,6 +91,7 @@ applySubst subst = \case
   Axiom n args        -> Axiom n (map (applySubst subst) args)
   Var v args          -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
   Lam b               -> Lam (applySubst (SubstLift subst) b)
+  Pair a b            -> Pair (applySubst subst a) (applySubst subst b)
   Type                -> Type
   Pi a b              -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
   Sigma a b           -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
@@ -110,6 +113,7 @@ strengthen = go 0
       | j == i          -> Nothing
       | otherwise       -> Var (j - 1) <$> traverse (go i) args
     Lam b               -> Lam <$> go (i + 1) b
+    Pair a b            -> Pair <$> go i a <*> go i b
     Type                -> return Type
     Pi a b              -> Pi <$> go i a <*> go (i + 1) b
     Sigma a b           -> Sigma <$> go i a <*> go (i + 1) b

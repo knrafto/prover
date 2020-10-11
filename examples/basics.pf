@@ -1,6 +1,15 @@
--- Cartesian product.
+-- Dependent sum and Cartesian product.
 infixr 5 ×
 define × A B ≡ Σ (a : A). B
+
+axiom Σ-ind (A : Type) (B : A → Type) (C : (Σ a. B a) → Type) : (Π a b. C (a, b)) → Π x. C x
+rewrite Σ-ind-pair (A : Type) (B : A → Type) (C : (Σ a. B a) → Type) (f : Π a b. C (a, b)) (a : A) (b : B a)
+    where Σ-ind A B C f (a, b) ≡ f a b
+
+define fst {A} {B} : (Σ a. B a) → A
+    ≡ Σ-ind A B _ (λ a b. a)
+define snd {A} {B} : Π (p : Σ a. B a). B (fst p)
+    ≡ Σ-ind A B (λ p. B (fst p)) (λ a b. b)
 
 -- Martin-Löf identity type.
 axiom Id A : A → A → Type
@@ -12,17 +21,6 @@ axiom refl {A} {a : A} : a = a
 axiom Id-ind {A} (C : Π (a b : A). a = b → Type) (c : Π a. C a a refl) : Π a b p. C a b p
 rewrite Id-ind-refl A (C : Π (a b : A). a = b → Type) c a
     where Id-ind C c _ _ refl ≡ c a
-
-axiom Sigma (A : Type) (B : A → Type) : Type
-axiom pair {A} {B} (a : A) (b : B a) : Sigma A B
-axiom Sigma-ind A B (C : Sigma A B → Type) : (Π a b. C (pair a b)) → Π x. C x
-rewrite Sigma-ind-pair (A : Type) (B : A → Type) (C : Sigma A B → Type) (f : Π a b. C (pair a b)) (a : A) (b : B a)
-    where Sigma-ind A B C f (pair a b) ≡ f a b
-
-define fst {A} {B} : Sigma A B → A
-    ≡ Sigma-ind A B _ (λ a b. a)
-define snd {A} {B} : Π (p : Sigma A B). B (fst p)
-    ≡ Sigma-ind A B (λ p. B (fst p)) (λ a b. b)
 
 -- Empty type.
 axiom 0 : Type
@@ -97,9 +95,8 @@ define Fib (A B : Type) (f : A → B) (b : B) : Type
 define IsEquiv (A B : Type) (f : A → B) : Type
     ≡ Π (b : B). IsContr (Fib A B f b)
 
--- TODO: define
-axiom inv {A} {B} (f : A → B) (f-IsEquiv : IsEquiv A B f) : B → A
---    ≡ λ b. fst (fst (f-IsEquiv b))
+define inv {A} {B} (f : A → B) (f-IsEquiv : IsEquiv A B f) : B → A
+    ≡ λ b. fst (fst (f-IsEquiv b))
 
 -- Natural numbers.
 define ℕ-rec {A} (z : A) (s : A → A) : ℕ → A

@@ -68,6 +68,7 @@ prettyTerm :: Ctx -> Term -> M Doc
 prettyTerm ctx = prettyPrec (ctxLength ctx) 0
   where
     binderPrec = 0
+    commaPrec = 1
     appPrec = 10
 
     prettyPrec :: Int -> Int -> Term -> M Doc
@@ -83,6 +84,10 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
       Lam b                -> parens (d > binderPrec) $ do
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "λ" <+> prettyVar k <> "." <+> bDoc
+      Pair a b             -> parens (d > commaPrec) $ do
+        aDoc <- prettyPrec k (commaPrec + 1) a
+        bDoc <- prettyPrec k commaPrec b
+        return $ aDoc <> "," <+> bDoc
       Type                 -> return "Type"
       Pi a b               -> parens (d > binderPrec) $ do
         aDoc <- prettyPrec k (appPrec + 1) a

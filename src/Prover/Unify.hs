@@ -140,6 +140,9 @@ matchPattern pat t = case pat of
     Axiom h termArgs | h == id && length args == length termArgs ->
       mconcat <$> mapM (uncurry matchPattern) (zip args termArgs)
     _ -> return NoMatch
+  PairPat pa pb    -> whnf t >>= \case
+    Pair a b -> mappend <$> matchPattern pa a <*> matchPattern pb b
+    _ -> return NoMatch
 
 applyRules :: NameId -> [Term] -> [Rule] -> M Term
 applyRules id args []          = return $ Axiom id args
@@ -207,6 +210,14 @@ unify ctx ty t1 t2 = do
     (Pi a b, Lam e1, Lam e2) -> unify (ctx :> a) b e1 e2
     (Pi a b, Lam e, t)       -> unify (ctx :> a) b e (applyTerm (weaken t) [var 0])
     (Pi a b, t, Lam e)       -> unify (ctx :> a) b (applyTerm (weaken t) [var 0]) e
+
+    -- Σ-types (no η)
+    (Sigma a b, Pair a1 b1, Pair a2 b2) -> do
+      -- If B does not depend on A (i.e. this is a non-dependent function type) then
+      -- we don't need to guard on the argument constraint.
+      case strengthen b of
+        Nothing -> guarded (TermEq ctx a a1 a2) (TermEq ctx (instantiate b a1) b1 b2)
+        Just b' -> simplify $ And [TermEq ctx a a1 a2, TermEq ctx b' b1 b2]
 
     (Type, Type, Type) -> return $ Solved True
     (Type, Pi a1 b1, Pi a2 b2) -> unifyDependentTypes ctx a1 b1 a2 b2
@@ -321,6 +332,7 @@ invertVarSubst σ t = do
         [i'] -> Var i' <$> mapM (invertVarSubst σ) args
         _ -> mzero
     Lam b -> Lam <$> invertVarSubst (liftVarSubst σ) b
+    Pair a b -> Pair <$> invertVarSubst σ a <*> invertVarSubst σ b
     Type -> return Type
     Pi a b -> Pi <$> invertVarSubst σ a <*> invertVarSubst (liftVarSubst σ) b
     Sigma a b -> Sigma <$> invertVarSubst σ a <*> invertVarSubst (liftVarSubst σ) b
