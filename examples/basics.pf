@@ -109,6 +109,10 @@ define Fib (A B : Type) (f : A → B) (b : B) : Type
 define IsEquiv (A B : Type) (f : A → B) : Type
     ≡ Π (b : B). IsContr (Fib A B f b)
 
+-- TODO: define
+axiom inv {A} {B} (f : A → B) (f-IsEquiv : IsEquiv A B f) : B → A
+--    ≡ λ b. fst (fst (f-IsEquiv b))
+
 -- Natural numbers.
 define ℕ-rec {A} (z : A) (s : A → A)
     : ℕ → A
@@ -196,5 +200,5 @@ rewrite ℤ-rec-zero A z f f-IsEquiv
     where ℤ-rec A z f f-IsEquiv zero ≡ z
 rewrite ℤ-rec-suc A z f f-IsEquiv n
     where ℤ-rec A z f f-IsEquiv (suc n) ≡ f (ℤ-rec A z f f-IsEquiv n)
--- rewrite ℤ-rec-pred A z f f-IsEquiv n
---     where ℤ-rec A z f f-IsEquiv (pred n) ≡ inv f (ℤ-rec A z f f-IsEquiv n)
+rewrite ℤ-rec-pred A z f f-IsEquiv n
+    where ℤ-rec A z f f-IsEquiv (pred n) ≡ inv f f-IsEquiv (ℤ-rec A z f f-IsEquiv n)
