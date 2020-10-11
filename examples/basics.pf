@@ -24,12 +24,10 @@ axiom Sigma-ind A B (C : Sigma A B → Type) : (Π a b. C (pair a b)) → Π x. 
 rewrite Sigma-ind-pair (A : Type) (B : A → Type) (C : Sigma A B → Type) (f : Π a b. C (pair a b)) (a : A) (b : B a)
     where Sigma-ind A B C f (pair a b) ≡ f a b
 
-define fst {A} {B} (p : Sigma A B)
-    : A
-    ≡ Sigma-ind A B _ (λ a b. a) p
-define snd {A} {B} (p : Sigma A B)
-    : B (fst p)
-    ≡ Sigma-ind A B (λ p. B (fst p)) (λ a b. b) p
+define fst {A} {B} : Sigma A B → A
+    ≡ Sigma-ind A B _ (λ a b. a)
+define snd {A} {B} : Π (p : Sigma A B). B (fst p)
+    ≡ Sigma-ind A B (λ p. B (fst p)) (λ a b. b)
 
 -- Empty type.
 axiom 0 : Type
@@ -94,8 +92,10 @@ define IsContr (A : Type) ≡ Σ (a : A). Π (x : A). a = x
 define IsProp  (A : Type) ≡ Π (x y : A). x = y
 define IsSet   (A : Type) ≡ Π (x y : A). IsProp (x = y)
 
-define fiber   (A B : Type) (f : A → B) (b : B) ≡ Σ (a : A). f a = b
-define IsEquiv (A B : Type) (f : A → B) ≡ Π (b : B). IsContr (fiber A B f b)
+define Fib (A B : Type) (f : A → B) (b : B) : Type
+    ≡ Σ (a : A). f a = b
+define IsEquiv (A B : Type) (f : A → B) : Type
+    ≡ Π (b : B). IsContr (Fib A B f b)
 
 -- Natural numbers.
 define ℕ-rec {A} (z : A) (s : A → A)
