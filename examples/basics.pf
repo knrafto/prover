@@ -98,6 +98,22 @@ define IsEquiv (A B : Type) (f : A → B) : Type
 define inv {A} {B} (f : A → B) (f-IsEquiv : IsEquiv A B f) : B → A
     ≡ λ b. fst (fst (f-IsEquiv b))
 
+define not A ≡ A → 0
+
+define Dec A ≡ A ⊎ not A
+
+define 0-IsProp : IsProp 0
+    ≡ 0-ind _
+
+define 0-Dec : Dec 0
+    ≡ inr id
+
+define 1-IsProp : IsProp 1
+    ≡ 1-ind _ (1-ind _ refl)
+
+define 1-Dec : Dec 1
+    ≡ inl tt
+
 -- Natural numbers.
 define ℕ-rec {A} (z : A) (s : A → A) : ℕ → A
     ≡ ℕ-ind (λ n. A) z (λ n. s)
@@ -112,6 +128,33 @@ define seven ≡ suc six
 define eight ≡ suc seven
 define nine  ≡ suc eight
 define ten   ≡ suc nine
+
+define ℕ-code : ℕ → ℕ → Type
+    ≡ ℕ-ind _
+        (ℕ-ind _ 1 (λ n r. 0))
+        (λ m rm. ℕ-ind _ 0 (λ n rn. rm n))
+
+define ℕ-code-IsProp : Π m n. IsProp (ℕ-code m n)
+    ≡ ℕ-ind _
+        (ℕ-ind _ 1-IsProp (λ n r. 0-IsProp))
+        (λ m rm. ℕ-ind _ 0-IsProp (λ n rn. rm n))
+
+define ℕ-code-Dec : Π m n. Dec (ℕ-code m n)
+    ≡ ℕ-ind _
+        (ℕ-ind _ 1-Dec (λ n r. 0-Dec))
+        (λ m rm. ℕ-ind _ 0-Dec (λ n rn. rm n))
+
+define ℕ-code-reflexive : Π n. ℕ-code n n
+    ≡ ℕ-ind _ tt (λ n r. r)
+
+define ℕ-decode : Π m n. ℕ-code m n → m = n
+    ≡ ℕ-ind _
+        (ℕ-ind _ (λ x. refl) (λ n r. 0-ind _))
+        (λ m rm. ℕ-ind _ (0-ind _) (λ n rn. ap _ _ _ _ suc ∘ rm n))
+
+-- TODO: show this from Theorem 7.2.2?
+-- define ℕ-decode-IsEquiv : Π m n. IsEquiv _ _ (ℕ-decode m n)
+    -- ≡ _
 
 -- Addition. Flipped from Agda's version.
 -- TODO: is this a good idea?
