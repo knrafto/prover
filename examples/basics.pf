@@ -75,15 +75,12 @@ define trans (A : Type) (x y z : A) : x = y → y = z → x = z
         Id-ind (λ x y p. Π z. y = z → x = z) (λ x z p. p) x y p z q
 
 -- Functions.
-define id {A} : A → A
+define id A : A → A
     ≡ λ x. x
 
 infixr 9 ∘
 define ∘ {A} {B} {C} : (B → C) → (A → B) → (A → C)
     ≡ λ g f. λ x. g (f x)
-
-define happly (A B : Type) (f g : A → B) : f = g → Π x. f x = g x
-    ≡ Id-ind (λ f g p. Π x. f x = g x) (λ f x. refl) f g
 
 -- Sets and logic.
 define IsContr (A : Type) ≡ Σ (a : A). Π (x : A). a = x
@@ -98,6 +95,31 @@ define IsEquiv (A B : Type) (f : A → B) : Type
 define inv {A} {B} (f : A → B) (f-IsEquiv : IsEquiv A B f) : B → A
     ≡ λ b. fst (fst (f-IsEquiv b))
 
+-- Function extensionality.
+define happly (A B : Type) (f g : A → B) : f = g → Π x. f x = g x
+    ≡ Id-ind (λ f g p. Π x. f x = g x) (λ f x. refl) f g
+
+axiom happly-IsEquiv (A B : Type) (f g : A → B) : IsEquiv _ _ (happly A B f g)
+
+define funext (A B : Type) (f g : A → B)
+    : (Π x. f x = g x) → f = g
+    ≡ inv _ (happly-IsEquiv A B f g)
+
+-- Univalence.
+-- TODO: define
+axiom id-IsEquiv {A}
+    : IsEquiv _ _ (id A)
+    -- ≡ λ a. _
+
+define Equiv A B ≡ Σ (f : A → B). IsEquiv A B f
+define Id→Equiv A B
+    : A = B → Equiv A B
+    ≡ Id-ind (λ A B p. Equiv A B) (λ A. (id A, id-IsEquiv)) A B
+
+axiom Id→Equiv-IsEquiv {A} {B} : IsEquiv _ _ (Id→Equiv A B)
+define ua {A} {B} : Equiv A B → A = B
+    ≡ inv _ Id→Equiv-IsEquiv
+
 define not A ≡ A → 0
 
 define Dec A ≡ A ⊎ not A
@@ -106,7 +128,7 @@ define 0-IsProp : IsProp 0
     ≡ 0-ind _
 
 define 0-Dec : Dec 0
-    ≡ inr id
+    ≡ inr (id 0)
 
 define 1-IsProp : IsProp 1
     ≡ 1-ind _ (1-ind _ refl)
