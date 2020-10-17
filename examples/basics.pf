@@ -96,24 +96,21 @@ define inv {A} {B} (f : A → B) (f-IsEquiv : IsEquiv A B f) : B → A
     ≡ λ b. fst (fst (f-IsEquiv b))
 
 -- Function extensionality.
-define happly (A B : Type) (f g : A → B) : f = g → Π x. f x = g x
+define happly (A : Type) (B : A → Type) (f g : Π a. B a) : f = g → Π x. f x = g x
     ≡ Id-ind (λ f g p. Π x. f x = g x) (λ f x. refl) f g
 
-axiom happly-IsEquiv (A B : Type) (f g : A → B) : IsEquiv _ _ (happly A B f g)
+axiom happly-IsEquiv (A : Type) (B : A → Type) (f g : Π a. B a) : IsEquiv _ _ (happly A B f g)
 
-define funext (A B : Type) (f g : A → B)
-    : (Π x. f x = g x) → f = g
+define funext (A : Type) (B : A → Type) (f g : Π a. B a) : (Π x. f x = g x) → f = g
     ≡ inv _ (happly-IsEquiv A B f g)
 
 -- Univalence.
 -- TODO: define
-axiom id-IsEquiv {A}
-    : IsEquiv _ _ (id A)
+axiom id-IsEquiv {A} : IsEquiv _ _ (id A)
     -- ≡ λ a. _
 
 define Equiv A B ≡ Σ (f : A → B). IsEquiv A B f
-define Id→Equiv A B
-    : A = B → Equiv A B
+define Id→Equiv A B : A = B → Equiv A B
     ≡ Id-ind (λ A B p. Equiv A B) (λ A. (id A, id-IsEquiv)) A B
 
 axiom Id→Equiv-IsEquiv {A} {B} : IsEquiv _ _ (Id→Equiv A B)
@@ -135,6 +132,9 @@ define 1-IsProp : IsProp 1
 
 define 1-Dec : Dec 1
     ≡ inl tt
+
+define Π-IsProp {A : Type} {B : A → Type} (B-IsProp : Π a. IsProp (B a)): IsProp (Π a. B a)
+    ≡ λ f g. funext _ _ f g (λ a. B-IsProp a (f a) (g a))
 
 -- Natural numbers.
 define ℕ-rec {A} (z : A) (s : A → A) : ℕ → A
