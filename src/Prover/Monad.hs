@@ -11,7 +11,6 @@ import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 
 import Control.Monad.IO.Class
-import Control.Monad.Reader.Class
 import Control.Monad.State.Class
 
 import Prover.Pattern
@@ -37,12 +36,6 @@ data Error
   -- | An implicit parameter that doesn't appear at the front.
   | LateImplicitParam Range Param
   deriving (Show)
-
--- | A context labeled with variable names.
--- TODO: Move to TypeCheck.hs
-data TcCtx
-  = EmptyTcCtx
-  | !TcCtx :>> (Maybe Name, Type)
 
 -- | Constraints for unification.
 data Constraint
@@ -116,36 +109,31 @@ initialState = State
   , constraints       = []
   }
 
-newtype M a = M { unM :: IORef State -> TcCtx -> IO a }
+newtype M a = M { unM :: IORef State -> IO a }
 
 -- TODO: benchmark inlining all of these
 
 instance Functor M where
-  fmap f (M m) = M $ \r e -> fmap f (m r e)
+  fmap f (M m) = M $ \r -> fmap f (m r)
 
 instance Applicative M where
-  pure a        = M $ \_ _ -> return a
-  M mf <*> M ma = M $ \r e -> mf r e <*> ma r e
+  pure a        = M $ \_ -> return a
+  M mf <*> M ma = M $ \r -> mf r <*> ma r
 
 instance Monad M where
-  M m >>= k = M $ \r e -> m r e >>= \a -> unM (k a) r e
+  M m >>= k = M $ \r -> m r >>= \a -> unM (k a) r
 
 instance MonadIO M where
-  liftIO m = M $ \_ _ -> m
-
-instance MonadReader TcCtx M where
-  ask           = M $ \_ e -> return e
-  local f (M m) = M $ \r e -> m r (f e)
+  liftIO m = M $ \_ -> m
 
 instance MonadState State M where
-  get   = M $ \r _ -> liftIO (readIORef r)
-  put s = M $ \r _ -> liftIO (writeIORef r s)
+  get   = M $ \r -> liftIO (readIORef r)
+  put s = M $ \r -> liftIO (writeIORef r s)
 
 runM :: M a -> IO (a, State)
 runM (M m) = do
   r <- newIORef initialState
-  let e = EmptyTcCtx
-  a <- m r e
+  a <- m r
   s <- readIORef r
   return (a, s)
 

@@ -5,7 +5,8 @@
 module Prover.TypeCheck where
 
 import Control.Monad
-import Control.Monad.Reader.Class
+import Data.List
+
 import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
@@ -24,6 +25,11 @@ import Prover.Syntax.Position
 import Prover.Term
 import Prover.Unify
 
+-- A context with variable names.
+data TcCtx
+  = EmptyTcCtx
+  | !TcCtx :>> (Maybe A.Name, Type)
+
 -- | Strip the names from a type-checking context.
 toCtx :: TcCtx -> Ctx
 toCtx EmptyTcCtx = EmptyCtx
@@ -38,10 +44,26 @@ lookupLocal t = go 0
       | A.nameText n == t = Just (i, n)
     go !i (tcCtx :>> _) = go (i + 1) tcCtx
 
+-- | Add a param to the context.
+addParam :: TcCtx -> A.Param -> TcCtx
+addParam tcCtx p = tcCtx :>> (Just (A.paramName p), A.paramType p)
+
+-- | Add a param group to the context.
+addParamGroup :: TcCtx -> A.ParamGroup -> TcCtx
+addParamGroup tcCtx (A.ParamGroup ps _) = foldl' addParam tcCtx ps
+
+-- | Add param groups to the context.
+addParams :: TcCtx -> [A.ParamGroup] -> TcCtx
+addParams = foldl' addParamGroup
+
+-- | Add an unnamed param to the environment.
+addUnnamed :: TcCtx -> Type -> TcCtx
+addUnnamed tcCtx ty = tcCtx :>> (Nothing, ty)
+
 -- | Create a metavariable with the given type in the given context.
-createMeta :: Range -> Type -> M Term
-createMeta r ty = do
-  ctx <- asks toCtx
+createMeta :: Range -> TcCtx -> Type -> M Term
+createMeta r tcCtx ty = do
+  let ctx = toCtx tcCtx
   id  <- freshMetaId
   -- Metavariables always represent closed terms, so in a context Γ we create
   -- a function Γ → A and apply it to all the variables in Γ.
@@ -64,22 +86,6 @@ createName :: C.Name -> M A.Name
 createName (C.Name r t) = do
   id <- freshNameId
   return (A.Name id r t)
-
--- | Add a param to the environment.
-localParam :: A.Param -> M a -> M a
-localParam p = local $ \tcCtx -> tcCtx :>> (Just (A.paramName p), A.paramType p)
-
--- | Add a param group to the environment.
-localParamGroup :: A.ParamGroup -> M a -> M a
-localParamGroup (A.ParamGroup ps _) m = go ps
-  where
-    go [] = m
-    go (p:ps) = localParam p $ go ps
-
--- | Add param groups to the environment.
-localParams :: [A.ParamGroup] -> M a -> M a
-localParams []     m = m
-localParams (p:ps) m = localParamGroup p $ localParams ps m
 
 -- | The number of variables in the parameter collection.
 paramsLength :: [A.ParamGroup] -> Int
@@ -107,15 +113,11 @@ paramsSigma (A.ParamGroup ps _ : rest) ty = paramListSigma ps $ paramsSigma rest
 paramsLam :: [A.ParamGroup] -> Term -> Term
 paramsLam ps = makeLam (paramsLength ps)
 
--- | Add an unnamed param to the environment.
-localUnnamed :: Type -> M a -> M a
-localUnnamed ty = local $ \tcCtx -> tcCtx :>> (Nothing, ty)
-
 -- | Generate a constraint that two terms (of possibly different types) are
 -- equal.
-addConstraint :: Range -> Term -> Type -> Term -> Type -> M ()
-addConstraint r a tyA b tyB = do
-  ctx <- asks toCtx
+addConstraint :: Range -> TcCtx -> Term -> Type -> Term -> Type -> M ()
+addConstraint r tcCtx a tyA b tyB = do
+  let ctx = toCtx tcCtx
   debugFields "create constraint" $
     [ "loc" |: return (pretty r)
     , "ctx" |: prettyCtx ctx
@@ -129,36 +131,35 @@ addConstraint r a tyA b tyB = do
 
 -- | Generate expression info for a range, term, and type, while checking that
 -- it matches the expected output type.
-expect :: Range -> Term -> Type -> Type -> M A.ExprInfo
-expect r t ty expectedTy = do
-  m <- createMeta r expectedTy
-  addConstraint r m expectedTy t ty
+expect :: Range -> TcCtx -> Term -> Type -> Type -> M A.ExprInfo
+expect r tcCtx t ty expectedTy = do
+  m <- createMeta r tcCtx expectedTy
+  addConstraint r tcCtx m expectedTy t ty
   return (A.ExprInfo r m expectedTy)
 
 -- | Apply a term to metavariables to fill implicit parameters.
-expandImplicits :: Range -> Int -> Term -> Type -> M (Term, Type)
-expandImplicits _ 0 t ty = return (t, ty)
-expandImplicits r n t ty = do
+expandImplicits :: Range -> TcCtx -> Int -> Term -> Type -> M (Term, Type)
+expandImplicits _ _     0 t ty = return (t, ty)
+expandImplicits r tcCtx n t ty = do
   (a, b) <- case ty of
     Pi a b -> return (a, b)
     _ -> error "expandImplicits: not a Π-type"
-  arg <- createMeta r a
-  expandImplicits r (n - 1) (applyTerm t [arg]) (instantiate b arg)
+  arg <- createMeta r tcCtx a
+  expandImplicits r tcCtx (n - 1) (applyTerm t [arg]) (instantiate b arg)
 
 -- | Producing a judgement Γ ⊢ t : A.
-checkExpr :: C.Expr -> Type -> M A.Expr
-checkExpr expr expectedTy = case expr of
+checkExpr :: C.Expr -> TcCtx -> Type -> M A.Expr
+checkExpr expr tcCtx expectedTy = case expr of
   C.Id      n       -> do
     let r = C.nameRange n
         s = C.nameText n
-    tcCtx <- ask
     state <- get
     case () of
       _ | Just (v, n) <- lookupLocal s tcCtx -> do
           let t    = var v
               ty   = ctxLookup (toCtx tcCtx) v
               n'   = A.Name (A.nameId n) r s
-          i <- expect r t ty expectedTy
+          i <- expect r tcCtx t ty expectedTy
           return $ A.Var i n'
 
       _ | Just id <- HashMap.lookup s (globalNames state)
@@ -166,8 +167,8 @@ checkExpr expr expectedTy = case expr of
           implicits <- getState id defImplicits
           t <- getState id defTerms
           let n' = A.Name id r s
-          (t', ty') <- expandImplicits r implicits t ty
-          i <- expect r t' ty' expectedTy
+          (t', ty') <- expandImplicits r tcCtx implicits t ty
+          i <- expect r tcCtx t' ty' expectedTy
           return $ A.Def i n'
 
       _ | Just id <- HashMap.lookup s (globalNames state)
@@ -175,140 +176,140 @@ checkExpr expr expectedTy = case expr of
           implicits <- getState id axiomImplicits
           let n' = A.Name id r s
               t  = BlockedAxiom id []
-          (t', ty') <- expandImplicits r implicits t ty
-          i <- expect r t' ty' expectedTy
+          (t', ty') <- expandImplicits r tcCtx implicits t ty
+          i <- expect r tcCtx t' ty' expectedTy
           return $ A.Axiom i n'
 
       _ -> do
         emitError $ UnboundName r s
-        t <- createMeta r expectedTy
+        t <- createMeta r tcCtx expectedTy
         return $ A.Unbound (A.ExprInfo r t expectedTy) s
 
   C.Hole    r       -> do
-    t <- createMeta r expectedTy
+    t <- createMeta r tcCtx expectedTy
     return $ A.Hole (A.ExprInfo r t expectedTy)
 
   C.Type    r       -> do
-    i <- expect r Type Type expectedTy
+    i <- expect r tcCtx Type Type expectedTy
     return $ A.Type i
 
   C.Pi      r ps e  -> do
     -- Γ ⊢ A : Type
-    ps' <- checkParams ps
+    ps' <- checkParams tcCtx ps
 
     -- Γ, x : A ⊢ B : Type
-    e' <- localParams ps' $ checkExpr e Type
+    e' <- checkExpr e (addParams tcCtx ps') Type
 
     -- ⟹ Γ ⊢ (Π x : A. B) : Type
     let t = paramsPi ps' (A.exprTerm e')
-    i <- expect r t Type expectedTy
+    i <- expect r tcCtx t Type expectedTy
     return $ A.Pi i ps' e'
 
   C.Lam     r ps e  -> do
     -- Γ ⊢ A : Type
-    ps' <- checkParams ps
+    ps' <- checkParams tcCtx ps
 
     -- Γ, x : A ⊢ e : B
-    tyB <- localParams ps' $ createMeta r Type
-    e'  <- localParams ps' $ checkExpr e tyB
+    tyB <- createMeta r (addParams tcCtx ps') Type
+    e'  <- checkExpr e (addParams tcCtx ps') tyB
 
     -- ⟹ Γ ⊢ (λ x : A. e) : (Π x : A. B)
     let t   = paramsLam ps' (A.exprTerm e')
         ty  = paramsPi ps' (A.exprType e')
-    i <- expect r t ty expectedTy
+    i <- expect r tcCtx t ty expectedTy
     return $ A.Lam i ps' e'
 
   C.Sigma   r ps e  -> do
     -- Γ ⊢ A : Type
-    ps' <- checkParams ps
+    ps' <- checkParams tcCtx ps
 
     -- Γ, x : A ⊢ B : Type
-    e' <- localParams ps' $ checkExpr e Type
+    e' <- checkExpr e (addParams tcCtx ps') Type
 
     -- ⟹ Γ ⊢ (Σ x : A. B) : Type
     let t = paramsSigma ps' (A.exprTerm e')
-    i <- expect r t Type expectedTy
+    i <- expect r tcCtx t Type expectedTy
     return $ A.Sigma i ps' e'
 
   C.Apps    r es    -> do
     tree <- parseInfixOperators r es
-    checkInfixTree tree expectedTy
+    checkInfixTree tree tcCtx expectedTy
 
   C.Arrow   r e1 e2 -> do
     -- Γ ⊢ A : Type
-    e1' <- checkExpr e1 Type
+    e1' <- checkExpr e1 tcCtx Type
 
     -- Γ ⊢ B : Type
-    e2' <- checkExpr e2 Type
+    e2' <- checkExpr e2 tcCtx Type
 
     -- ⟹ Γ ⊢ (Π _ : A. B) : Type
     let t = Pi (A.exprTerm e1') (weaken (A.exprTerm e2'))
-    i <- expect r t Type expectedTy
+    i <- expect r tcCtx t Type expectedTy
     return $ A.Arrow i e1' e2'
 
   C.Pair    r a  b  -> do
     -- Γ ⊢ a : A
-    tyA <- createMeta r Type
-    a' <- checkExpr a tyA
+    tyA <- createMeta r tcCtx Type
+    a' <- checkExpr a tcCtx tyA
 
     -- Γ ⊢ b : B a
-    tyB <- localUnnamed tyA $ createMeta r Type
-    b' <- checkExpr b (instantiate tyB (A.exprTerm a'))
+    tyB <- createMeta r (addUnnamed tcCtx tyA) Type
+    b' <- checkExpr b tcCtx (instantiate tyB (A.exprTerm a'))
 
     -- ⟹ Γ ⊢ (a, b) : Σ _ : A. B
     let t  = Pair (A.exprTerm a') (A.exprTerm b')
         ty = Sigma tyA tyB
-    i <- expect r t ty expectedTy
+    i <- expect r tcCtx t ty expectedTy
     return $ A.Pair i a' b'
 
-checkInfixTree :: InfixTree -> Type -> M A.Expr
-checkInfixTree tree expectedTy = case tree of
-  Atom e    -> checkExpr e expectedTy
+checkInfixTree :: InfixTree -> TcCtx -> Type -> M A.Expr
+checkInfixTree tree tcCtx expectedTy = case tree of
+  Atom e    -> checkExpr e tcCtx expectedTy
   App r f a -> do
     -- Γ ⊢ a : A
-    tyA <- createMeta r Type
-    a'  <- checkInfixTree a tyA
+    tyA <- createMeta r tcCtx Type
+    a'  <- checkInfixTree a tcCtx tyA
 
     -- Γ ⊢ f : (Π x : A. B)
-    tyB <- localUnnamed tyA $ createMeta r Type
-    f'  <- checkInfixTree f (Pi tyA tyB)
+    tyB <- createMeta r (addUnnamed tcCtx tyA) Type
+    f'  <- checkInfixTree f tcCtx (Pi tyA tyB)
 
     -- ⟹ Γ ⊢ f a : B[a/x]
     -- TODO: a chained application is currently quadratic in the number of
     -- arguments
     let t  = applyTerm (A.exprTerm f') [A.exprTerm a']
         ty = instantiate tyB (A.exprTerm a') 
-    i <- expect r t ty expectedTy
+    i <- expect r tcCtx t ty expectedTy
     return $ A.App i f' a'
 
 -- | Given (x : A), check Γ ⊢ A : Type and construct a param for x.
-checkParamNames :: [C.Name] -> Type -> M [A.Param]
-checkParamNames [] _ = return []
-checkParamNames (n:ns) ty = do
+checkParamNames :: TcCtx -> [C.Name] -> Type -> M [A.Param]
+checkParamNames _ [] _ = return []
+checkParamNames tcCtx (n:ns) ty = do
   n' <- createName n
   let p = A.Param n' ty
-  ps <- localParam p $ checkParamNames ns (weaken ty)
+  ps <- checkParamNames (addParam tcCtx p) ns (weaken ty)
   return (p:ps)
 
 -- | Given (x : A), check Γ ⊢ A : Type and construct a param for x.
-checkParamGroup :: C.ParamGroup -> M A.ParamGroup
-checkParamGroup (C.ParamGroup ns ann) = do
+checkParamGroup :: TcCtx -> C.ParamGroup -> M A.ParamGroup
+checkParamGroup tcCtx (C.ParamGroup ns ann) = do
   (ty', ann') <- case ann of
     Nothing -> do
       -- TODO: is this the right range? or should it be all of them?
-      ty <- createMeta (C.nameRange (head ns)) Type
+      ty <- createMeta (C.nameRange (head ns)) tcCtx Type
       return (ty, Nothing)
     Just ty -> do
-      ty' <- checkExpr ty Type
+      ty' <- checkExpr ty tcCtx Type
       return (A.exprTerm ty', Just ty')
-  ps <- checkParamNames ns ty'
+  ps <- checkParamNames tcCtx ns ty'
   return $ A.ParamGroup ps ann'
 
-checkParams :: [C.ParamGroup] -> M [A.ParamGroup]
-checkParams [] = return []
-checkParams (p:ps) = do
-  p' <- checkParamGroup p
-  ps' <- localParamGroup p' $ checkParams ps
+checkParams :: TcCtx -> [C.ParamGroup] -> M [A.ParamGroup]
+checkParams _ [] = return []
+checkParams tcCtx (p:ps) = do
+  p' <- checkParamGroup tcCtx p
+  ps' <- checkParams (addParamGroup tcCtx p') ps
   return (p':ps')
 
 termToPattern :: Term -> MaybeT M Pattern
@@ -322,58 +323,51 @@ checkDecl :: C.Decl -> M A.Decl
 checkDecl = \case
   C.Define n implicits explicits ann e -> do
     debug $ "checking definition" <+> pretty (C.nameText n) <+> "..."
-    params' <- checkParams (implicits ++ explicits)
-    (def, ann', e') <- localParams params' $ do
-      n' <- createName n
-      (ty, ann') <- case ann of
-        Nothing -> do
-          ty <- createMeta (A.nameRange n') Type
-          return (ty, Nothing)
-        Just ann -> do
-          ann' <- checkExpr ann Type
-          return (A.exprTerm ann', Just ann')
-      e' <- checkExpr e ty
-      return (A.Param n' ty, ann', e')
+    params' <- checkParams EmptyTcCtx (implicits ++ explicits)
+    n' <- createName n
+    let tcCtx = addParams EmptyTcCtx params'
+    (ty, ann') <- case ann of
+      Nothing -> do
+        ty <- createMeta (A.nameRange n') tcCtx Type
+        return (ty, Nothing)
+      Just ann -> do
+        ann' <- checkExpr ann tcCtx Type
+        return (A.exprTerm ann', Just ann')
+    e' <- checkExpr e tcCtx ty
     solveConstraints
-    let n' = A.paramName def
-        ty = paramsPi params' (A.exprType e')
-        tm = paramsLam params' (A.exprTerm e')
+    let def' = A.Param n' ty
     modify $ \s -> s
       { globalNames  = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , defNames     = HashMap.insert (A.nameId n') n' (defNames s)
       , defImplicits = HashMap.insert (A.nameId n') (length implicits) (defImplicits s)
-      , defTypes     = HashMap.insert (A.nameId n') ty (defTypes s)
-      , defTerms     = HashMap.insert (A.nameId n') tm (defTerms s)
+      , defTypes     = HashMap.insert (A.nameId n') (paramsPi params' (A.exprType e')) (defTypes s)
+      , defTerms     = HashMap.insert (A.nameId n') (paramsLam params' (A.exprTerm e')) (defTerms s)
       }
-    return $ A.Define params' def ann' e'
+    return $ A.Define params' def' ann' e'
   C.Assume n implicits explicits ann -> do
     debug $ "checking axiom" <+> pretty (C.nameText n) <+> "..."
-    params' <- checkParams (implicits ++ explicits)
-    (ctx, def, ann') <- localParams params' $ do
-      ctx <- asks toCtx
-      n' <- createName n
-      ann' <- checkExpr ann Type
-      let ty = A.exprTerm ann'
-      return (ctx, A.Param n' ty, ann')
+    params' <- checkParams EmptyTcCtx (implicits ++ explicits)
+    n' <- createName n
+    let tcCtx = addParams EmptyTcCtx params'
+    ann' <- checkExpr ann tcCtx Type
     solveConstraints
-    let n' = A.paramName def
-        ty = ctxPi ctx (A.paramType def)
+    let def' = A.Param n' (A.exprTerm ann')
     modify $ \s -> s
       { globalNames    = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
       , axiomNames     = HashMap.insert (A.nameId n') n' (axiomNames s)
       , axiomImplicits = HashMap.insert (A.nameId n') (length implicits) (axiomImplicits s)
-      , axiomTypes     = HashMap.insert (A.nameId n') ty (axiomTypes s)
+      , axiomTypes     = HashMap.insert (A.nameId n') (paramsPi params' (A.exprTerm ann')) (axiomTypes s)
       }
-    return $ A.Assume params' def ann'
+    return $ A.Assume params' def' ann'
   C.Rewrite n params lhs rhs -> do
     debug $ "checking rewrite" <+> pretty (C.nameText n) <+> "..."
-    params' <- checkParams params
-    (def, lhs', rhs') <- localParams params' $ do
-      n' <- createName n
-      ty <- createMeta (A.nameRange n') Type
-      lhs' <- checkExpr lhs ty
-      rhs' <- checkExpr rhs ty
-      return (A.Param n' ty, lhs', rhs')
+    params' <- checkParams EmptyTcCtx params
+    n' <- createName n
+    let tcCtx = addParams EmptyTcCtx params'
+    ty <- createMeta (A.nameRange n') tcCtx Type
+    lhs' <- checkExpr lhs tcCtx ty
+    rhs' <- checkExpr rhs tcCtx ty
+    let def' = A.Param n' ty
     solveConstraints
     runMaybeT (termToPattern (A.exprTerm lhs')) >>= \case
       Just (AxiomPat h args) -> do
@@ -391,7 +385,7 @@ checkDecl = \case
         else
           emitError $ MissingPatternVariable (getRange lhs')
       _ -> emitError $ BadPattern (getRange lhs')
-    return $ A.Rewrite params' def lhs' rhs'
+    return $ A.Rewrite params' def' lhs' rhs'
   C.Fixity fixity prec n -> do
     modify $ \s -> s { fixities = HashMap.insert n (fixity, prec) (fixities s) }
     return $ A.Fixity fixity prec n
