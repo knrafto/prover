@@ -50,7 +50,7 @@ data Env = Env
 initialEnv :: Env
 initialEnv = Env
   { envVarNames = []
-  , envCtx      = C0
+  , envCtx      = EmptyCtx
   }
 
 -- | Constraints for unification.

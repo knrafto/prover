@@ -106,7 +106,7 @@ assignMeta :: MetaId -> Term -> M ()
 assignMeta id t = do
   debugFields "assign meta" $
     [ "meta" |: return (prettyMeta id)
-    , "term" |: prettyTerm C0 t
+    , "term" |: prettyTerm EmptyCtx t
     ]
   modify $ \s -> s
     { metaTerms = HashMap.insert id t (metaTerms s)

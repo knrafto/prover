@@ -106,9 +106,9 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
 
 -- | Pretty-print a context.
 prettyCtx :: Ctx -> M Doc
-prettyCtx C0          = return mempty
-prettyCtx (C0  :> ty) = do
-  tyDoc  <- prettyTerm C0 ty
+prettyCtx EmptyCtx = return mempty
+prettyCtx (EmptyCtx :> ty) = do
+  tyDoc  <- prettyTerm EmptyCtx ty
   return $ prettyVar 0 <+> ":" <+> tyDoc
 prettyCtx (ctx :> ty) = do
   ctxDoc <- prettyCtx ctx

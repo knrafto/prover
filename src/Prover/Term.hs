@@ -49,7 +49,7 @@ type Type = Term
 
 -- | A context for a term.
 data Ctx
-  = C0
+  = EmptyCtx
   | !Ctx :> Type
   deriving (Show)
 
@@ -124,18 +124,18 @@ instantiate a t = applySubst (SubstTerm t) a
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
-ctxLength C0         = 0
+ctxLength EmptyCtx   = 0
 ctxLength (ctx :> _) = 1 + ctxLength ctx
 
 -- | Get the type of a variable in a context.
 ctxLookup :: Ctx -> Var -> Type
-ctxLookup C0          _ = error "ctxLookup: empty context"
+ctxLookup EmptyCtx    _ = error "ctxLookup: empty context"
 ctxLookup (_   :> ty) 0 = weaken ty
 ctxLookup (ctx :> _ ) i = weaken (ctxLookup ctx (i - 1))
 
 -- | Construct a Π-type out of a context ending with the given type.
 ctxPi :: Ctx -> Type -> Type
-ctxPi C0          t = t
+ctxPi EmptyCtx    t = t
 ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
 
 -- | Add n lambdas to a term.
@@ -152,5 +152,5 @@ ctxLam ctx = makeLam (ctxLength ctx)
 ctxVars :: Ctx -> [Term]
 ctxVars = reverse . go 0
   where
-    go _ C0         = []
+    go _ EmptyCtx   = []
     go i (ctx :> _) = var i : go (i + 1) ctx
