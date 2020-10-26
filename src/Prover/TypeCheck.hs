@@ -24,10 +24,24 @@ import Prover.Syntax.Position
 import Prover.Term
 import Prover.Unify
 
+-- | Strip the names from a type-checking context.
+toCtx :: TcCtx -> Ctx
+toCtx EmptyTcCtx = EmptyCtx
+toCtx (tcCtx :>> (_, ty)) = toCtx tcCtx :> ty
+
+-- | Look up a local variable name.
+lookupLocal :: Text -> TcCtx -> Maybe (Var, A.Name)
+lookupLocal t = go 0
+  where
+    go _ EmptyTcCtx = Nothing
+    go !i (_ :>> (Just n, _))
+      | A.nameText n == t = Just (i, n)
+    go !i (tcCtx :>> _) = go (i + 1) tcCtx
+
 -- | Create a metavariable with the given type in the given context.
 createMeta :: Range -> Type -> M Term
 createMeta r ty = do
-  ctx <- asks envCtx
+  ctx <- asks toCtx
   id  <- freshMetaId
   -- Metavariables always represent closed terms, so in a context Γ we create
   -- a function Γ → A and apply it to all the variables in Γ.
@@ -53,10 +67,7 @@ createName (C.Name r t) = do
 
 -- | Add a param to the environment.
 localParam :: A.Param -> M a -> M a
-localParam p = local $ \e -> Env
-  { envVarNames = Just (A.paramName p) : envVarNames e
-  , envCtx      = envCtx e :> A.paramType p
-  }
+localParam p = local $ \tcCtx -> tcCtx :>> (Just (A.paramName p), A.paramType p)
 
 -- | Add a param group to the environment.
 localParamGroup :: A.ParamGroup -> M a -> M a
@@ -98,25 +109,13 @@ paramsLam ps = makeLam (paramsLength ps)
 
 -- | Add an unnamed param to the environment.
 localUnnamed :: Type -> M a -> M a
-localUnnamed ty = local $ \e -> Env
-  { envVarNames = Nothing : envVarNames e
-  , envCtx      = envCtx e :> ty
-  }
-
--- | Lookup the de Bruijn index of a local variable name.
-lookupLocal :: Text -> [Maybe A.Name] -> Maybe (Var, A.Name)
-lookupLocal t varNames = go 0 varNames
-  where
-    go _ []               = Nothing
-    go i (Just n:_)
-      | A.nameText n == t = Just (i, n)
-    go i (_:rest)         = go (i + 1) rest
+localUnnamed ty = local $ \tcCtx -> tcCtx :>> (Nothing, ty)
 
 -- | Generate a constraint that two terms (of possibly different types) are
 -- equal.
 addConstraint :: Range -> Term -> Type -> Term -> Type -> M ()
 addConstraint r a tyA b tyB = do
-  ctx <- asks envCtx
+  ctx <- asks toCtx
   debugFields "create constraint" $
     [ "loc" |: return (pretty r)
     , "ctx" |: prettyCtx ctx
@@ -152,12 +151,12 @@ checkExpr expr expectedTy = case expr of
   C.Id      n       -> do
     let r = C.nameRange n
         s = C.nameText n
-    e <- ask
+    tcCtx <- ask
     state <- get
     case () of
-      _ | Just (v, n) <- lookupLocal s (envVarNames e) -> do
+      _ | Just (v, n) <- lookupLocal s tcCtx -> do
           let t    = var v
-              ty   = ctxLookup (envCtx e) v
+              ty   = ctxLookup (toCtx tcCtx) v
               n'   = A.Name (A.nameId n) r s
           i <- expect r t ty expectedTy
           return $ A.Var i n'
@@ -351,7 +350,7 @@ checkDecl = \case
     debug $ "checking axiom" <+> pretty (C.nameText n) <+> "..."
     params' <- checkParams (implicits ++ explicits)
     (ctx, def, ann') <- localParams params' $ do
-      ctx <- asks envCtx
+      ctx <- asks toCtx
       n' <- createName n
       ann' <- checkExpr ann Type
       let ty = A.exprTerm ann'

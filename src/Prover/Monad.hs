@@ -38,20 +38,11 @@ data Error
   | LateImplicitParam Range Param
   deriving (Show)
 
--- | Read-only environment used for local variables.
-data Env = Env
-  { -- | List of local variable bindings in scope. Variables with no name are
-    -- represented by `Nothing`.
-    envVarNames :: [Maybe Name]
-    -- | The current term context.
-  , envCtx      :: Ctx
-  } deriving (Show)
-
-initialEnv :: Env
-initialEnv = Env
-  { envVarNames = []
-  , envCtx      = EmptyCtx
-  }
+-- | A context labeled with variable names.
+-- TODO: Move to TypeCheck.hs
+data TcCtx
+  = EmptyTcCtx
+  | !TcCtx :>> (Maybe Name, Type)
 
 -- | Constraints for unification.
 data Constraint
@@ -125,7 +116,7 @@ initialState = State
   , constraints       = []
   }
 
-newtype M a = M { unM :: IORef State -> Env -> IO a }
+newtype M a = M { unM :: IORef State -> TcCtx -> IO a }
 
 -- TODO: benchmark inlining all of these
 
@@ -142,7 +133,7 @@ instance Monad M where
 instance MonadIO M where
   liftIO m = M $ \_ _ -> m
 
-instance MonadReader Env M where
+instance MonadReader TcCtx M where
   ask           = M $ \_ e -> return e
   local f (M m) = M $ \r e -> m r (f e)
 
@@ -153,7 +144,7 @@ instance MonadState State M where
 runM :: M a -> IO (a, State)
 runM (M m) = do
   r <- newIORef initialState
-  let e = initialEnv
+  let e = EmptyTcCtx
   a <- m r e
   s <- readIORef r
   return (a, s)
