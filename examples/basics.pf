@@ -105,9 +105,13 @@ define funext (A : Type) (B : A → Type) (f g : Π a. B a) : (Π x. f x = g x) 
     ≡ inv _ (happly-IsEquiv A B f g)
 
 -- Univalence.
+define Singleton (A : Type) (a : A) ≡ Σ b. b = a
+
 -- TODO: define
-axiom id-IsEquiv {A} : IsEquiv _ _ (id A)
-    -- ≡ λ a. _
+axiom Singleton-IsContr (A : Type) (a : A) : IsContr (Singleton A a)
+
+define id-IsEquiv {A} : IsEquiv _ _ (id A)
+    ≡ Singleton-IsContr A
 
 define Equiv A B ≡ Σ (f : A → B). IsEquiv A B f
 define Id→Equiv A B : A = B → Equiv A B
