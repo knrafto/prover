@@ -58,15 +58,15 @@ to Haskell or Agda.
 ## Lexical structure
 
 Whitespace are space, tab, newline, carriage return, form feed, and vertical
-tab. Line comments start with `--`. Block comments are delimited with `{-` and
-`-}`. Block comments may be nested.
+tab. Line comments start with `--` and end with a newline. Block comments are
+delimited with `{-` and `-}`. Block comments may be nested.
 
-The symbols `(`, `)`, `{`, `}`, `,`, and `.` are "punctuation", and are always
-treated as a token by themselves.
+The characters `(){},.` are "symbols", and are always treated as a token by
+themselves.
 
-Any other contiguous sequence of non-whitespace, non-punctuation Unicode
-characters is a "word". The following words are reserved, and are treated
-specially in the syntax:
+Any other contiguous sequence of non-whitespace, non-symbol Unicode characters
+is a "word". The following words are reserved, and are treated specially in the
+syntax:
 
 ```
 Type
@@ -75,6 +75,8 @@ _
 Π λ Σ
 define axiom rewrite where infix infixl infixr
 ```
+
+All other words are "names".
 
 ## Pseudo-grammar
 
