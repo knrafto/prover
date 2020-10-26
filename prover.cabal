@@ -30,6 +30,7 @@ executable prover
       Prover.Parser
       Prover.Pattern
       Prover.Pretty
+      Prover.Search
       Prover.Syntax.Abstract
       Prover.Syntax.Concrete
       Prover.Syntax.Position
@@ -47,6 +48,7 @@ executable prover
     , bytestring >=0.10.8.2 && <1
     , containers >=0.6.2.1 && <1
     , hashable >=1.2.7.0 && <2
+    , heaps >=0.3.6.1 && <2
     , megaparsec >=9.0.0 && <10
     , mtl >=2.2.2 && <3
     , parser-combinators >=1.1.0 && <2
@@ -56,8 +58,11 @@ executable prover
     , unordered-containers >=0.2.10.0 && <1
   default-language: Haskell2010
   default-extensions:
-      GeneralizedNewtypeDeriving
+      BangPatterns
+    , DeriveFunctor
+    , GeneralizedNewtypeDeriving
     , ImportQualifiedPost
     , LambdaCase
     , MultiParamTypeClasses
+    , MultiWayIf
     , OverloadedStrings
