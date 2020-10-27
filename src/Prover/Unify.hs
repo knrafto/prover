@@ -11,50 +11,20 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet qualified as HashSet
-import Prettyprinter
 
 import Prover.Monad
 import Prover.Pattern
 import Prover.Pretty
 import Prover.Term
 
--- | Try to solve all constraints.
-solveConstraints :: M ()
-solveConstraints = do
-  eqs <- gets equations
-  modify $ \s -> s { equations = [] }
-  eqs' <- go eqs
-  -- Report unsolved constraints
-  forM_ eqs' $ \(Equation r c) -> case c of
-    Solved True  -> return ()
-    Solved False -> do
-      debugFields "type error" $
-        [ "loc"  |: return (pretty r)
-        ]
-      emitError $ TypeError r
-    _            -> do
-      debugFields "unsolved constraint" $
-        [ "loc"  |: return (pretty r)
-        ]
-      emitError $ UnsolvedConstraint r
-  -- Report and clear unsolved metas
-  metaIds <- gets unsolvedMetas
-  modify $ \s -> s { unsolvedMetas = HashSet.empty }
-  forM_ metaIds $ \id -> do
-    r <- getState id metaRanges
-    debugFields "unsolved meta" $
-      [ "loc"  |: return (pretty r)
-      , "meta" |: return (prettyMeta id)
-      ]
-    emitError $ UnsolvedMeta r id
-  where
-    go :: [Equation] -> M [Equation]
-    go eqs = do
-      -- Loop until no more additional metas get solved
-      unsolvedBefore <- gets (HashSet.size . unsolvedMetas)
-      eqs' <- mapM simplifyEquation eqs
-      unsolvedAfter <- gets (HashSet.size . unsolvedMetas)
-      if unsolvedBefore == unsolvedAfter then return eqs' else go eqs'
+-- | Try to solve all equations.
+solveEquations :: [Equation] -> M [Equation]
+solveEquations eqs = do
+  -- Loop until no more additional metas get solved
+  unsolvedBefore <- gets (HashSet.size . unsolvedMetas)
+  eqs' <- mapM simplifyEquation eqs
+  unsolvedAfter <- gets (HashSet.size . unsolvedMetas)
+  if unsolvedBefore == unsolvedAfter then return eqs' else solveEquations eqs'
 
 simplifyEquation :: Equation -> M Equation
 simplifyEquation (Equation r c) = Equation r <$> simplify c

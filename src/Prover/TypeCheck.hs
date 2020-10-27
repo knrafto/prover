@@ -129,6 +129,36 @@ addConstraint r tcCtx a tyA b tyB = do
   let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
   modify $ \s -> s { equations = Equation r c : equations s}
 
+-- | Try to solve all constraints.
+solveConstraints :: M ()
+solveConstraints = do
+  eqs <- gets equations
+  modify $ \s -> s { equations = [] }
+  eqs' <- solveEquations eqs
+  -- Report unsolved constraints
+  forM_ eqs' $ \(Equation r c) -> case c of
+    Solved True  -> return ()
+    Solved False -> do
+      debugFields "type error" $
+        [ "loc"  |: return (pretty r)
+        ]
+      emitError $ TypeError r
+    _            -> do
+      debugFields "unsolved constraint" $
+        [ "loc"  |: return (pretty r)
+        ]
+      emitError $ UnsolvedConstraint r
+  -- Report and clear unsolved metas
+  metaIds <- gets unsolvedMetas
+  modify $ \s -> s { unsolvedMetas = HashSet.empty }
+  forM_ metaIds $ \id -> do
+    r <- getState id metaRanges
+    debugFields "unsolved meta" $
+      [ "loc"  |: return (pretty r)
+      , "meta" |: return (prettyMeta id)
+      ]
+    emitError $ UnsolvedMeta r id
+
 -- | Generate expression info for a range, term, and type, while checking that
 -- it matches the expected output type.
 expect :: Range -> TcCtx -> Term -> Type -> Type -> M A.ExprInfo
