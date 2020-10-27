@@ -9,6 +9,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.State.Class
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
+import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet qualified as HashSet
 
@@ -18,16 +19,16 @@ import Prover.Pretty
 import Prover.Term
 
 -- | Try to solve all equations.
-solveEquations :: [Equation] -> M [Equation]
+solveEquations :: HashMap EquationId Constraint -> M (HashMap EquationId Constraint)
 solveEquations eqs = do
   -- Loop until no more additional metas get solved
   unsolvedBefore <- gets (HashSet.size . unsolvedMetas)
-  eqs' <- mapM simplifyEquation eqs
+  -- TODO: order matters?? This is a hack to keep the old behavior until we can
+  -- actually debug unification.
+  let sortedEqs = reverse . sortOn fst . HashMap.toList $ eqs
+  eqs' <- HashMap.fromList <$> mapM (\(id, c) -> (,) <$> pure id <*> simplify c) sortedEqs
   unsolvedAfter <- gets (HashSet.size . unsolvedMetas)
   if unsolvedBefore == unsolvedAfter then return eqs' else solveEquations eqs'
-
-simplifyEquation :: Equation -> M Equation
-simplifyEquation (Equation r c) = Equation r <$> simplify c
 
 -- | Simplify a constraint as much as possible. The resulting constraint should
 -- not be able to be simplified more, except if a meta is instantiated.

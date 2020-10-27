@@ -126,28 +126,34 @@ addConstraint r tcCtx a tyA b tyB = do
     , "b"   |: prettyTerm ctx b
     , "B"   |: prettyTerm ctx tyB
     ]
+  id <- freshEquationId
   let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
-  modify $ \s -> s { equations = Equation r c : equations s}
+  modify $ \s -> s
+    { equationRanges = HashMap.insert id r (equationRanges s)
+    , equationConstraints = HashMap.insert id c (equationConstraints s)
+    }
 
 -- | Try to solve all constraints.
 solveConstraints :: M ()
 solveConstraints = do
-  eqs <- gets equations
-  modify $ \s -> s { equations = [] }
+  eqs <- gets equationConstraints
+  modify $ \s -> s { equationConstraints = HashMap.empty }
   eqs' <- solveEquations eqs
   -- Report unsolved constraints
-  forM_ eqs' $ \(Equation r c) -> case c of
-    Solved True  -> return ()
-    Solved False -> do
-      debugFields "type error" $
-        [ "loc"  |: return (pretty r)
-        ]
-      emitError $ TypeError r
-    _            -> do
-      debugFields "unsolved constraint" $
-        [ "loc"  |: return (pretty r)
-        ]
-      emitError $ UnsolvedConstraint r
+  forM_ (HashMap.toList eqs') $ \(id, c) -> do
+    r <- getState id equationRanges
+    case c of
+      Solved True  -> return ()
+      Solved False -> do
+        debugFields "type error" $
+          [ "loc"  |: return (pretty r)
+          ]
+        emitError $ TypeError r
+      _            -> do
+        debugFields "unsolved constraint" $
+          [ "loc"  |: return (pretty r)
+          ]
+        emitError $ UnsolvedConstraint r
   -- Report and clear unsolved metas
   metaIds <- gets unsolvedMetas
   modify $ \s -> s { unsolvedMetas = HashSet.empty }

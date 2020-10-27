@@ -18,6 +18,10 @@ import Prover.Syntax.Abstract
 import Prover.Syntax.Position
 import Prover.Term
 
+-- | A unique identifier for type-checking equations.
+newtype EquationId = EquationId Int
+  deriving (Eq, Ord, Show, Enum, Hashable)
+
 data Error
   -- | A name could not be resolved.
   = UnboundName Range Text
@@ -48,65 +52,64 @@ data Constraint
   | Guarded Constraint Constraint
   deriving (Show)
 
--- | A "user-facing" constraint as a result of typechecking.
-data Equation = Equation Range Constraint
-  deriving (Show)
-
 -- | Global type-checking state.
 data State = State
   { -- | Error messages.
-    errors            :: [Error]
-    -- | For generating fresh NameIds.
-  , nextNameId        :: !NameId
-    -- | For generating fresh MetaIds.
-  , nextMetaId        :: !MetaId
+    errors              :: [Error]
+    -- | Generating fresh things.
+  , nextNameId          :: !NameId
+  , nextMetaId          :: !MetaId
+  , nextEquationId      :: !EquationId
     -- | Fixity declarations.
-  , fixities          :: HashMap Text (Fixity, Int)
+  , fixities            :: HashMap Text (Fixity, Int)
     -- | Globally-defined names.
-  , globalNames       :: HashMap Text NameId
+  , globalNames         :: HashMap Text NameId
     -- | Definitions. TODO: use a record?
-  , defNames          :: HashMap NameId Name
-  , defImplicits      :: HashMap NameId Int
-  , defTypes          :: HashMap NameId Type
-  , defTerms          :: HashMap NameId Term
+  , defNames            :: HashMap NameId Name
+  , defImplicits        :: HashMap NameId Int
+  , defTypes            :: HashMap NameId Type
+  , defTerms            :: HashMap NameId Term
     -- | Axioms. TODO: use a record?
-  , axiomNames        :: HashMap NameId Name
-  , axiomImplicits    :: HashMap NameId Int
-  , axiomTypes        :: HashMap NameId Type
-  , axiomRules        :: HashMap NameId [Rule]
+  , axiomNames          :: HashMap NameId Name
+  , axiomImplicits      :: HashMap NameId Int
+  , axiomTypes          :: HashMap NameId Type
+  , axiomRules          :: HashMap NameId [Rule]
     -- | Metavariables. TODO: use a record?
-  , metaRanges        :: HashMap MetaId Range
-  , metaTypes         :: HashMap MetaId Type
-  , metaTerms         :: HashMap MetaId Term
+  , metaRanges          :: HashMap MetaId Range
+  , metaTypes           :: HashMap MetaId Type
+  , metaTerms           :: HashMap MetaId Term
     -- | Unsolved metavariables for the current definition, for tracking errors.
     -- If unification fails, there may be metas that are not "unsolved" yet do
     -- not have a term assigned, but we don't want to emit an error about these
     -- metas again.
-  , unsolvedMetas     :: HashSet MetaId
-    -- | Type-checking constraints.
-  , equations         :: [Equation]
+  , unsolvedMetas       :: HashSet MetaId
+    -- | Type-checking equations.
+  , equationRanges      :: HashMap EquationId Range
+  , equationConstraints :: HashMap EquationId Constraint
   } deriving (Show)
 
 initialState :: State
 initialState = State
-  { errors            = []
-  , nextNameId        = NameId 0
-  , nextMetaId        = MetaId 0
-  , fixities          = HashMap.empty
-  , globalNames       = HashMap.empty
-  , defNames          = HashMap.empty
-  , defImplicits      = HashMap.empty
-  , defTypes          = HashMap.empty
-  , defTerms          = HashMap.empty
-  , axiomNames        = HashMap.empty
-  , axiomImplicits    = HashMap.empty
-  , axiomTypes        = HashMap.empty
-  , axiomRules        = HashMap.empty
-  , metaRanges        = HashMap.empty
-  , metaTypes         = HashMap.empty
-  , metaTerms         = HashMap.empty
-  , unsolvedMetas     = HashSet.empty
-  , equations         = []
+  { errors              = []
+  , nextNameId          = NameId 0
+  , nextMetaId          = MetaId 0
+  , nextEquationId      = EquationId 0
+  , fixities            = HashMap.empty
+  , globalNames         = HashMap.empty
+  , defNames            = HashMap.empty
+  , defImplicits        = HashMap.empty
+  , defTypes            = HashMap.empty
+  , defTerms            = HashMap.empty
+  , axiomNames          = HashMap.empty
+  , axiomImplicits      = HashMap.empty
+  , axiomTypes          = HashMap.empty
+  , axiomRules          = HashMap.empty
+  , metaRanges          = HashMap.empty
+  , metaTypes           = HashMap.empty
+  , metaTerms           = HashMap.empty
+  , unsolvedMetas       = HashSet.empty
+  , equationRanges      = HashMap.empty
+  , equationConstraints = HashMap.empty
   }
 
 newtype M a = M { unM :: IORef State -> IO a }
@@ -152,6 +155,13 @@ freshMetaId = do
   s <- get
   let id = nextMetaId s
   put s { nextMetaId = succ id }
+  return id
+
+freshEquationId :: M EquationId
+freshEquationId = do
+  s <- get
+  let id = nextEquationId s
+  put s { nextEquationId = succ id }
   return id
 
 getState :: (Eq k, Hashable k, Show k) => k -> (State -> HashMap k v) -> M v
