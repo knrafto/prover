@@ -52,6 +52,45 @@ data Constraint
   | Guarded Constraint Constraint
   deriving (Show)
 
+-- | A unification problem is a set of metavariables (which stand for unknown
+-- terms) and a set of constraints involving those metavariables. Any
+-- "bookkeeping" information for error message (source range, for example) is
+-- tracked separately by the type-checker.
+-- TODO: move to Unify.hs
+data UnificationProblem = UnificationProblem
+  { -- | The types of metavariables in the unification problem.
+    problemMetaTypes :: HashMap MetaId Type
+    -- | A (partial) substitution of metavariables to terms.
+  , problemMetaTerms :: HashMap MetaId Term
+    -- | Unification constraints.
+  , problemConstraints :: HashMap EquationId Constraint
+  } deriving (Show)
+
+-- | Get the unsolved metas in a unification problem.
+problemUnsolvedMetas :: UnificationProblem -> HashSet MetaId
+problemUnsolvedMetas problem =
+  HashSet.difference
+    (HashMap.keysSet (problemMetaTypes problem))
+    (HashMap.keysSet (problemMetaTerms problem))
+
+-- | The empty unification problem.
+emptyProblem :: UnificationProblem
+emptyProblem = UnificationProblem
+  { problemMetaTypes   = HashMap.empty
+  , problemMetaTerms   = HashMap.empty
+  , problemConstraints = HashMap.empty
+  }
+
+-- | Add a metavariable to a unification problem.
+addProblemMeta :: MetaId -> Type -> UnificationProblem -> UnificationProblem
+addProblemMeta id ty problem =
+  problem { problemMetaTypes = HashMap.insert id ty (problemMetaTypes problem) }
+
+-- | Add a constraint to a unification problem.
+addProblemConstraint :: EquationId -> Constraint -> UnificationProblem -> UnificationProblem
+addProblemConstraint id c problem =
+  problem { problemConstraints = HashMap.insert id c (problemConstraints problem) }
+
 -- | Global type-checking state.
 data State = State
   { -- | Error messages.
@@ -74,18 +113,17 @@ data State = State
   , axiomImplicits      :: HashMap NameId Int
   , axiomTypes          :: HashMap NameId Type
   , axiomRules          :: HashMap NameId [Rule]
-    -- | Metavariables. TODO: use a record?
-  , metaRanges          :: HashMap MetaId Range
+    -- | Global metavariable substitution. When we add a new global definition
+    -- (axiom, etc.) after type-checking, we also stick the meta substitution
+    -- here and substitute "lazily" instead of substituting everywhere all at
+    -- once. Any unsolved metas after type-checking will be here as well, but
+    -- they will not have a term, so they effectively become constants.
   , metaTypes           :: HashMap MetaId Type
   , metaTerms           :: HashMap MetaId Term
-    -- | Unsolved metavariables for the current definition, for tracking errors.
-    -- If unification fails, there may be metas that are not "unsolved" yet do
-    -- not have a term assigned, but we don't want to emit an error about these
-    -- metas again.
-  , unsolvedMetas       :: HashSet MetaId
-    -- | Type-checking equations.
+    -- | Type-checking information.
+  , metaRanges          :: HashMap MetaId Range
   , equationRanges      :: HashMap EquationId Range
-  , equationConstraints :: HashMap EquationId Constraint
+  , unificationProblem  :: UnificationProblem
   } deriving (Show)
 
 initialState :: State
@@ -107,9 +145,8 @@ initialState = State
   , metaRanges          = HashMap.empty
   , metaTypes           = HashMap.empty
   , metaTerms           = HashMap.empty
-  , unsolvedMetas       = HashSet.empty
   , equationRanges      = HashMap.empty
-  , equationConstraints = HashMap.empty
+  , unificationProblem  = emptyProblem
   }
 
 newtype M a = M { unM :: IORef State -> IO a }

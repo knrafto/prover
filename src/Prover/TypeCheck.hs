@@ -11,7 +11,6 @@ import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
 import Data.HashMap.Strict qualified as HashMap
-import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 import Prettyprinter
 
@@ -69,9 +68,8 @@ createMeta r tcCtx ty = do
   -- a function Γ → A and apply it to all the variables in Γ.
   let metaTy = ctxPi ctx ty
   modify $ \s -> s
-    { metaRanges = HashMap.insert id r (metaRanges s)
-    , metaTypes = HashMap.insert id metaTy (metaTypes s)
-    , unsolvedMetas = HashSet.insert id (unsolvedMetas s)
+    { metaRanges  = HashMap.insert id r (metaRanges s)
+    , unificationProblem = addProblemMeta id metaTy (unificationProblem s)
     }
   debugFields "create meta" $
     [ "loc"  |: return (pretty r)
@@ -130,17 +128,16 @@ addConstraint r tcCtx a tyA b tyB = do
   let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
   modify $ \s -> s
     { equationRanges = HashMap.insert id r (equationRanges s)
-    , equationConstraints = HashMap.insert id c (equationConstraints s)
+    , unificationProblem = addProblemConstraint id c (unificationProblem s)
     }
 
 -- | Try to solve all constraints.
 solveConstraints :: M ()
 solveConstraints = do
-  eqs <- gets equationConstraints
-  modify $ \s -> s { equationConstraints = HashMap.empty }
-  eqs' <- solveEquations eqs
+  problem <- gets unificationProblem
+  problem' <- simplifyProblem problem
   -- Report unsolved constraints
-  forM_ (HashMap.toList eqs') $ \(id, c) -> do
+  forM_ (HashMap.toList (problemConstraints problem')) $ \(id, c) -> do
     r <- getState id equationRanges
     case c of
       Solved True  -> return ()
@@ -154,16 +151,20 @@ solveConstraints = do
           [ "loc"  |: return (pretty r)
           ]
         emitError $ UnsolvedConstraint r
-  -- Report and clear unsolved metas
-  metaIds <- gets unsolvedMetas
-  modify $ \s -> s { unsolvedMetas = HashSet.empty }
-  forM_ metaIds $ \id -> do
+  -- Report unsolved metas
+  forM_ (problemUnsolvedMetas problem') $ \id -> do
     r <- getState id metaRanges
     debugFields "unsolved meta" $
       [ "loc"  |: return (pretty r)
       , "meta" |: return (prettyMeta id)
       ]
     emitError $ UnsolvedMeta r id
+  -- Clear problem and merge into global substitution
+  modify $ \s -> s
+    { metaTypes = HashMap.union (problemMetaTypes problem') (metaTypes s)
+    , metaTerms = HashMap.union (problemMetaTerms problem') (metaTerms s)
+    , unificationProblem = emptyProblem
+    }
 
 -- | Generate expression info for a range, term, and type, while checking that
 -- it matches the expected output type.
@@ -349,7 +350,10 @@ checkParams tcCtx (p:ps) = do
   return (p':ps')
 
 termToPattern :: Term -> MaybeT M Pattern
-termToPattern t = lift (whnf t) >>= \case
+termToPattern = \case
+  BlockedMeta id args -> lift (lookupState id metaTerms) >>= \case
+    Just t' -> termToPattern (applyTerm t' args)
+    Nothing -> mzero
   Var i []     -> return (VarPat i)
   Axiom i args -> AxiomPat i <$> mapM termToPattern args
   Pair a b     -> PairPat <$> termToPattern a <*> termToPattern b

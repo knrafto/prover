@@ -6,33 +6,51 @@ import Data.Maybe
 
 import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
-import Control.Monad.State.Class
+import Control.Monad.State
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
-import Data.HashSet qualified as HashSet
 
 import Prover.Monad
 import Prover.Pattern
+    ( Pattern(..), Rule(ruleCtxLength, ruleArgs, ruleRhs) )
 import Prover.Pretty
 import Prover.Term
 
+-- TODO: Restructure unification algorithm to get rid of this.
+type UnifyM = StateT UnificationProblem M
+
+-- | Run the unification algorithm in order to "simplify" a unification problem.
+-- This tries to find solutions to metavariables that "must be so" given the
+-- constraints (in constrast to proof search, which tries to find any solution
+-- that works). The unification algorithm is not guaranteed to make progress.
+--
+-- All metavariables in the original problem will appear in the simplified
+-- problem. Solved constraints will be removed, but unsolved or false
+-- constraints will remain.
+--
+-- TODO: solved constraints are not actually removed yet.
+simplifyProblem :: UnificationProblem -> M UnificationProblem
+simplifyProblem problem = do
+  (eqs', problem') <- runStateT (solveEquations (problemConstraints problem)) problem
+  return problem' { problemConstraints = eqs' }
+
 -- | Try to solve all equations.
-solveEquations :: HashMap EquationId Constraint -> M (HashMap EquationId Constraint)
+solveEquations :: HashMap EquationId Constraint -> UnifyM (HashMap EquationId Constraint)
 solveEquations eqs = do
   -- Loop until no more additional metas get solved
-  unsolvedBefore <- gets (HashSet.size . unsolvedMetas)
+  solvedBefore <- gets (HashMap.size . problemMetaTerms)
   -- TODO: order matters?? This is a hack to keep the old behavior until we can
   -- actually debug unification.
   let sortedEqs = reverse . sortOn fst . HashMap.toList $ eqs
   eqs' <- HashMap.fromList <$> mapM (\(id, c) -> (,) <$> pure id <*> simplify c) sortedEqs
-  unsolvedAfter <- gets (HashSet.size . unsolvedMetas)
-  if unsolvedBefore == unsolvedAfter then return eqs' else solveEquations eqs'
+  solvedAfter <- gets (HashMap.size . problemMetaTerms)
+  if solvedBefore == solvedAfter then return eqs' else solveEquations eqs'
 
 -- | Simplify a constraint as much as possible. The resulting constraint should
 -- not be able to be simplified more, except if a meta is instantiated.
-simplify :: Constraint -> M Constraint
+simplify :: Constraint -> UnifyM Constraint
 simplify = \case
   Solved b          -> return (Solved b)
   TermEq ctx ty a b -> unify ctx ty a b
@@ -66,22 +84,21 @@ simplifyExactlyOne cs = case filter (not . isFalse) cs of
       Solved False -> True
       _            -> False
 
-guarded :: Constraint -> Constraint -> M Constraint
+guarded :: Constraint -> Constraint -> UnifyM Constraint
 guarded guard c = simplify guard >>= \case
   Solved False -> return (Solved False)
   Solved True  -> simplify c
   guard'       -> return (Guarded guard' c)
 
 -- | Assign a term for a metavariable.
-assignMeta :: MetaId -> Term -> M ()
+assignMeta :: MetaId -> Term -> UnifyM ()
 assignMeta id t = do
-  debugFields "assign meta" $
+  lift $ debugFields "assign meta" $
     [ "meta" |: return (prettyMeta id)
     , "term" |: prettyTerm EmptyCtx t
     ]
   modify $ \s -> s
-    { metaTerms = HashMap.insert id t (metaTerms s)
-    , unsolvedMetas = HashSet.delete id (unsolvedMetas s)
+    { problemMetaTerms = HashMap.insert id t (problemMetaTerms s)
     }
 
 -- | The result of a pattern match.
@@ -101,7 +118,7 @@ instance Semigroup MatchResult where
 instance Monoid MatchResult where
   mempty = Match IntMap.empty
 
-matchPattern :: Pattern -> Term -> M MatchResult
+matchPattern :: Pattern -> Term -> UnifyM MatchResult
 matchPattern pat t = case pat of
   VarPat i         -> return $ Match (IntMap.singleton i t)
   AxiomPat id args -> whnf t >>= \case
@@ -115,7 +132,7 @@ matchPattern pat t = case pat of
     Pair a b -> mappend <$> matchPattern pa a <*> matchPattern pb b
     _ -> return NoMatch
 
-applyRules :: NameId -> [Term] -> [Rule] -> M Term
+applyRules :: NameId -> [Term] -> [Rule] -> UnifyM Term
 applyRules id args []          = return $ Axiom id args
 applyRules id args (rule:rest)
   | length (ruleArgs rule) <= length args = do
@@ -131,27 +148,30 @@ applyRules id args (rule:rest)
   | otherwise = applyRules id args rest
 
 -- | Attempts to reduce a term to a weak head normal form.
-whnf :: Term -> M Term
+whnf :: Term -> UnifyM Term
 whnf t = case t of
   BlockedMeta id args -> do
     -- TODO: path compression?
-    lookupState id metaTerms >>= \case
-      Nothing -> return t
+    subst <- gets problemMetaTerms
+    case HashMap.lookup id subst of
       Just t' -> whnf (applyTerm t' args)
+      Nothing -> lift (lookupState id metaTerms) >>= \case
+        Just t' -> whnf (applyTerm t' args)
+        Nothing -> return t
   BlockedAxiom id args -> do
-    rules <- fromMaybe [] <$> lookupState id axiomRules
+    rules <- fromMaybe [] <$> lift (lookupState id axiomRules)
     applyRules id args rules
   Axiom id args -> do
-    rules <- fromMaybe [] <$> lookupState id axiomRules
+    rules <- fromMaybe [] <$> lift (lookupState id axiomRules)
     applyRules id args rules
   t -> return t
 
-unify :: Ctx -> Type -> Term -> Term -> M Constraint
+unify :: Ctx -> Type -> Term -> Term -> UnifyM Constraint
 unify ctx ty t1 t2 = do
   ty' <- whnf ty
   t1' <- whnf t1
   t2' <- whnf t2
-  debugFields "unify" $
+  lift $ debugFields "unify" $
     [ "ctx"  |: prettyCtx ctx
     , "type" |: prettyTerm ctx ty'
     , "a"    |: prettyTerm ctx t1'
@@ -174,7 +194,7 @@ unify ctx ty t1 t2 = do
         unifySpine ctx (ctxLookup ctx i1) (zip args1 args2)
     (_, Axiom n1 args1, Axiom n2 args2)
       | n1 == n2 && length args1 == length args2 -> do
-        nty <- getState n1 axiomTypes
+        nty <- lift $ getState n1 axiomTypes
         unifySpine ctx nty (zip args1 args2)
 
     -- Π-types (with η)
@@ -196,10 +216,10 @@ unify ctx ty t1 t2 = do
         
     _ -> return $ Solved False
 
-unifySpine :: Ctx -> Type -> [(Term, Term)] -> M Constraint
+unifySpine :: Ctx -> Type -> [(Term, Term)] -> UnifyM Constraint
 unifySpine _ _ [] = return $ Solved True
 unifySpine ctx ty ((arg1, arg2):rest) = do
-  debugFields "unify spine" $
+  lift $ debugFields "unify spine" $
     [ "ctx"  |: prettyCtx ctx
     , "type" |: prettyTerm ctx ty
     , "arg1" |: prettyTerm ctx arg1
@@ -215,7 +235,7 @@ unifySpine ctx ty ((arg1, arg2):rest) = do
     Just b' -> simplify $ And [TermEq ctx a arg1 arg2, SpineEq ctx b' rest]
 
 -- | Unifies A₁ with A₂, and B₁ with B₂ (over the first equality).
-unifyDependentTypes :: Ctx -> Type -> Type -> Type -> Type -> M Constraint
+unifyDependentTypes :: Ctx -> Type -> Type -> Type -> Type -> UnifyM Constraint
 unifyDependentTypes ctx a1 b1 a2 b2 =
   -- If B does not depend on A in one of the types, then we don't have to
   -- wait for A to be checked before checking B.
@@ -237,7 +257,7 @@ unifyDependentTypes ctx a1 b1 a2 b2 =
       simplify $ And [TermEq ctx Type a1 a2, TermEq ctx Type b1' b2']
 
 -- | Try both ways.
-flexFlex :: Ctx -> Type -> MetaId -> [Term] -> MetaId -> [Term] -> M Constraint
+flexFlex :: Ctx -> Type -> MetaId -> [Term] -> MetaId -> [Term] -> UnifyM Constraint
 flexFlex ctx ty m1 args1 m2 args2 = do
   let t1 = BlockedMeta m1 args1
       t2 = BlockedMeta m2 args2
@@ -251,7 +271,7 @@ flexFlex ctx ty m1 args1 m2 args2 = do
         return $ Solved True
       Nothing -> return $ TermEq ctx ty t1 t2
 
-flexRigid :: Ctx -> Type -> MetaId -> [Term] -> Term -> M Constraint
+flexRigid :: Ctx -> Type -> MetaId -> [Term] -> Term -> UnifyM Constraint
 flexRigid ctx ty m args t =
   solveMeta args t >>= \case
     Nothing -> return $ TermEq ctx ty (BlockedMeta m args) t
@@ -260,7 +280,7 @@ flexRigid ctx ty m args t =
       return $ Solved True
 
 -- | Given α args = t, try to find a unique solution for α.
-solveMeta :: [Term] -> Term -> M (Maybe Term)
+solveMeta :: [Term] -> Term -> UnifyM (Maybe Term)
 solveMeta args t = runMaybeT $ do
   σ  <- convertMetaArgs args
   t' <- invertVarSubst σ t
@@ -282,7 +302,7 @@ liftVarSubst :: VarSubst -> VarSubst
 liftVarSubst σ = 0 : map (+ 1) σ
 
 -- Determine if a series of arguments (to a meta) is a variable substitution.
-convertMetaArgs :: [Term] -> MaybeT M VarSubst
+convertMetaArgs :: [Term] -> MaybeT UnifyM VarSubst
 convertMetaArgs args = mapM convertMetaArg (reverse args)
   where
     convertMetaArg t = do
@@ -292,7 +312,7 @@ convertMetaArgs args = mapM convertMetaArg (reverse args)
         _ -> mzero
 
 -- invertVarSubst σ t tries to find a unique term u such that u[σ] = t.
-invertVarSubst :: VarSubst -> Term -> MaybeT M Term
+invertVarSubst :: VarSubst -> Term -> MaybeT UnifyM Term
 invertVarSubst σ t = do
   t' <- lift $ whnf t
   case t' of
