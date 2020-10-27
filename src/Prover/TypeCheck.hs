@@ -127,7 +127,7 @@ addConstraint r tcCtx a tyA b tyB = do
     , "B"   |: prettyTerm ctx tyB
     ]
   let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
-  modify $ \s -> s { constraints = TopLevelConstraint r c : constraints s}
+  modify $ \s -> s { equations = Equation r c : equations s}
 
 -- | Generate expression info for a range, term, and type, while checking that
 -- it matches the expected output type.

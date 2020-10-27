@@ -49,7 +49,7 @@ data Constraint
   deriving (Show)
 
 -- | A "user-facing" constraint as a result of typechecking.
-data TopLevelConstraint = TopLevelConstraint Range Constraint
+data Equation = Equation Range Constraint
   deriving (Show)
 
 -- | Global type-checking state.
@@ -83,8 +83,8 @@ data State = State
     -- not have a term assigned, but we don't want to emit an error about these
     -- metas again.
   , unsolvedMetas     :: HashSet MetaId
-    -- | Constraints.
-  , constraints       :: [TopLevelConstraint]
+    -- | Type-checking constraints.
+  , equations         :: [Equation]
   } deriving (Show)
 
 initialState :: State
@@ -106,7 +106,7 @@ initialState = State
   , metaTypes         = HashMap.empty
   , metaTerms         = HashMap.empty
   , unsolvedMetas     = HashSet.empty
-  , constraints       = []
+  , equations         = []
   }
 
 newtype M a = M { unM :: IORef State -> IO a }

@@ -21,11 +21,11 @@ import Prover.Term
 -- | Try to solve all constraints.
 solveConstraints :: M ()
 solveConstraints = do
-  cs <- gets constraints
-  modify $ \s -> s { constraints = [] }
-  cs' <- go cs
+  eqs <- gets equations
+  modify $ \s -> s { equations = [] }
+  eqs' <- go eqs
   -- Report unsolved constraints
-  forM_ cs' $ \(TopLevelConstraint r c) -> case c of
+  forM_ eqs' $ \(Equation r c) -> case c of
     Solved True  -> return ()
     Solved False -> do
       debugFields "type error" $
@@ -48,16 +48,16 @@ solveConstraints = do
       ]
     emitError $ UnsolvedMeta r id
   where
-    go :: [TopLevelConstraint] -> M [TopLevelConstraint]
-    go cs = do
+    go :: [Equation] -> M [Equation]
+    go eqs = do
       -- Loop until no more additional metas get solved
       unsolvedBefore <- gets (HashSet.size . unsolvedMetas)
-      cs' <- mapM simplifyTopLevelConstraint cs
+      eqs' <- mapM simplifyEquation eqs
       unsolvedAfter <- gets (HashSet.size . unsolvedMetas)
-      if unsolvedBefore == unsolvedAfter then return cs' else go cs'
+      if unsolvedBefore == unsolvedAfter then return eqs' else go eqs'
 
-simplifyTopLevelConstraint :: TopLevelConstraint -> M TopLevelConstraint
-simplifyTopLevelConstraint (TopLevelConstraint r c) = TopLevelConstraint r <$> simplify c
+simplifyEquation :: Equation -> M Equation
+simplifyEquation (Equation r c) = Equation r <$> simplify c
 
 -- | Simplify a constraint as much as possible. The resulting constraint should
 -- not be able to be simplified more, except if a meta is instantiated.
