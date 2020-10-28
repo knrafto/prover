@@ -36,11 +36,7 @@ solveEquations :: HashMap EquationId Constraint -> UnifyM (HashMap EquationId Co
 solveEquations eqs = do
   -- Loop until no more additional metas get solved
   solvedBefore <- gets (HashMap.size . problemMetaTerms)
-  -- TODO: order matters?? This is a hack to keep the old behavior until we can
-  -- actually debug unification.
-  let sortedEqs = reverse . sortOn fst . HashMap.toList $ eqs
-  eqs' <- HashMap.fromList . filter (\(_, c) -> not (isSolved c))
-    <$> mapM (\(id, c) -> (,) <$> pure id <*> simplify c) sortedEqs
+  eqs' <- HashMap.filter (not . isSolved) <$> mapM simplify eqs
   solvedAfter <- gets (HashMap.size . problemMetaTerms)
   if solvedBefore == solvedAfter then return eqs' else solveEquations eqs'
 

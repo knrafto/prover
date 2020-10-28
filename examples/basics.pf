@@ -68,11 +68,13 @@ define ap (A B : Type) (x y : A) (f : A → B) : x = y → f x = f y
     ≡ Id-ind (λ x y p. f x = f y) (λ x. refl) x y
 define subst (A : Type) (x y : A) (B : A → Type) : x = y → B x → B y
     ≡ Id-ind (λ x y p. B x → B y) (λ x b. b) x y
+{-
 define sym (A : Type) (x y : A) : x = y → y = x
     ≡ Id-ind (λ x y p. y = x) (λ x. refl) x y
 define trans (A : Type) (x y z : A) : x = y → y = z → x = z
     ≡ λ (p : x = y). λ (q : y = z).
         Id-ind (λ x y p. Π z. y = z → x = z) (λ x z p. p) x y p z q
+-}
 
 -- Functions.
 define id A : A → A
@@ -202,8 +204,10 @@ define zero-+ : Π n. zero + n = n
 define suc-+ : Π m n. suc m + n = suc (m + n)
     ≡ λ m. ℕ-ind _ refl (λ n p. ap _ _ _ _ suc p)
 
+{-
 define +-comm : Π m n. n + m = m + n
     ≡ λ m. ℕ-ind _ (zero-+ m) (λ n p. trans _ _ _ _ (suc-+ n m) (ap _ _ _ _ suc p))
+-}
 
 -- TODO: which way should this go?
 define +-assoc : Π a b c. (a + b) + c = a + (b + c)

@@ -112,7 +112,7 @@ paramsLam :: [A.ParamGroup] -> Term -> Term
 paramsLam ps = makeLam (paramsLength ps)
 
 -- | Generate a constraint that two terms (of possibly different types) are
--- equal.
+-- equal, and simplify the unification problem.
 addConstraint :: Range -> TcCtx -> Term -> Type -> Term -> Type -> M ()
 addConstraint r tcCtx a tyA b tyB = do
   let ctx = toCtx tcCtx
@@ -124,20 +124,22 @@ addConstraint r tcCtx a tyA b tyB = do
     , "b"   |: prettyTerm ctx b
     , "B"   |: prettyTerm ctx tyB
     ]
+  problem <- gets unificationProblem
   id <- freshEquationId
   let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
+  problem' <- simplifyProblem (addProblemConstraint id c problem)
   modify $ \s -> s
     { equationRanges = HashMap.insert id r (equationRanges s)
-    , unificationProblem = addProblemConstraint id c (unificationProblem s)
+    , unificationProblem = problem'
     }
 
--- | Try to solve all constraints.
-solveConstraints :: M ()
-solveConstraints = do
+-- | Check that there is a unique solution to the unification problem (and
+-- report any errors if not).
+checkSolved :: M ()
+checkSolved = do
   problem <- gets unificationProblem
-  problem' <- simplifyProblem problem
   -- Report unsolved constraints
-  forM_ (HashMap.toList (problemConstraints problem')) $ \(id, c) -> do
+  forM_ (HashMap.toList (problemConstraints problem)) $ \(id, c) -> do
     r <- getState id equationRanges
     case c of
       Solved True  -> return ()
@@ -152,7 +154,7 @@ solveConstraints = do
           ]
         emitError $ UnsolvedConstraint r
   -- Report unsolved metas
-  forM_ (problemUnsolvedMetas problem') $ \id -> do
+  forM_ (problemUnsolvedMetas problem) $ \id -> do
     r <- getState id metaRanges
     debugFields "unsolved meta" $
       [ "loc"  |: return (pretty r)
@@ -161,8 +163,8 @@ solveConstraints = do
     emitError $ UnsolvedMeta r id
   -- Clear problem and merge into global substitution
   modify $ \s -> s
-    { metaTypes = HashMap.union (problemMetaTypes problem') (metaTypes s)
-    , metaTerms = HashMap.union (problemMetaTerms problem') (metaTerms s)
+    { metaTypes = HashMap.union (problemMetaTypes problem) (metaTypes s)
+    , metaTerms = HashMap.union (problemMetaTerms problem) (metaTerms s)
     , unificationProblem = emptyProblem
     }
 
@@ -374,7 +376,7 @@ checkDecl = \case
         ann' <- checkExpr ann tcCtx Type
         return (A.exprTerm ann', Just ann')
     e' <- checkExpr e tcCtx ty
-    solveConstraints
+    checkSolved
     let def' = A.Param n' ty
     modify $ \s -> s
       { globalNames  = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
@@ -390,7 +392,7 @@ checkDecl = \case
     n' <- createName n
     let tcCtx = addParams EmptyTcCtx params'
     ann' <- checkExpr ann tcCtx Type
-    solveConstraints
+    checkSolved
     let def' = A.Param n' (A.exprTerm ann')
     modify $ \s -> s
       { globalNames    = HashMap.insert (A.nameText n') (A.nameId n') (globalNames s)
@@ -408,7 +410,7 @@ checkDecl = \case
     lhs' <- checkExpr lhs tcCtx ty
     rhs' <- checkExpr rhs tcCtx ty
     let def' = A.Param n' ty
-    solveConstraints
+    checkSolved
     runMaybeT (termToPattern (A.exprTerm lhs')) >>= \case
       Just (AxiomPat h args) -> do
         let rule = Rule
