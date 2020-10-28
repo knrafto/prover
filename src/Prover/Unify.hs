@@ -26,8 +26,6 @@ type UnifyM = StateT UnificationProblem M
 -- original problem. All metavariables in the original problem will appear in
 -- the simplified problem. Solved constraints will be removed, but unsolved or
 -- false constraints will remain.
---
--- TODO: solved constraints are not actually removed yet.
 simplifyProblem :: UnificationProblem -> M UnificationProblem
 simplifyProblem problem = do
   (eqs', problem') <- runStateT (solveEquations (problemConstraints problem)) problem
@@ -41,9 +39,16 @@ solveEquations eqs = do
   -- TODO: order matters?? This is a hack to keep the old behavior until we can
   -- actually debug unification.
   let sortedEqs = reverse . sortOn fst . HashMap.toList $ eqs
-  eqs' <- HashMap.fromList <$> mapM (\(id, c) -> (,) <$> pure id <*> simplify c) sortedEqs
+  eqs' <- HashMap.fromList . filter (\(_, c) -> not (isSolved c))
+    <$> mapM (\(id, c) -> (,) <$> pure id <*> simplify c) sortedEqs
   solvedAfter <- gets (HashMap.size . problemMetaTerms)
   if solvedBefore == solvedAfter then return eqs' else solveEquations eqs'
+
+-- | Determine if a constraint is solved.
+isSolved :: Constraint -> Bool
+isSolved = \case
+  Solved True -> True
+  _ -> False
 
 -- | Simplify a constraint as much as possible. The resulting constraint should
 -- not be able to be simplified more, except if a meta is instantiated.
