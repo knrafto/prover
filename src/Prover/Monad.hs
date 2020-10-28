@@ -43,8 +43,8 @@ data Error
 
 -- | Constraints for unification.
 data Constraint
-  -- TODO: split into two constructors? "trivial", "inconsistent"
-  = Solved Bool
+  = Solved  -- ^ Constraint is true
+  | Inconsistent  -- ^ Constraint is false
   | TermEq Ctx Type Term Term
   | SpineEq Ctx Type [(Term, Term)]
   | And [Constraint]

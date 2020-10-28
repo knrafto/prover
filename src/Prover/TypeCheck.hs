@@ -142,8 +142,8 @@ checkSolved = do
   forM_ (HashMap.toList (problemConstraints problem)) $ \(id, c) -> do
     r <- getState id equationRanges
     case c of
-      Solved True  -> return ()
-      Solved False -> do
+      Solved  -> return ()
+      Inconsistent -> do
         debugFields "type error" $
           [ "loc"  |: return (pretty r)
           ]

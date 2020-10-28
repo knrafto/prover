@@ -43,14 +43,21 @@ solveEquations eqs = do
 -- | Determine if a constraint is solved.
 isSolved :: Constraint -> Bool
 isSolved = \case
-  Solved True -> True
+  Solved -> True
+  _ -> False
+
+-- | Determine if a constraint is inconsistent.
+isInconsistent :: Constraint -> Bool
+isInconsistent = \case
+  Inconsistent -> True
   _ -> False
 
 -- | Simplify a constraint as much as possible. The resulting constraint should
 -- not be able to be simplified more, except if a meta is instantiated.
 simplify :: Constraint -> UnifyM Constraint
 simplify = \case
-  Solved b          -> return (Solved b)
+  Solved            -> return Solved
+  Inconsistent      -> return Inconsistent
   TermEq ctx ty a b -> unify ctx ty a b
   SpineEq ctx ty ts -> unifySpine ctx ty ts
   And cs            -> simplifyAnd <$> mapM simplify cs
@@ -59,33 +66,28 @@ simplify = \case
 
 simplifyAnd :: [Constraint] -> Constraint
 simplifyAnd cs = case concat <$> traverse clauses cs of
-  Nothing  -> Solved False
-  Just []  -> Solved True
+  Nothing  -> Inconsistent
+  Just []  -> Solved
   Just [c] -> c
   Just cs  -> And cs
   where
     clauses :: Constraint -> Maybe [Constraint]
     clauses = \case
-      Solved False  -> Nothing
-      Solved True   -> Just []
+      Inconsistent  -> Nothing
+      Solved        -> Just []
       And cs        -> Just cs
       c             -> Just [c]
 
 simplifyExactlyOne :: [Constraint] -> Constraint
-simplifyExactlyOne cs = case filter (not . isFalse) cs of
-  []  -> Solved False
+simplifyExactlyOne cs = case filter (not . isInconsistent) cs of
+  []  -> Inconsistent
   [c] -> c
   _   -> ExactlyOne cs
-  where
-    isFalse :: Constraint -> Bool
-    isFalse = \case
-      Solved False -> True
-      _            -> False
 
 guarded :: Constraint -> Constraint -> UnifyM Constraint
 guarded guard c = simplify guard >>= \case
-  Solved False -> return (Solved False)
-  Solved True  -> simplify c
+  Solved       -> simplify c
+  Inconsistent -> return Inconsistent
   guard'       -> return (Guarded guard' c)
 
 -- | Assign a term for a metavariable.
@@ -211,14 +213,14 @@ unify ctx ty t1 t2 = do
         Nothing -> guarded (TermEq ctx a a1 a2) (TermEq ctx (instantiate b a1) b1 b2)
         Just b' -> simplify $ And [TermEq ctx a a1 a2, TermEq ctx b' b1 b2]
 
-    (Type, Type, Type) -> return $ Solved True
+    (Type, Type, Type) -> return Solved
     (Type, Pi a1 b1, Pi a2 b2) -> unifyDependentTypes ctx a1 b1 a2 b2
     (Type, Sigma a1 b1, Sigma a2 b2) -> unifyDependentTypes ctx a1 b1 a2 b2
         
-    _ -> return $ Solved False
+    _ -> return Inconsistent
 
 unifySpine :: Ctx -> Type -> [(Term, Term)] -> UnifyM Constraint
-unifySpine _ _ [] = return $ Solved True
+unifySpine _ _ [] = return Solved
 unifySpine ctx ty ((arg1, arg2):rest) = do
   lift $ debugFields "unify spine" $
     [ "ctx"  |: prettyCtx ctx
@@ -265,11 +267,11 @@ flexFlex ctx ty m1 args1 m2 args2 = do
   solveMeta args1 t2 >>= \case
     Just t2' -> do
       assignMeta m1 t2'
-      return $ Solved True
+      return Solved
     Nothing -> solveMeta args2 t1 >>= \case
       Just t1' -> do
         assignMeta m2 t1'
-        return $ Solved True
+        return Solved
       Nothing -> return $ TermEq ctx ty t1 t2
 
 flexRigid :: Ctx -> Type -> MetaId -> [Term] -> Term -> UnifyM Constraint
@@ -278,7 +280,7 @@ flexRigid ctx ty m args t =
     Nothing -> return $ TermEq ctx ty (BlockedMeta m args) t
     Just t' -> do
       assignMeta m t'
-      return $ Solved True
+      return Solved
 
 -- | Given α args = t, try to find a unique solution for α.
 solveMeta :: [Term] -> Term -> UnifyM (Maybe Term)
