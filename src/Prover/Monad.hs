@@ -53,10 +53,17 @@ data Constraint
   deriving (Show)
 
 -- | A unification problem is a set of metavariables (which stand for unknown
--- terms) and a set of constraints involving those metavariables. Any
--- "bookkeeping" information for error message (source range, for example) is
--- tracked separately by the type-checker.
--- TODO: move to Unify.hs
+-- terms) and a set of constraints involving those metavariables. A solution to
+-- a unification problem is an assignment of metavariables to terms (a
+-- metavariable substitution) that satisfies the constraints. A unification
+-- problem can have zero, one, or many solutions.
+--
+-- Unification is used in the implementation of both type-checking and proof
+-- search. For type-checking, the goal is to find a unique solution to a
+-- unification problem, and for proof search, the goal is to find any solution.
+--
+-- Any "bookkeeping" information for error message (source range, for example)
+-- is tracked separately by the type-checker. TODO: move to Unify.hs
 data UnificationProblem = UnificationProblem
   { -- | The types of metavariables in the unification problem.
     problemMetaTypes :: HashMap MetaId Type

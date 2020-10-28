@@ -21,14 +21,11 @@ import Prover.Term
 -- TODO: Restructure unification algorithm to get rid of this.
 type UnifyM = StateT UnificationProblem M
 
--- | Run the unification algorithm in order to "simplify" a unification problem.
--- This tries to find solutions to metavariables that "must be so" given the
--- constraints (in constrast to proof search, which tries to find any solution
--- that works). The unification algorithm is not guaranteed to make progress.
---
--- All metavariables in the original problem will appear in the simplified
--- problem. Solved constraints will be removed, but unsolved or false
--- constraints will remain.
+-- | Try to "simplify" a unification problem, returning a new unification
+-- problem whose solutions are in 1-to-1 correspondence with solution to the
+-- original problem. All metavariables in the original problem will appear in
+-- the simplified problem. Solved constraints will be removed, but unsolved or
+-- false constraints will remain.
 --
 -- TODO: solved constraints are not actually removed yet.
 simplifyProblem :: UnificationProblem -> M UnificationProblem
