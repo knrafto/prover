@@ -202,8 +202,8 @@ checkExpr expr tcCtx expectedTy = case expr of
       _ | Just id <- HashMap.lookup s (globalNames state)
         , Just ty <- HashMap.lookup id (defTypes state) -> do
           implicits <- getState id defImplicits
-          t <- getState id defTerms
           let n' = A.Name id r s
+              t = Def id []
           (t', ty') <- expandImplicits r tcCtx implicits t ty
           i <- expect r tcCtx t' ty' expectedTy
           return $ A.Def i n'

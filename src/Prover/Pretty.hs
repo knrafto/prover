@@ -8,7 +8,7 @@ import Control.Monad.IO.Class
 import Prettyprinter hiding (Doc, parens)
 import Prettyprinter qualified as PP
 import Prettyprinter.Render.Text
-import Prover.Monad ( getState, M, State(axiomNames) )
+import Prover.Monad
 import Prover.Syntax.Abstract qualified as A
 import Prover.Term
 
@@ -79,6 +79,9 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
         app k d (pretty (A.nameText n)) args
       Axiom n args         -> do
         n <- getState n axiomNames
+        app k d (pretty (A.nameText n)) args
+      Def n args         -> do
+        n <- getState n defNames
         app k d (pretty (A.nameText n)) args
       Var i args           -> app k d (prettyVar (k - i - 1)) args
       Lam b                -> parens (d > binderPrec) $ do

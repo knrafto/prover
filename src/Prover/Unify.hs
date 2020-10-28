@@ -164,6 +164,9 @@ whnf t = case t of
   Axiom id args -> do
     rules <- fromMaybe [] <$> lift (lookupState id axiomRules)
     applyRules id args rules
+  Def id args -> do
+    t <- lift (getState id defTerms)
+    whnf (applyTerm t args)
   t -> return t
 
 unify :: Ctx -> Type -> Term -> Term -> UnifyM Constraint
@@ -319,6 +322,7 @@ invertVarSubst σ t = do
     BlockedMeta m args -> BlockedMeta m <$> mapM (invertVarSubst σ) args
     BlockedAxiom n args -> BlockedAxiom n <$> mapM (invertVarSubst σ) args
     Axiom n args -> Axiom n <$> mapM (invertVarSubst σ) args
+    Def n args -> Def n <$> mapM (invertVarSubst σ) args
     Var i args -> case elemIndices i σ of
         [i'] -> Var i' <$> mapM (invertVarSubst σ) args
         _ -> mzero

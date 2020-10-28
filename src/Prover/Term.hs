@@ -31,6 +31,8 @@ data Term
   | BlockedAxiom !NameId [Term]
   -- | A neutral axiom applied to args.
   | Axiom !NameId [Term]
+  -- | A definition applied to args.
+  | Def !NameId [Term]
   -- | A de Bruijn variable applied to args.
   | Var !Var [Term]
   -- | A lambda function.
@@ -73,6 +75,7 @@ applyTerm t args@(arg:rest) = case t of
   BlockedMeta m args'   -> BlockedMeta m (args' ++ args)
   BlockedAxiom n args'  -> BlockedAxiom n (args' ++ args)
   Axiom n args'         -> Axiom n (args' ++ args)
+  Def n args'           -> Def n (args' ++ args)
   Var v args'           -> Var v (args' ++ args)
   Lam b                 -> applyTerm (instantiate b arg) rest
   _                     -> error "applyTerm"
@@ -89,6 +92,7 @@ applySubst subst = \case
   BlockedMeta m args  -> BlockedMeta m (map (applySubst subst) args)
   BlockedAxiom n args -> BlockedAxiom n (map (applySubst subst) args)
   Axiom n args        -> Axiom n (map (applySubst subst) args)
+  Def n args          -> Def n (map (applySubst subst) args)
   Var v args          -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
   Lam b               -> Lam (applySubst (SubstLift subst) b)
   Pair a b            -> Pair (applySubst subst a) (applySubst subst b)
@@ -108,6 +112,7 @@ strengthen = go 0
     BlockedMeta m args  -> BlockedMeta m <$> traverse (go i) args
     BlockedAxiom n args -> BlockedAxiom n <$> traverse (go i) args
     Axiom n args        -> Axiom n <$> traverse (go i) args
+    Def n args          -> Def n <$> traverse (go i) args
     Var j args
       | j < i           -> Var j <$> traverse (go i) args
       | j == i          -> Nothing
