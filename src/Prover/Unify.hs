@@ -167,6 +167,9 @@ unify ctx ty t1 t2 = do
   t1' <- whnf t1
   t2' <- whnf t2
   case (ty', t1', t2') of
+    -- Test for syntactic equality
+    _ | t1' == t2' -> return Solved
+
     -- TODO: intersect?
     (_, BlockedMeta m1 _, BlockedMeta m2 _) | m1 == m2 ->
       return $ TermEq ctx ty' t1' t2'

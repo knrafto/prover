@@ -45,7 +45,7 @@ data Term
   | Pi Term Term
   -- | A Σ-type.
   | Sigma Term Term
-  deriving (Show)
+  deriving (Eq, Show)
 
 type Type = Term
 
