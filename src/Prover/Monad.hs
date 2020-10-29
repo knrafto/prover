@@ -25,9 +25,6 @@ newtype EquationId = EquationId Int
 data Error
   -- | A name could not be resolved.
   = UnboundName Range Text
-  -- | A false constraint.
-  -- TODO: add more info
-  | TypeError Range
   -- | An unsolved constraint.
   -- TODO: add more info
   | UnsolvedConstraint Range

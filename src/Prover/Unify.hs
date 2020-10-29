@@ -14,8 +14,6 @@ import Data.HashMap.Strict qualified as HashMap
 
 import Prover.Monad
 import Prover.Pattern
-    ( Pattern(..), Rule(ruleCtxLength, ruleArgs, ruleRhs) )
-import Prover.Pretty
 import Prover.Term
 
 -- TODO: Restructure unification algorithm to get rid of this.
@@ -92,14 +90,8 @@ guarded guard c = simplify guard >>= \case
 
 -- | Assign a term for a metavariable.
 assignMeta :: MetaId -> Term -> UnifyM ()
-assignMeta id t = do
-  lift $ debugFields "assign meta" $
-    [ "meta" |: return (prettyMeta id)
-    , "term" |: prettyTerm EmptyCtx t
-    ]
-  modify $ \s -> s
-    { problemMetaTerms = HashMap.insert id t (problemMetaTerms s)
-    }
+assignMeta id t =  modify $ \s -> s
+  { problemMetaTerms = HashMap.insert id t (problemMetaTerms s) }
 
 -- | The result of a pattern match.
 data MatchResult
@@ -174,12 +166,6 @@ unify ctx ty t1 t2 = do
   ty' <- whnf ty
   t1' <- whnf t1
   t2' <- whnf t2
-  lift $ debugFields "unify" $
-    [ "ctx"  |: prettyCtx ctx
-    , "type" |: prettyTerm ctx ty'
-    , "a"    |: prettyTerm ctx t1'
-    , "b"    |: prettyTerm ctx t2'
-    ]
   case (ty', t1', t2') of
     -- TODO: intersect?
     (_, BlockedMeta m1 _, BlockedMeta m2 _) | m1 == m2 ->
@@ -222,12 +208,6 @@ unify ctx ty t1 t2 = do
 unifySpine :: Ctx -> Type -> [(Term, Term)] -> UnifyM Constraint
 unifySpine _ _ [] = return Solved
 unifySpine ctx ty ((arg1, arg2):rest) = do
-  lift $ debugFields "unify spine" $
-    [ "ctx"  |: prettyCtx ctx
-    , "type" |: prettyTerm ctx ty
-    , "arg1" |: prettyTerm ctx arg1
-    , "arg2" |: prettyTerm ctx arg2
-    ]
   (a, b) <- whnf ty >>= \case
     Pi a b -> return (a, b)
     _      -> error "unifySpine: term is not well-typed"

@@ -5,9 +5,12 @@ import Data.Void
 import System.IO
 
 import Control.Monad.IO.Class
+import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict qualified as HashMap
 import Prettyprinter hiding (Doc, parens)
 import Prettyprinter qualified as PP
 import Prettyprinter.Render.Text
+
 import Prover.Monad
 import Prover.Syntax.Abstract qualified as A
 import Prover.Term
@@ -33,7 +36,7 @@ debugFields :: Doc -> [(Doc, M Doc)] -> M ()
 debugFields label fields = debugM $ do
   fieldDocs <- forM fields $ \(key, m) -> do
     value <- m
-    return $ fillBreak 8 (key <> ":") <> nest 8 value
+    return $ fillBreak 10 (key <> ":") <> nest 10 value
   return $ label <> nest 2 (line <> vsep fieldDocs)
 
 parens :: Bool -> M Doc -> M Doc
@@ -63,9 +66,23 @@ prettyVar i = subscript "x" i
 prettyMeta :: MetaId -> Doc
 prettyMeta (MetaId i) = subscript "α" i
 
+-- TODO: move this?
+type MetaSubst = HashMap MetaId Term
+
+-- | Pretty-print a context.
+prettyCtx :: MetaSubst -> Ctx -> M Doc
+prettyCtx _ EmptyCtx = return mempty
+prettyCtx subst (EmptyCtx :> ty) = do
+  tyDoc  <- prettyTerm subst EmptyCtx ty
+  return $ prettyVar 0 <+> ":" <+> tyDoc
+prettyCtx subst (ctx :> ty) = do
+  ctxDoc <- prettyCtx subst ctx
+  tyDoc  <- prettyTerm subst ctx ty
+  return $ ctxDoc <> "," <+> prettyVar (ctxLength ctx) <+> ":" <+> tyDoc
+
 -- | Pretty-print a term in a context.
-prettyTerm :: Ctx -> Term -> M Doc
-prettyTerm ctx = prettyPrec (ctxLength ctx) 0
+prettyTerm :: MetaSubst -> Ctx -> Term -> M Doc
+prettyTerm subst ctx = prettyPrec (ctxLength ctx) 0
   where
     binderPrec = 0
     commaPrec = 1
@@ -73,7 +90,13 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
 
     prettyPrec :: Int -> Int -> Term -> M Doc
     prettyPrec k d = \case
-      BlockedMeta m args   -> app k d (prettyMeta m) args
+      BlockedMeta m args   ->
+        -- TODO: code is copied from whnf implementation
+        case HashMap.lookup m subst of
+          Just t' -> prettyPrec k d (applyTerm t' args)
+          Nothing -> lookupState m metaTerms >>= \case
+            Just t' -> prettyPrec k d (applyTerm t' args)
+            Nothing -> app k d (prettyMeta m) args
       BlockedAxiom n args  -> do
         n <- getState n axiomNames
         app k d (pretty (A.nameText n)) args
@@ -107,13 +130,32 @@ prettyTerm ctx = prettyPrec (ctxLength ctx) 0
         argsDocs <- mapM (prettyPrec k (appPrec + 1)) args
         return $ hsep (h : argsDocs)
 
--- | Pretty-print a context.
-prettyCtx :: Ctx -> M Doc
-prettyCtx EmptyCtx = return mempty
-prettyCtx (EmptyCtx :> ty) = do
-  tyDoc  <- prettyTerm EmptyCtx ty
-  return $ prettyVar 0 <+> ":" <+> tyDoc
-prettyCtx (ctx :> ty) = do
-  ctxDoc <- prettyCtx ctx
-  tyDoc  <- prettyTerm ctx ty
-  return $ ctxDoc <> line <> prettyVar (ctxLength ctx) <+> ":" <+> tyDoc
+-- | Pretty-print a unification constraint.
+prettyConstraint :: MetaSubst -> Constraint -> M Doc
+prettyConstraint subst = \case
+  Solved -> return "Solved"
+  Inconsistent -> return "Inconsistent"
+  TermEq ctx ty a b -> do
+    ctxDoc <- prettyCtx subst ctx
+    tyDoc <- prettyTerm subst ctx ty
+    aDoc <- prettyTerm subst ctx a
+    bDoc <-prettyTerm subst ctx b
+    return $ ctxDoc <+> "⊢" <+> aDoc <+> "≡" <+> bDoc <+> ":" <+> tyDoc
+  SpineEq ctx ty spine -> do
+    ctxDoc <- prettyCtx subst ctx
+    tyDoc <- prettyTerm subst ctx ty
+    aDocs <- mapM (prettyTerm subst ctx) (map fst spine)
+    bDocs <- mapM (prettyTerm subst ctx) (map snd spine)
+    -- TODO: how exactly do we show this?
+    return $ ctxDoc <+> "⊢" <+> list aDocs <+> "≡" <+> list bDocs <+> ":" <+> tyDoc
+  And cs -> do
+    csDocs <- mapM (prettyConstraint subst) cs
+    return $ "And" <+> list csDocs
+  ExactlyOne cs -> do
+    csDocs <- mapM (prettyConstraint subst) cs
+    return $ "ExactlyOne" <+> list csDocs
+  Guarded c1 c2 -> do
+    c1Doc <- prettyConstraint subst c1
+    c2Doc <- prettyConstraint subst c2
+    return $ "Guarded" <+> "(" <> c1Doc <> ")" <+> "(" <> c2Doc <> ")"
+

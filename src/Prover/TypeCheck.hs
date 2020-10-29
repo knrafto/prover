@@ -11,6 +11,7 @@ import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
 import Data.HashMap.Strict qualified as HashMap
+import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 import Prettyprinter
 
@@ -71,12 +72,6 @@ createMeta r tcCtx ty = do
     { metaRanges  = HashMap.insert id r (metaRanges s)
     , unificationProblem = addProblemMeta id metaTy (unificationProblem s)
     }
-  debugFields "create meta" $
-    [ "loc"  |: return (pretty r)
-    , "meta" |: return (prettyMeta id)
-    , "ctx"  |: prettyCtx ctx
-    , "type" |: prettyTerm ctx ty
-    ]
   return $ BlockedMeta id (ctxVars ctx)
 
 -- | Create a new name.
@@ -111,55 +106,20 @@ paramsSigma (A.ParamGroup ps _ : rest) ty = paramListSigma ps $ paramsSigma rest
 paramsLam :: [A.ParamGroup] -> Term -> Term
 paramsLam ps = makeLam (paramsLength ps)
 
--- | Generate a constraint that two terms (of possibly different types) are
--- equal, and simplify the unification problem.
-addConstraint :: Range -> TcCtx -> Term -> Type -> Term -> Type -> M ()
-addConstraint r tcCtx a tyA b tyB = do
-  let ctx = toCtx tcCtx
-  debugFields "create constraint" $
-    [ "loc" |: return (pretty r)
-    , "ctx" |: prettyCtx ctx
-    , "a"   |: prettyTerm ctx a
-    , "A"   |: prettyTerm ctx tyA
-    , "b"   |: prettyTerm ctx b
-    , "B"   |: prettyTerm ctx tyB
-    ]
-  problem <- gets unificationProblem
-  id <- freshEquationId
-  let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
-  problem' <- simplifyProblem (addProblemConstraint id c problem)
-  modify $ \s -> s
-    { equationRanges = HashMap.insert id r (equationRanges s)
-    , unificationProblem = problem'
-    }
-
 -- | Check that there is a unique solution to the unification problem (and
 -- report any errors if not).
 checkSolved :: M ()
 checkSolved = do
   problem <- gets unificationProblem
   -- Report unsolved constraints
-  forM_ (HashMap.toList (problemConstraints problem)) $ \(id, c) -> do
+  forM_ (HashMap.toList (problemConstraints problem)) $ \(id, _) -> do
     r <- getState id equationRanges
-    case c of
-      Solved  -> return ()
-      Inconsistent -> do
-        debugFields "type error" $
-          [ "loc"  |: return (pretty r)
-          ]
-        emitError $ TypeError r
-      _            -> do
-        debugFields "unsolved constraint" $
-          [ "loc"  |: return (pretty r)
-          ]
-        emitError $ UnsolvedConstraint r
+    -- TODO: show original equation
+    emitError $ UnsolvedConstraint r
   -- Report unsolved metas
   forM_ (problemUnsolvedMetas problem) $ \id -> do
     r <- getState id metaRanges
-    debugFields "unsolved meta" $
-      [ "loc"  |: return (pretty r)
-      , "meta" |: return (prettyMeta id)
-      ]
+    -- TODO: show type of meta
     emitError $ UnsolvedMeta r id
   -- Clear problem and merge into global substitution
   modify $ \s -> s
@@ -169,12 +129,50 @@ checkSolved = do
     }
 
 -- | Generate expression info for a range, term, and type, while checking that
--- it matches the expected output type.
+-- it matches the expected output type. Internally this generates a constraint
+-- that two terms (of possibly different types) are equal, and simplify the
+-- unification problem.
 expect :: Range -> TcCtx -> Term -> Type -> Type -> M A.ExprInfo
-expect r tcCtx t ty expectedTy = do
-  m <- createMeta r tcCtx expectedTy
-  addConstraint r tcCtx m expectedTy t ty
-  return (A.ExprInfo r m expectedTy)
+expect r tcCtx b tyB tyA = do
+  let ctx = toCtx tcCtx
+  a <- createMeta r tcCtx tyA
+  problem <- gets unificationProblem
+  id <- freshEquationId
+  let c = Guarded (TermEq ctx Type tyA tyB) (TermEq ctx tyA a b)
+  problem' <- simplifyProblem (addProblemConstraint id c problem)
+  modify $ \s -> s
+    { equationRanges = HashMap.insert id r (equationRanges s)
+    , unificationProblem = problem'
+    }
+
+  let subst = problemMetaTerms problem'
+  debugFields ("checking expression at" <+> pretty r)
+    [ "newly solved metas" |: do
+      let solvedMetas =
+            HashSet.difference
+              (HashMap.keysSet (problemMetaTerms problem'))
+              (HashMap.keysSet (problemMetaTerms problem))
+      docs <- forM (HashSet.toList solvedMetas) $ \m -> do
+        tmDoc <- prettyTerm subst EmptyCtx (problemMetaTerms problem' HashMap.! m)
+        return $ prettyMeta m <+> "↦" <+> tmDoc
+      return $ vsep docs
+    , "unsolved metas" |: do
+      let unsolvedMetas = HashSet.difference
+              (HashMap.keysSet (problemMetaTypes problem'))
+              (HashMap.keysSet (problemMetaTerms problem'))
+      docs <- forM (HashSet.toList unsolvedMetas) $ \m -> do
+        tyDoc <- prettyTerm subst EmptyCtx (problemMetaTypes problem' HashMap.! m)
+        return $ prettyMeta m <+> ":" <+> tyDoc
+      return $ vsep docs
+    , "constraints" |: do
+      docs <- mapM (prettyConstraint subst) (HashMap.elems (problemConstraints problem'))
+      return $ vsep docs
+    , "context" |: prettyCtx subst ctx
+    , "type" |: prettyTerm subst ctx tyA
+    , "term" |: prettyTerm subst ctx a
+    ]
+
+  return $ A.ExprInfo r a tyA
 
 -- | Apply a term to metavariables to fill implicit parameters.
 expandImplicits :: Range -> TcCtx -> Int -> Term -> Type -> M (Term, Type)

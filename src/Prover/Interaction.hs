@@ -106,7 +106,6 @@ quote t = "'" ++ Text.unpack t ++ "'"
 diagnoseError :: Error -> Diagnostic
 diagnoseError = \case
   UnboundName r n          -> Diagnostic r $ "unbound name " ++ quote n
-  TypeError r              -> Diagnostic r $ "type error"
   UnsolvedConstraint r     -> Diagnostic r $ "unsolved constraint"
   UnsolvedMeta r _         -> Diagnostic r $ "unsolved meta"
   BadPattern r             -> Diagnostic r $ "expression not allowed in pattern"
