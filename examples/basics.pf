@@ -11,7 +11,7 @@ define fst {A} {B} : (Σ a. B a) → A
 define snd {A} {B} : Π (p : Σ a. B a). B (fst p)
     ≡ Σ-ind A B (λ p. B (fst p)) (λ a b. b)
 
--- Martin-Löf identity type.
+-- Identity type.
 axiom Id A : A → A → Type
 
 infix 4 =
@@ -210,6 +210,7 @@ define +-assoc : Π a b c. (a + b) + c = a + (b + c)
    ≡ λ a b. ℕ-ind _ refl (λ c p. ap _ _ _ _ suc p)
 
 -- Multiplication. Also different from Agda's version.
+-- TODO: is this a good idea?
 
 define mul : ℕ → ℕ → ℕ
     ≡ λ m. ℕ-rec zero (add m)
