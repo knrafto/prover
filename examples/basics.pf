@@ -113,11 +113,16 @@ axiom Singleton-IsContr (A : Type) (a : A) : IsContr (Singleton A a)
 define id-IsEquiv {A} : IsEquiv _ _ (id A)
     ≡ Singleton-IsContr A
 
+define subst-IsEquiv (A : Type) (x y : A) (B : A → Type) (p : x = y) : IsEquiv _ _ (subst _ _ _ B p)
+    ≡ Id-ind (λ x y p. IsEquiv _ _ (subst _ _ _ B p)) (λ x. id-IsEquiv) x y p
+
 define Equiv A B ≡ Σ (f : A → B). IsEquiv A B f
+
 define Id→Equiv A B : A = B → Equiv A B
-    ≡ Id-ind (λ A B p. Equiv A B) (λ A. (id A, id-IsEquiv)) A B
+    ≡ λ p. (subst _ _ _ (λ A. A) p, subst-IsEquiv _ _ _ (λ A. A) p)
 
 axiom Id→Equiv-IsEquiv {A} {B} : IsEquiv _ _ (Id→Equiv A B)
+
 define ua {A} {B} : Equiv A B → A = B
     ≡ inv _ Id→Equiv-IsEquiv
 
