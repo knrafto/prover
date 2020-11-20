@@ -89,6 +89,7 @@ define IsSet   (A : Type) ≡ Π (x y : A). IsProp (x = y)
 
 define Fib (A B : Type) (f : A → B) (b : B) : Type
     ≡ Σ (a : A). f a = b
+
 define IsEquiv (A B : Type) (f : A → B) : Type
     ≡ Π (b : B). IsContr (Fib A B f b)
 
@@ -144,6 +145,14 @@ define 1-Dec : Dec 1
 
 define Π-IsProp {A : Type} {B : A → Type} (B-IsProp : Π a. IsProp (B a)): IsProp (Π a. B a)
     ≡ λ f g. funext _ _ f g (λ a. B-IsProp a (f a) (g a))
+
+-- TODO: name. IsEmbedding?
+define IsEmbed (A B : Type) (f : A → B) : Type
+    ≡ Π (b : B). IsProp (Fib A B f b)
+
+-- define id-IsEmbed (A : Type) : IsEmbed _ _ (id A) ≡ _
+
+-- define ∘-IsEmbed g f : IsEmbed (g ∘ f) ≡ _
 
 -- Natural numbers.
 define ℕ-rec {A} (z : A) (s : A → A) : ℕ → A
@@ -214,6 +223,12 @@ define +-comm : Π m n. n + m = m + n
 define +-assoc : Π a b c. (a + b) + c = a + (b + c)
    ≡ λ a b. ℕ-ind _ refl (λ c p. ap _ _ _ _ suc p)
 
+-- define suc-IsEmbed : IsEmbed _ _ suc
+--      ≡ _
+
+-- define +-IsEmbed-l : Π (k : ℕ). IsEmbed _ _ (λ n. n + k)
+--     ≡ ℕ-ind _ (id-IsEmbed _) _
+
 -- Multiplication. Also different from Agda's version.
 -- TODO: is this a good idea?
 
@@ -231,6 +246,17 @@ define *-suc : Π m n. m * suc n = m + m * n
 
 define zero-* : Π n. zero * n = zero
     ≡ ℕ-ind _ refl (λ n p. ap _ _ _ _ (add zero) p)
+
+infix 4 ≤
+define ≤ m n ≡ Σ (k : ℕ). k + m = n  -- Fib (λ k. k + m) n
+
+-- define ≤-IsProp (m n : ℕ) : IsProp (m ≤ n)
+--     ≡ +-IsEmbed-l m n
+
+infix 4 <
+define < m n ≡ suc m ≤ n
+
+define Fin (n : ℕ) ≡ Σ (i : ℕ). i < n
 
 -- Propositional truncation.
 axiom Trunc : Type → Type
