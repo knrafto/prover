@@ -93,19 +93,34 @@ assignMeta :: MetaId -> Term -> UnifyM ()
 assignMeta id t =  modify $ \s -> s
   { problemMetaTerms = HashMap.insert id t (problemMetaTerms s) }
 
+-- | The result of trying to reduce a term to weak head normal form.
+data WhnfResult
+  -- Evaluation is blocked due to unsolved metas. The head can either be an
+  -- unsolved meta, or an axiom with rewrite rules.
+  = Blocked Term
+  -- A term in whnf.
+  | Whnf Term
+  deriving (Eq, Show)
+
+whnfTerm :: WhnfResult -> Term
+whnfTerm = \case
+  Blocked t -> t
+  Whnf t -> t
+
 -- | The result of a pattern match.
 data MatchResult
   -- | The match succeeded, and we can extract terms for context variables.
   = Match (IntMap Term)
   | NoMatch
-  | Blocked
+  | BlockedMatch
+  deriving (Eq, Show)
 
 instance Semigroup MatchResult where
-  Match m1 <> Match m2 = Match (IntMap.union m1 m2)
-  NoMatch  <> _        = NoMatch
-  _        <> NoMatch  = NoMatch
-  Blocked  <> _        = Blocked
-  _        <> Blocked  = Blocked
+  Match m1      <> Match m2     = Match (IntMap.union m1 m2)
+  NoMatch       <> _            = NoMatch
+  _             <> NoMatch      = NoMatch
+  BlockedMatch  <> _            = BlockedMatch
+  _             <> BlockedMatch = BlockedMatch
 
 instance Monoid MatchResult where
   mempty = Match IntMap.empty
@@ -114,18 +129,18 @@ matchPattern :: Pattern -> Term -> UnifyM MatchResult
 matchPattern pat t = case pat of
   VarPat i         -> return $ Match (IntMap.singleton i t)
   AxiomPat id args -> whnf t >>= \case
-    BlockedMeta _ _  -> return Blocked
-    BlockedAxiom _ _ -> return Blocked
+    Blocked _ -> return BlockedMatch
     -- TODO: what happens if the arg lengths do not match?
-    Axiom h termArgs | h == id && length args == length termArgs ->
+    Whnf (Axiom h termArgs) | h == id && length args == length termArgs ->
       mconcat <$> zipWithM matchPattern args termArgs
     _ -> return NoMatch
   PairPat pa pb    -> whnf t >>= \case
-    Pair a b -> mappend <$> matchPattern pa a <*> matchPattern pb b
+    Blocked _ -> return BlockedMatch
+    Whnf (Pair a b) -> mappend <$> matchPattern pa a <*> matchPattern pb b
     _ -> return NoMatch
 
-applyRules :: NameId -> [Term] -> [Rule] -> UnifyM Term
-applyRules id args []          = return $ Axiom id args
+applyRules :: NameId -> [Term] -> [Rule] -> UnifyM WhnfResult
+applyRules id args [] = return $ Whnf (Axiom id args)
 applyRules id args (rule:rest)
   | length (ruleArgs rule) <= length args = do
     result <- mconcat <$> zipWithM matchPattern (ruleArgs rule) args
@@ -135,31 +150,28 @@ applyRules id args (rule:rest)
             varTerms   = reverse [vars IntMap.! i | i <- [0..n-1]]
             extraTerms = drop (length (ruleArgs rule)) args
         whnf $ applyTerm (ruleRhs rule) (varTerms ++ extraTerms)
-      Blocked    -> return $ BlockedAxiom id args
-      NoMatch    -> applyRules id args rest
+      BlockedMatch -> return $ Blocked (Axiom id args)
+      NoMatch -> applyRules id args rest
   | otherwise = applyRules id args rest
 
 -- | Attempts to reduce a term to a weak head normal form.
-whnf :: Term -> UnifyM Term
+whnf :: Term -> UnifyM WhnfResult
 whnf t = case t of
-  BlockedMeta id args -> do
+  Meta id args -> do
     -- TODO: path compression?
     subst <- gets problemMetaTerms
     case HashMap.lookup id subst of
       Just t' -> whnf (applyTerm t' args)
       Nothing -> lift (lookupState id metaTerms) >>= \case
         Just t' -> whnf (applyTerm t' args)
-        Nothing -> return t
-  BlockedAxiom id args -> do
-    rules <- fromMaybe [] <$> lift (lookupState id axiomRules)
-    applyRules id args rules
+        Nothing -> return (Blocked t)
   Axiom id args -> do
     rules <- fromMaybe [] <$> lift (lookupState id axiomRules)
     applyRules id args rules
   Def id args -> do
     t <- lift (getState id defTerms)
     whnf (applyTerm t args)
-  t -> return t
+  t -> return (Whnf t)
 
 unify :: Ctx -> Type -> Term -> Term -> UnifyM Constraint
 unify ctx ty t1 t2 = do
@@ -171,40 +183,40 @@ unify ctx ty t1 t2 = do
     _ | t1' == t2' -> return Solved
 
     -- TODO: intersect?
-    (_, BlockedMeta m1 _, BlockedMeta m2 _) | m1 == m2 ->
-      return $ TermEq ctx ty' t1' t2'
+    (_, Blocked (Meta m1 _), Blocked (Meta m2 _)) | m1 == m2 ->
+      return $ TermEq ctx (whnfTerm ty') (whnfTerm t1') (whnfTerm t2')
 
-    (_, BlockedMeta m1 args1, BlockedMeta m2 args2) -> flexFlex ctx ty' m1 args1 m2 args2
-    (_, BlockedMeta m args, t) -> flexRigid ctx ty' m args t
-    (_, t, BlockedMeta m args) -> flexRigid ctx ty' m args t
+    (_, Blocked (Meta m1 args1), Blocked (Meta m2 args2)) -> flexFlex ctx (whnfTerm ty') m1 args1 m2 args2
+    (_, Blocked (Meta m args), t) -> flexRigid ctx (whnfTerm ty') m args (whnfTerm t)
+    (_, t, Blocked (Meta m args)) -> flexRigid ctx (whnfTerm ty') m args (whnfTerm t)
 
-    (_, BlockedAxiom _ _, _) -> return $ TermEq ctx ty' t1' t2'
-    (_, _, BlockedAxiom _ _) -> return $ TermEq ctx ty' t1' t2'
+    (_, Blocked (Axiom _ _), _) -> return $ TermEq ctx (whnfTerm ty') (whnfTerm t1') (whnfTerm t2')
+    (_, _, Blocked (Axiom _ _)) -> return $ TermEq ctx (whnfTerm ty') (whnfTerm t1') (whnfTerm t2')
 
-    (_, Var i1 args1, Var i2 args2)
+    (_, Whnf (Var i1 args1), Whnf (Var i2 args2))
       | i1 == i2 && length args1 == length args2 ->
         unifySpine ctx (ctxLookup ctx i1) (zip args1 args2)
-    (_, Axiom n1 args1, Axiom n2 args2)
+    (_, Whnf (Axiom n1 args1), Whnf (Axiom n2 args2))
       | n1 == n2 && length args1 == length args2 -> do
         nty <- lift $ getState n1 axiomTypes
         unifySpine ctx nty (zip args1 args2)
 
     -- Π-types (with η)
-    (Pi a b, Lam e1, Lam e2) -> unify (ctx :> a) b e1 e2
-    (Pi a b, Lam e, t)       -> unify (ctx :> a) b e (applyTerm (weaken t) [var 0])
-    (Pi a b, t, Lam e)       -> unify (ctx :> a) b (applyTerm (weaken t) [var 0]) e
+    (Whnf (Pi a b), Whnf (Lam e1), Whnf (Lam e2)) -> unify (ctx :> a) b e1 e2
+    (Whnf (Pi a b), Whnf (Lam e), t) -> unify (ctx :> a) b e (applyTerm (weaken (whnfTerm t)) [var 0])
+    (Whnf (Pi a b), t, Whnf (Lam e)) -> unify (ctx :> a) b (applyTerm (weaken (whnfTerm t)) [var 0]) e
 
     -- Σ-types (no η)
-    (Sigma a b, Pair a1 b1, Pair a2 b2) -> do
+    (Whnf (Sigma a b), Whnf (Pair a1 b1), Whnf (Pair a2 b2)) -> do
       -- If B does not depend on A (i.e. this is a non-dependent function type) then
       -- we don't need to guard on the argument constraint.
       case strengthen b of
         Nothing -> guarded (TermEq ctx a a1 a2) (TermEq ctx (instantiate b a1) b1 b2)
         Just b' -> simplify $ And [TermEq ctx a a1 a2, TermEq ctx b' b1 b2]
 
-    (Type, Type, Type) -> return Solved
-    (Type, Pi a1 b1, Pi a2 b2) -> unifyDependentTypes ctx a1 b1 a2 b2
-    (Type, Sigma a1 b1, Sigma a2 b2) -> unifyDependentTypes ctx a1 b1 a2 b2
+    (Whnf Type, Whnf Type, Whnf Type) -> return Solved
+    (Whnf Type, Whnf (Pi a1 b1), Whnf (Pi a2 b2)) -> unifyDependentTypes ctx a1 b1 a2 b2
+    (Whnf Type, Whnf (Sigma a1 b1), Whnf (Sigma a2 b2)) -> unifyDependentTypes ctx a1 b1 a2 b2
         
     _ -> return Inconsistent
 
@@ -212,8 +224,8 @@ unifySpine :: Ctx -> Type -> [(Term, Term)] -> UnifyM Constraint
 unifySpine _ _ [] = return Solved
 unifySpine ctx ty ((arg1, arg2):rest) = do
   (a, b) <- whnf ty >>= \case
-    Pi a b -> return (a, b)
-    _      -> error "unifySpine: term is not well-typed"
+    Whnf (Pi a b) -> return (a, b)
+    _ -> error "unifySpine: term is not well-typed"
   -- If B does not depend on A (i.e. this is a non-dependent function type) then
   -- we don't need to guard on the argument constraint.
   case strengthen b of
@@ -245,8 +257,8 @@ unifyDependentTypes ctx a1 b1 a2 b2 =
 -- | Try both ways.
 flexFlex :: Ctx -> Type -> MetaId -> [Term] -> MetaId -> [Term] -> UnifyM Constraint
 flexFlex ctx ty m1 args1 m2 args2 = do
-  let t1 = BlockedMeta m1 args1
-      t2 = BlockedMeta m2 args2
+  let t1 = Meta m1 args1
+      t2 = Meta m2 args2
   solveMeta args1 t2 >>= \case
     Just t2' -> do
       assignMeta m1 t2'
@@ -260,7 +272,7 @@ flexFlex ctx ty m1 args1 m2 args2 = do
 flexRigid :: Ctx -> Type -> MetaId -> [Term] -> Term -> UnifyM Constraint
 flexRigid ctx ty m args t =
   solveMeta args t >>= \case
-    Nothing -> return $ TermEq ctx ty (BlockedMeta m args) t
+    Nothing -> return $ TermEq ctx ty (Meta m args) t
     Just t' -> do
       assignMeta m t'
       return Solved
@@ -294,16 +306,15 @@ convertMetaArgs args = mapM convertMetaArg (reverse args)
     convertMetaArg t = do
       t' <- lift $ whnf t
       case t' of
-        Var i [] -> return i
+        Whnf (Var i []) -> return i
         _ -> mzero
 
 -- invertVarSubst σ t tries to find a unique term u such that u[σ] = t.
 invertVarSubst :: VarSubst -> Term -> MaybeT UnifyM Term
 invertVarSubst σ t = do
   t' <- lift $ whnf t
-  case t' of
-    BlockedMeta m args -> BlockedMeta m <$> mapM (invertVarSubst σ) args
-    BlockedAxiom n args -> BlockedAxiom n <$> mapM (invertVarSubst σ) args
+  case whnfTerm t' of
+    Meta m args -> Meta m <$> mapM (invertVarSubst σ) args
     Axiom n args -> Axiom n <$> mapM (invertVarSubst σ) args
     Def n args -> Def n <$> mapM (invertVarSubst σ) args
     Var i args -> case elemIndices i σ of

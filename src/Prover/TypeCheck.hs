@@ -72,7 +72,7 @@ createMeta r tcCtx ty = do
     { metaRanges  = HashMap.insert id r (metaRanges s)
     , unificationProblem = addProblemMeta id metaTy (unificationProblem s)
     }
-  return $ BlockedMeta id (ctxVars ctx)
+  return $ Meta id (ctxVars ctx)
 
 -- | Create a new name.
 createName :: C.Name -> M A.Name
@@ -212,7 +212,7 @@ checkExpr expr tcCtx expectedTy = case expr of
         , Just ty <- HashMap.lookup id (axiomTypes state) -> do
           implicits <- getState id axiomImplicits
           let n' = A.Name id r s
-              t  = BlockedAxiom id []
+              t  = Axiom id []
           (t', ty') <- expandImplicits r tcCtx implicits t ty
           i <- expect r tcCtx t' ty' expectedTy
           return $ A.Axiom i n'
@@ -351,7 +351,7 @@ checkParams tcCtx (p:ps) = do
 
 termToPattern :: Term -> MaybeT M Pattern
 termToPattern = \case
-  BlockedMeta id args -> lift (lookupState id metaTerms) >>= \case
+  Meta id args -> lift (lookupState id metaTerms) >>= \case
     Just t' -> termToPattern (applyTerm t' args)
     Nothing -> mzero
   Var i []     -> return (VarPat i)

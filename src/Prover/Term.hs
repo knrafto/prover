@@ -22,13 +22,9 @@ newtype MetaId = MetaId Int
 --
 -- A useful property of this representation that we can (ab)use is that a closed
 -- term can be used in any context without explicitly applying a substitution.
---
--- TODO: having both BlockedAxiom and Axiom is very confusing.
 data Term
   -- | A metavariable applied to args.
-  = BlockedMeta !MetaId [Term]
-  -- | An axiom applied to args that may be reduced when more metas are solved.
-  | BlockedAxiom !NameId [Term]
+  = Meta !MetaId [Term]
   -- | A neutral axiom applied to args.
   | Axiom !NameId [Term]
   -- | A definition applied to args.
@@ -72,13 +68,12 @@ var i = Var i []
 applyTerm :: Term -> [Term] -> Term
 applyTerm t [] = t
 applyTerm t args@(arg:rest) = case t of
-  BlockedMeta m args'   -> BlockedMeta m (args' ++ args)
-  BlockedAxiom n args'  -> BlockedAxiom n (args' ++ args)
-  Axiom n args'         -> Axiom n (args' ++ args)
-  Def n args'           -> Def n (args' ++ args)
-  Var v args'           -> Var v (args' ++ args)
-  Lam b                 -> applyTerm (instantiate b arg) rest
-  _                     -> error "applyTerm"
+  Meta m args'  -> Meta m (args' ++ args)
+  Axiom n args' -> Axiom n (args' ++ args)
+  Def n args'   -> Def n (args' ++ args)
+  Var v args'   -> Var v (args' ++ args)
+  Lam b         -> applyTerm (instantiate b arg) rest
+  _             -> error "applyTerm"
 
 lookupVar :: Subst -> Var -> Term
 lookupVar (SubstWeaken k)    i = var (i + k)
@@ -89,16 +84,15 @@ lookupVar (SubstTerm _)      i = var (i - 1)
 
 applySubst :: Subst -> Term -> Term
 applySubst subst = \case
-  BlockedMeta m args  -> BlockedMeta m (map (applySubst subst) args)
-  BlockedAxiom n args -> BlockedAxiom n (map (applySubst subst) args)
-  Axiom n args        -> Axiom n (map (applySubst subst) args)
-  Def n args          -> Def n (map (applySubst subst) args)
-  Var v args          -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
-  Lam b               -> Lam (applySubst (SubstLift subst) b)
-  Pair a b            -> Pair (applySubst subst a) (applySubst subst b)
-  Type                -> Type
-  Pi a b              -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
-  Sigma a b           -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
+  Meta m args   -> Meta m (map (applySubst subst) args)
+  Axiom n args  -> Axiom n (map (applySubst subst) args)
+  Def n args    -> Def n (map (applySubst subst) args)
+  Var v args    -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
+  Lam b         -> Lam (applySubst (SubstLift subst) b)
+  Pair a b      -> Pair (applySubst subst a) (applySubst subst b)
+  Type          -> Type
+  Pi a b        -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
+  Sigma a b     -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
 
 -- TODO: comment
 weaken :: Term -> Term
@@ -109,19 +103,18 @@ strengthen = go 0
   where
   go :: Int -> Term -> Maybe Term
   go i = \case
-    BlockedMeta m args  -> BlockedMeta m <$> traverse (go i) args
-    BlockedAxiom n args -> BlockedAxiom n <$> traverse (go i) args
-    Axiom n args        -> Axiom n <$> traverse (go i) args
-    Def n args          -> Def n <$> traverse (go i) args
+    Meta m args   -> Meta m <$> traverse (go i) args
+    Axiom n args  -> Axiom n <$> traverse (go i) args
+    Def n args    -> Def n <$> traverse (go i) args
     Var j args
-      | j < i           -> Var j <$> traverse (go i) args
-      | j == i          -> Nothing
-      | otherwise       -> Var (j - 1) <$> traverse (go i) args
-    Lam b               -> Lam <$> go (i + 1) b
-    Pair a b            -> Pair <$> go i a <*> go i b
-    Type                -> return Type
-    Pi a b              -> Pi <$> go i a <*> go (i + 1) b
-    Sigma a b           -> Sigma <$> go i a <*> go (i + 1) b
+      | j < i     -> Var j <$> traverse (go i) args
+      | j == i    -> Nothing
+      | otherwise -> Var (j - 1) <$> traverse (go i) args
+    Lam b         -> Lam <$> go (i + 1) b
+    Pair a b      -> Pair <$> go i a <*> go i b
+    Type          -> return Type
+    Pi a b        -> Pi <$> go i a <*> go (i + 1) b
+    Sigma a b     -> Sigma <$> go i a <*> go (i + 1) b
 
 -- TODO: comment
 instantiate :: Term -> Term -> Term

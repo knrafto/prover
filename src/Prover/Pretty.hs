@@ -61,7 +61,7 @@ subscript s i = pretty s <> pretty (map toSubscriptChar (show i))
       _   -> error "subscript: not a digit"
 
 prettyVar :: Int -> Doc
-prettyVar i = subscript "x" i
+prettyVar = subscript "x"
 
 prettyMeta :: MetaId -> Doc
 prettyMeta (MetaId i) = subscript "α" i
@@ -90,16 +90,13 @@ prettyTerm subst ctx = prettyPrec (ctxLength ctx) 0
 
     prettyPrec :: Int -> Int -> Term -> M Doc
     prettyPrec k d = \case
-      BlockedMeta m args   ->
+      Meta m args   ->
         -- TODO: code is copied from whnf implementation
         case HashMap.lookup m subst of
           Just t' -> prettyPrec k d (applyTerm t' args)
           Nothing -> lookupState m metaTerms >>= \case
             Just t' -> prettyPrec k d (applyTerm t' args)
             Nothing -> app k d (prettyMeta m) args
-      BlockedAxiom n args  -> do
-        n <- getState n axiomNames
-        app k d (pretty (A.nameText n)) args
       Axiom n args         -> do
         n <- getState n axiomNames
         app k d (pretty (A.nameText n)) args
@@ -144,8 +141,8 @@ prettyConstraint subst = \case
   SpineEq ctx ty spine -> do
     ctxDoc <- prettyCtx subst ctx
     tyDoc <- prettyTerm subst ctx ty
-    aDocs <- mapM (prettyTerm subst ctx) (map fst spine)
-    bDocs <- mapM (prettyTerm subst ctx) (map snd spine)
+    aDocs <- mapM (prettyTerm subst ctx . fst) spine
+    bDocs <- mapM (prettyTerm subst ctx . snd) spine
     -- TODO: how exactly do we show this?
     return $ ctxDoc <+> "⊢" <+> list aDocs <+> "≡" <+> list bDocs <+> ":" <+> tyDoc
   And cs -> do
