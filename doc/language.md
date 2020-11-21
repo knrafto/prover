@@ -76,7 +76,7 @@ _
 define axiom rewrite where infix infixl infixr
 ```
 
-All other words are "names".
+All other words are identifiers.
 
 ## Pseudo-grammar
 
@@ -84,22 +84,22 @@ All other words are "names".
 module = [ decl ]*
 
 decl =
-    fixity number name
-    define name implicit_params explicit_params [ : expr ] ≡ expr
-    axiom name implicit_params explicit_params : expr
-    rewrite name explicit_params where expr ≡ expr
+    fixity number ident
+    define ident implicit_params explicit_params [ : expr ] ≡ expr
+    axiom ident implicit_params explicit_params : expr
+    rewrite ident explicit_params where expr ≡ expr
 
 implicit_params = implicit_param_group*
 
 implicit_param_group =
-    { name }
-    { name+ : expr }
+    { ident }
+    { ident+ : expr }
 
 explicit_params = explicit_param_group*
 
 explicit_param_group =
-    name
-    ( name+ : expr )
+    ident
+    ( ident+ : expr )
 
 fixity =
     infix
@@ -108,7 +108,7 @@ fixity =
 
 expr =
     _
-    name
+    ident
     Type
     ( expr )
     expr expr

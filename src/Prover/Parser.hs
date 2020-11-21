@@ -13,7 +13,7 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
 import Prover.Position
-import Prover.Syntax.Concrete
+import Prover.Syntax
 
 type Parser = Parsec Void Text
 
@@ -29,8 +29,7 @@ isWordChar c = c `notElem` (" \t\r\n\f\v(){},." :: [Char])
 getPosition :: Parser Position
 getPosition = do
     SourcePos _ l c <- getSourcePos
-    offset <- getOffset
-    return (Position (unPos l) (unPos c) offset)
+    Position (unPos l) (unPos c) <$> getOffset
 
 reservedWord :: Text -> Parser Range
 reservedWord w = lexeme . try $ do
@@ -39,17 +38,17 @@ reservedWord w = lexeme . try $ do
     notFollowedBy (satisfy isWordChar)
     Range s <$> getPosition
 
-name :: Parser Name
-name = lexeme . try $ do
+ident :: Parser Ident
+ident = lexeme . try $ do
     s <- getPosition
     w <- takeWhile1P (Just "word character") isWordChar
     when (w `elem` reservedWords) $ fail
         (  "keyword "
         ++ T.unpack w
-        ++ " is reserved and cannot be used as a name"
+        ++ " is reserved and cannot be used as an identifier"
         )
     e <- getPosition
-    return (Name (Range s e) w)
+    return (Ident (Range s e) w)
   where
     reservedWords :: [Text]
     reservedWords =
@@ -72,7 +71,7 @@ name = lexeme . try $ do
 
 text :: Parser Text
 text = do
-    Name _ s <- name
+    Ident _ s <- ident
     return s
 
 number :: Parser Int
@@ -89,21 +88,23 @@ symbol c = lexeme $ do
     Range s <$> getPosition
 
 -- TODO: this also parses {x y z}, which is incorrect
-implicitParams :: Parser [ParamGroup]
-implicitParams = many $ ParamGroup <$ symbol '{' <*> some name <*> optional (reservedWord ":" *> expr) <* symbol '}'
+implicitParams :: Parser [ParamGroup Range Ident]
+implicitParams = many $ ParamGroup <$ symbol '{' <*> some ident <*> optional (reservedWord ":" *> expr) <* symbol '}'
 
-explicitParams :: Parser [ParamGroup]
+explicitParams :: Parser [ParamGroup Range Ident]
 explicitParams = many (annotated <|> bare)
   where
-    annotated = ParamGroup <$ symbol '(' <*> some name <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
-    bare      = (\n -> ParamGroup [n] Nothing) <$> name
+    annotated = ParamGroup <$ symbol '(' <*> some ident <* reservedWord ":" <*> (Just <$> expr) <* symbol ')'
+    bare      = (\n -> ParamGroup [n] Nothing) <$> ident
 
-atom :: Parser Expr
-atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
+atom :: Parser (Expr Range Ident)
+atom = var <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
   where
-    id_   = Id <$> name
-    hole  = Hole <$> reservedWord "_"
-    type_ = Type <$> reservedWord "Type"
+    var   = do
+        id <- ident
+        return $ EVar (identRange id) id
+    hole  = EHole <$> reservedWord "_"
+    type_ = EType <$> reservedWord "Type"
     parens = do
         _ <- symbol '('
         e <- expr
@@ -114,67 +115,67 @@ atom = id_ <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
         p <- explicitParams
         _ <- symbol '.'
         e <- expr
-        return (Pi (rangeSpan s (getRange e)) p e)
+        return (EPi (rangeSpan s (ann e)) p e)
     lam = do
         s <- reservedWord "λ"
         p <- explicitParams
         _ <- symbol '.'
         e <- expr
-        return (Lam (rangeSpan s (getRange e)) p e)
+        return (ELam (rangeSpan s (ann e)) p e)
     sigma = do
         s <- reservedWord "Σ"
         p <- explicitParams
         _ <- symbol '.'
         e <- expr
-        return (Sigma (rangeSpan s (getRange e)) p e)
+        return (ESigma (rangeSpan s (ann e)) p e)
 
-apps :: Parser Expr
+apps :: Parser (Expr Range Ident)
 apps = do
     es <- some atom
     case es of
         [e] -> return e
         _   -> do
-            let r = foldr1 rangeSpan (map getRange es)
-            return (Apps r es)
+            let r = foldr1 rangeSpan (map ann es)
+            return (EApps r es)
 
-expr :: Parser Expr
+expr :: Parser (Expr Range Ident)
 expr = makeExprParser
     apps
-    [ [InfixR (binop Arrow  <$ reservedWord "→")]
-    , [InfixR (binop Pair   <$ symbol       ',')]
+    [ [InfixR (binop EArrow  <$ reservedWord "→")]
+    , [InfixR (binop EPair   <$ symbol       ',')]
     ]
-    where binop c e1 e2 = c (rangeSpan (getRange e1) (getRange e2)) e1 e2
+    where binop c e1 e2 = c (rangeSpan (ann e1) (ann e2)) e1 e2
 
-define :: Parser Decl
+define :: Parser (Decl Range Ident)
 define = Define
     <$  reservedWord "define"
-    <*> name
+    <*> ident
     <*> implicitParams
     <*> explicitParams
     <*> optional (reservedWord ":" *> expr)
     <*  reservedWord "≡"
     <*> expr
 
-axiom :: Parser Decl
+axiom :: Parser (Decl Range Ident)
 axiom = Assume
     <$  reservedWord "axiom"
-    <*> name
+    <*> ident
     <*> implicitParams
     <*> explicitParams
     <*  reservedWord ":"
     <*> expr
 
-rewrite :: Parser Decl
+rewrite :: Parser (Decl Range Ident)
 rewrite = Rewrite
     <$  reservedWord "rewrite"
-    <*> name
+    <*> ident
     <*> explicitParams
     <*  reservedWord "where"
     <*> expr
     <*  reservedWord "≡"
     <*> expr
 
-fixity :: Parser Decl
+fixity :: Parser (Decl Range Ident)
 fixity = Fixity
     <$> (Infix  <$ reservedWord "infix"  <|>
          Infixl <$ reservedWord "infixl" <|>
@@ -182,13 +183,13 @@ fixity = Fixity
     <*> number
     <*> text
 
-decl :: Parser Decl
+decl :: Parser (Decl Range Ident)
 decl = define <|> axiom <|> rewrite <|> fixity
 
-module_ :: Parser Module
+module_ :: Parser (Module Range Ident)
 module_ = Module <$ sc <*> many decl <* eof
 
-parseModule :: FilePath -> Text -> Either String Module
+parseModule :: FilePath -> Text -> Either String (Module Range Ident)
 parseModule path input = case parse module_ path input of
     Left  e -> Left (errorBundlePretty e)
     Right m -> Right m
