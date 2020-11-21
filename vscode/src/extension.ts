@@ -29,7 +29,7 @@ let binaryPath =
     '/Users/knrafto/code/prover/dist-newstyle/build/x86_64-osx/ghc-8.10.1/prover-0.1.0.0/x/prover/build/prover/prover';
 
 let highlightStyles: Map<string, string> = new Map([
-  ['var_name', 'base1'],
+  ['local_name', 'base1'],
   ['def_name', 'blue'],
   ['axiom_name', 'blue'],
   ['rewrite_name', 'blue'],

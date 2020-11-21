@@ -30,7 +30,7 @@ data HighlightKind
 
 instance ToJSON HighlightKind where
   toJSON = \case
-    HighlightLocalName    -> "var_name"
+    HighlightLocalName    -> "local_name"
     HighlightDefName      -> "def_name"
     HighlightAxiomName    -> "axiom_name"
     HighlightRewriteName  -> "rewrite_name"
