@@ -54,10 +54,10 @@ instance ToJSON Range where
 rangeSpan :: Range -> Range -> Range
 rangeSpan (Range s _) (Range _ e) = Range s e
 
+-- TODO: delete?
 class HasRange a where
   getRange :: a -> Range
 
--- TODO: does this really belong here? Maybe rename "Prover.Syntax.Position" to
--- "Prover.Syntax.Common" or something
+-- TODO: move to "Prover.Syntax"
 data Fixity = Infix | Infixl | Infixr
   deriving (Eq, Show)

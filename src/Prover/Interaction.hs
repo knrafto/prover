@@ -7,7 +7,7 @@ import Data.Text qualified as Text
 
 import Prover.Monad
 import Prover.Position
-import Prover.Syntax.Abstract
+import Prover.Syntax
 
 data Response = Response
   { highlighting :: [HighlightedRange]
@@ -19,7 +19,7 @@ instance ToJSON Response where
   toJSON r = object ["highlighting" .= highlighting r, "diagnostics" .= diagnostics r]
 
 data HighlightKind
-  = HighlightVarName
+  = HighlightLocalName
   | HighlightDefName
   | HighlightAxiomName
   | HighlightRewriteName
@@ -30,7 +30,7 @@ data HighlightKind
 
 instance ToJSON HighlightKind where
   toJSON = \case
-    HighlightVarName      -> "var_name"
+    HighlightLocalName    -> "var_name"
     HighlightDefName      -> "def_name"
     HighlightAxiomName    -> "axiom_name"
     HighlightRewriteName  -> "rewrite_name"
@@ -53,50 +53,57 @@ data Diagnostic = Diagnostic
 instance ToJSON Diagnostic where
   toJSON (Diagnostic r m) = object ["range" .= r, "message" .= m]
 
-highlightExpr :: Expr -> [HighlightedRange]
+highlightExpr :: Expr ExprInfo Name -> [HighlightedRange]
 highlightExpr = \case
-  Var     i _     -> [HighlightedRange (getRange i) HighlightVarName]
-  Def     i _     -> [HighlightedRange (getRange i) HighlightDefName]
-  Axiom   i _     -> [HighlightedRange (getRange i) HighlightAxiomName]
-  Unbound i _     -> [HighlightedRange (getRange i) HighlightUnboundName]
-  Hole    i       -> [HighlightedRange (getRange i) HighlightHole]
-  Type    i       -> [HighlightedRange (getRange i) HighlightType]
-  Pi      _ ps e  -> highlightParams HighlightVarName ps ++ highlightExpr e
-  Lam     _ ps e  -> highlightParams HighlightVarName ps ++ highlightExpr e
-  Sigma   _ ps e  -> highlightParams HighlightVarName ps ++ highlightExpr e
-  App     _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
-  Arrow   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
-  Pair    _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  EVar     _ n     -> highlightName n
+  EHole    i       -> [HighlightedRange (exprInfoRange i) HighlightHole]
+  EType    i       -> [HighlightedRange (exprInfoRange i) HighlightType]
+  EPi      _ ps e  -> highlightParamGroups ps ++ highlightExpr e
+  ELam     _ ps e  -> highlightParamGroups ps ++ highlightExpr e
+  ESigma   _ ps e  -> highlightParamGroups ps ++ highlightExpr e
+  EApps    _ es    -> concatMap highlightExpr es
+  EApp     _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  EArrow   _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
+  EPair    _ e1 e2 -> highlightExpr e1 ++ highlightExpr e2
 
-highlightParam :: HighlightKind -> Param -> [HighlightedRange]
-highlightParam kind p = [HighlightedRange (nameRange (paramName p)) kind]
+highlightName :: Name -> [HighlightedRange]
+highlightName n = [HighlightedRange (nameRange n) kind]
+  where
+    kind = case nameReferent n of
+      LocalName _ -> HighlightLocalName
+      DefName _ -> HighlightDefName
+      AxiomName _ -> HighlightAxiomName
+      RewriteName -> HighlightRewriteName
+      UnboundName -> HighlightUnboundName
 
-highlightParamGroup :: HighlightKind -> ParamGroup -> [HighlightedRange]
-highlightParamGroup kind (ParamGroup ps ann) =
-  concatMap (highlightParam kind) ps ++ foldMap highlightExpr ann
+highlightParamGroup :: ParamGroup ExprInfo Name -> [HighlightedRange]
+highlightParamGroup (ParamGroup ns ann) =
+  concatMap highlightName ns ++ foldMap highlightExpr ann
 
-highlightParams :: HighlightKind -> [ParamGroup] -> [HighlightedRange]
-highlightParams kind = concatMap (highlightParamGroup kind)
+highlightParamGroups :: [ParamGroup ExprInfo Name] -> [HighlightedRange]
+highlightParamGroups = concatMap highlightParamGroup
 
-highlightDecl :: Decl -> [HighlightedRange]
+highlightDecl :: Decl ExprInfo Name -> [HighlightedRange]
 highlightDecl = \case
-  Define params def ann e ->
-    highlightParams HighlightVarName params ++
-    highlightParam HighlightDefName def ++
+  Define n implicits explicits ann e ->
+    highlightName n ++
+    highlightParamGroups implicits ++
+    highlightParamGroups explicits ++
     foldMap highlightExpr ann ++
     highlightExpr e
-  Assume params def ann ->
-    highlightParams HighlightVarName params ++
-    highlightParam HighlightAxiomName def ++
+  Assume n implicits explicits ann ->
+    highlightName n ++
+    highlightParamGroups implicits ++
+    highlightParamGroups explicits ++
     highlightExpr ann
-  Rewrite params def lhs rhs ->
-    highlightParams HighlightVarName params ++
-    highlightParam HighlightRewriteName def ++
+  Rewrite n params lhs rhs ->
+    highlightName n ++
+    highlightParamGroups params ++
     highlightExpr lhs ++
     highlightExpr rhs
-  Fixity _ _ _ -> []  -- TODO: highlight?
+  Fixity{} -> []  -- TODO: highlight?
 
-highlightModule :: Module -> [HighlightedRange]
+highlightModule :: Module ExprInfo Name -> [HighlightedRange]
 highlightModule (Module decls) = concatMap highlightDecl decls
 
 quote :: Text -> String
@@ -105,9 +112,9 @@ quote t = "'" ++ Text.unpack t ++ "'"
 -- TODO: Move Error type into Prover.Errors, provide getRange and errorMessage
 diagnoseError :: Error -> Diagnostic
 diagnoseError = \case
-  UnboundName r n          -> Diagnostic r $ "unbound name " ++ quote n
-  UnsolvedConstraint r     -> Diagnostic r $ "unsolved constraint"
-  UnsolvedMeta r _         -> Diagnostic r $ "unsolved meta"
-  BadPattern r             -> Diagnostic r $ "expression not allowed in pattern"
-  MissingPatternVariable r -> Diagnostic r $ "missing variable in pattern"
-  LateImplicitParam r _    -> Diagnostic r $ "implicit parameters must precede any explicit parameters"
+  UnboundNameError r n     -> Diagnostic r ("unbound name " ++ quote n)
+  UnsolvedConstraint r     -> Diagnostic r "unsolved constraint"
+  UnsolvedMeta r _         -> Diagnostic r "unsolved meta"
+  BadPattern r             -> Diagnostic r "expression not allowed in pattern"
+  MissingPatternVariable r -> Diagnostic r "missing variable in pattern"
+  LateImplicitParam r _    -> Diagnostic r "implicit parameters must precede any explicit parameters"

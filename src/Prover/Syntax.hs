@@ -9,7 +9,7 @@ module Prover.Syntax where
 
 import Data.Text (Text)
 
-import Prover.Position hiding (Fixity)
+import Prover.Position
 import Prover.Term (NameId, Type, Term)
 
 -- | A name that has not yet been resolved.
@@ -25,10 +25,11 @@ data Ident = Ident
 -- | The thing (local variable, definition, or axiom) that a name refers to.
 -- Names are "unbound" if they don't refer to anything in scope.
 data NameReferent
-  = Local !NameId
-  | Def !NameId
-  | Axiom !NameId
-  | Unbound
+  = LocalName !NameId
+  | DefName !NameId
+  | AxiomName !NameId
+  | RewriteName
+  | UnboundName
   deriving (Show)
 
 -- | An occurence of a name.
@@ -57,49 +58,57 @@ data ExprInfo = ExprInfo
 -- | An expression.
 data Expr a n
   -- | A variable.
-  = Var a n
+  = EVar a n
   -- | A hole `_`.
-  | Hole a
+  | EHole a
   -- | `Type`.
-  | Type a
+  | EType a
   -- | `Π`.
-  | Pi a [ParamGroup a n] (Expr a n)
+  | EPi a [ParamGroup a n] (Expr a n)
   -- | `λ`.
-  | Lam a [ParamGroup a n] (Expr a n)
+  | ELam a [ParamGroup a n] (Expr a n)
   -- | `Σ`.
-  | Sigma a [ParamGroup a n] (Expr a n)
+  | ESigma a [ParamGroup a n] (Expr a n)
   -- | A sequence of terms (possibly involving infix operators) that must be
   -- parsed into applications.
-  | Apps a [Expr a n]
+  | EApps a [Expr a n]
   -- | A function application.
-  | App a (Expr a n) (Expr a n)
+  | EApp a (Expr a n) (Expr a n)
   -- | `→`.
-  | Arrow a (Expr a n) (Expr a n)
+  | EArrow a (Expr a n) (Expr a n)
   -- | A pair `(a, b)`.
-  | Pair a (Expr a n) (Expr a n)
+  | EPair a (Expr a n) (Expr a n)
   deriving (Show)
 
--- | Extract the annotation from an expression.
+-- | Get the annotation from an expression.
 ann :: Expr a n -> a
 ann = \case
-  Var   a _   -> a
-  Hole  a     -> a
-  Type  a     -> a
-  Pi    a _ _ -> a
-  Lam   a _ _ -> a
-  Sigma a _ _ -> a
-  Apps  a _   -> a
-  App   a _ _ -> a
-  Arrow a _ _ -> a
-  Pair  a _ _ -> a
+  EVar   a _   -> a
+  EHole  a     -> a
+  EType  a     -> a
+  EPi    a _ _ -> a
+  ELam   a _ _ -> a
+  ESigma a _ _ -> a
+  EApps  a _   -> a
+  EApp   a _ _ -> a
+  EArrow a _ _ -> a
+  EPair  a _ _ -> a
+
+-- | Get the range of an expression.
+exprRange :: Expr ExprInfo a -> Range
+exprRange = exprInfoRange . ann
+
+-- | Get the type of an expression.
+exprType :: Expr ExprInfo a -> Type
+exprType = exprInfoType . ann
+
+-- | Get the term of an expression.
+exprTerm :: Expr ExprInfo a -> Term
+exprTerm = exprInfoTerm . ann
 
 -- | A list of a names with an optional type annotation.
 data ParamGroup a n = ParamGroup [n] (Maybe (Expr a n))
   deriving (Show)
-
--- | A kind of infix-ness.
-data Fixity = Infix | Infixl | Infixr
-  deriving (Eq, Show)
 
 -- | A top-level declaration.
 data Decl a n

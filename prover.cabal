@@ -34,7 +34,6 @@ executable prover
     Prover.Pretty
     Prover.Search
     Prover.Syntax
-    Prover.Syntax.Abstract
     Prover.Syntax.Concrete
     Prover.Term
     Prover.TypeCheck

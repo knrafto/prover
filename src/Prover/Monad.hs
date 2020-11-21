@@ -15,7 +15,7 @@ import Control.Monad.State.Class
 
 import Prover.Pattern
 import Prover.Position
-import Prover.Syntax.Abstract
+import Prover.Syntax
 import Prover.Term
 
 -- | A unique identifier for type-checking equations.
@@ -24,7 +24,7 @@ newtype EquationId = EquationId Int
 
 data Error
   -- | A name could not be resolved.
-  = UnboundName Range Text
+  = UnboundNameError Range Text
   -- | An unsolved constraint.
   -- TODO: add more info
   | UnsolvedConstraint Range
@@ -35,7 +35,7 @@ data Error
   -- | Some parameter can't be determined by the pattern.
   | MissingPatternVariable Range
   -- | An implicit parameter that doesn't appear at the front.
-  | LateImplicitParam Range Param
+  | LateImplicitParam Range Name
   deriving (Show)
 
 -- | Constraints for unification.

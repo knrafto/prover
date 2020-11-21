@@ -13,7 +13,7 @@ import Prettyprinter.Render.Text
 
 import Prover.Flags qualified as Flags
 import Prover.Monad
-import Prover.Syntax.Abstract qualified as A
+import Prover.Syntax
 import Prover.Term
 
 type Doc = PP.Doc Void
@@ -98,10 +98,10 @@ prettyTerm subst ctx = prettyPrec (ctxLength ctx) 0
             Nothing -> app k d (prettyMeta m) args
       Axiom n args         -> do
         n <- getState n axiomNames
-        app k d (pretty (A.nameText n)) args
+        app k d (pretty (nameText n)) args
       Def n args         -> do
         n <- getState n defNames
-        app k d (pretty (A.nameText n)) args
+        app k d (pretty (nameText n)) args
       Var i args           -> app k d (prettyVar (k - i - 1)) args
       Lam b                -> parens (d > binderPrec) $ do
         bDoc <- prettyPrec (k + 1) binderPrec b
