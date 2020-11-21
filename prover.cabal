@@ -33,6 +33,7 @@ executable prover
     Prover.Position
     Prover.Pretty
     Prover.Search
+    Prover.Syntax
     Prover.Syntax.Abstract
     Prover.Syntax.Concrete
     Prover.Term
