@@ -102,7 +102,7 @@ applySubst subst = \case
 
 -- TODO: comment
 weaken :: Term -> Term
-weaken a = applySubst (SubstWeaken 1) a
+weaken = applySubst (SubstWeaken 1)
 
 strengthen :: Term -> Maybe Term
 strengthen = go 0

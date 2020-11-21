@@ -118,7 +118,7 @@ matchPattern pat t = case pat of
     BlockedAxiom _ _ -> return Blocked
     -- TODO: what happens if the arg lengths do not match?
     Axiom h termArgs | h == id && length args == length termArgs ->
-      mconcat <$> mapM (uncurry matchPattern) (zip args termArgs)
+      mconcat <$> zipWithM matchPattern args termArgs
     _ -> return NoMatch
   PairPat pa pb    -> whnf t >>= \case
     Pair a b -> mappend <$> matchPattern pa a <*> matchPattern pb b
@@ -128,7 +128,7 @@ applyRules :: NameId -> [Term] -> [Rule] -> UnifyM Term
 applyRules id args []          = return $ Axiom id args
 applyRules id args (rule:rest)
   | length (ruleArgs rule) <= length args = do
-    result <- mconcat <$> mapM (uncurry matchPattern) (zip (ruleArgs rule) args)
+    result <- mconcat <$> zipWithM matchPattern (ruleArgs rule) args
     case result of
       Match vars -> do
         let n          = ruleCtxLength rule

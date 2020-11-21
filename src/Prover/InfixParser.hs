@@ -80,7 +80,7 @@ makeParser operators = makeExprParser term operatorTable
 
     operatorTable :: [[Operator InfixParser InfixTree]]
     operatorTable =
-      map (\ (_, ops) -> map (\ (n, fixity) -> makeOperator n fixity) ops)
+      map (\ (_, ops) -> map (uncurry makeOperator) ops)
         (IntMap.toDescList operatorsByPrecedence)
 
     makeOperator :: Text -> Fixity -> Operator InfixParser InfixTree
