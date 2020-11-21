@@ -15,7 +15,6 @@ import Data.HashSet qualified as HashSet
 import Data.Text (Text)
 import Prettyprinter
 
-import Prover.InfixParser
 import Prover.Monad
 import Prover.Pattern
 import Prover.Position
@@ -261,9 +260,14 @@ checkExpr expr tcCtx expectedTy = case expr of
     i <- expect r tcCtx t Type expectedTy
     return $ ESigma i ps' e'
 
+  -- TODO: This will probably result in a lot of error messages that we should
+  -- suppress. Should we have a separate "Error" node for these cases?
   EApps r es -> do
-    tree <- parseInfixOperators r es
-    checkInfixTree tree tcCtx expectedTy
+    es' <- forM es $ \e -> do
+      ty <- createMeta r tcCtx Type
+      checkExpr e tcCtx ty
+    t <- createMeta r tcCtx expectedTy
+    return $ EApps (ExprInfo r t expectedTy) es'
 
   EApp r f a -> do
     -- Γ ⊢ a : A
@@ -308,26 +312,6 @@ checkExpr expr tcCtx expectedTy = case expr of
         ty = Sigma tyA tyB
     i <- expect r tcCtx t ty expectedTy
     return $ EPair i a' b'
-
-checkInfixTree :: InfixTree -> TcCtx -> Type -> M (Expr ExprInfo Name)
-checkInfixTree tree tcCtx expectedTy = case tree of
-  Atom e    -> checkExpr e tcCtx expectedTy
-  App r f a -> do
-    -- Γ ⊢ a : A
-    tyA <- createMeta r tcCtx Type
-    a'  <- checkInfixTree a tcCtx tyA
-
-    -- Γ ⊢ f : (Π x : A. B)
-    tyB <- createMeta r (addUnnamed tcCtx tyA) Type
-    f'  <- checkInfixTree f tcCtx (Pi tyA tyB)
-
-    -- ⟹ Γ ⊢ f a : B[a/x]
-    -- TODO: a chained application is currently quadratic in the number of
-    -- arguments
-    let t  = applyTerm (exprTerm f') [exprTerm a']
-        ty = instantiate tyB (exprTerm a') 
-    i <- expect r tcCtx t ty expectedTy
-    return $ EApp i f' a'
 
 -- | Create a new name.
 checkParam :: Ident -> Type -> M Name
