@@ -1,6 +1,6 @@
 -- Easy command-line flags as global constants. This module is intended to be
 -- imported qualified.
-module Flags where
+module Prover.Flags where
 
 import Data.List
 

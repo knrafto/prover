@@ -11,11 +11,10 @@ import Data.ByteString.Lazy.Char8 qualified as B
 import Data.Text.IO qualified as Text
 
 import Prover.Interaction
+import Prover.Flags qualified as Flags
 import Prover.Monad
 import Prover.Parser
 import Prover.TypeCheck
-
-import Flags qualified
 
 main :: IO ()
 main = do

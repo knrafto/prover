@@ -11,11 +11,10 @@ import Prettyprinter hiding (Doc, parens)
 import Prettyprinter qualified as PP
 import Prettyprinter.Render.Text
 
+import Prover.Flags qualified as Flags
 import Prover.Monad
 import Prover.Syntax.Abstract qualified as A
 import Prover.Term
-
-import Flags qualified
 
 type Doc = PP.Doc Void
 

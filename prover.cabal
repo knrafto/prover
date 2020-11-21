@@ -24,6 +24,7 @@ source-repository head
 executable prover
   main-is: Main.hs
   other-modules:
+    Prover.Flags
     Prover.InfixParser
     Prover.Interaction
     Prover.Monad
@@ -37,7 +38,6 @@ executable prover
     Prover.Term
     Prover.TypeCheck
     Prover.Unify
-    Flags
   hs-source-dirs:
     src
   ghc-options:
