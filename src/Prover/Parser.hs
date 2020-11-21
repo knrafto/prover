@@ -12,7 +12,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
-import Prover.Syntax.Position
+import Prover.Position
 import Prover.Syntax.Concrete
 
 type Parser = Parsec Void Text

@@ -1,5 +1,5 @@
 -- | Source locations and ranges.
-module Prover.Syntax.Position where
+module Prover.Position where
 
 import Data.Char
 

@@ -14,8 +14,8 @@ import Control.Monad.IO.Class
 import Control.Monad.State.Class
 
 import Prover.Pattern
+import Prover.Position
 import Prover.Syntax.Abstract
-import Prover.Syntax.Position
 import Prover.Term
 
 -- | A unique identifier for type-checking equations.

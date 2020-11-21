@@ -6,8 +6,8 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 
 import Prover.Monad
+import Prover.Position
 import Prover.Syntax.Abstract
-import Prover.Syntax.Position
 
 data Response = Response
   { highlighting :: [HighlightedRange]

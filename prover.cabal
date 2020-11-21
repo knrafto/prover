@@ -30,11 +30,11 @@ executable prover
     Prover.Monad
     Prover.Parser
     Prover.Pattern
+    Prover.Position
     Prover.Pretty
     Prover.Search
     Prover.Syntax.Abstract
     Prover.Syntax.Concrete
-    Prover.Syntax.Position
     Prover.Term
     Prover.TypeCheck
     Prover.Unify

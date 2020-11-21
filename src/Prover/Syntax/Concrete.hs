@@ -3,7 +3,7 @@ module Prover.Syntax.Concrete where
 
 import Data.Text (Text)
 
-import Prover.Syntax.Position
+import Prover.Position
 
 data Name = Name
   { nameRange :: Range

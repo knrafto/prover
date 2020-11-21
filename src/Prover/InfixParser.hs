@@ -16,9 +16,9 @@ import Data.Text (Text)
 import Prettyprinter
 
 import Prover.Monad
+import Prover.Position
 import Prover.Pretty
 import Prover.Syntax.Concrete
-import Prover.Syntax.Position
 
 type InfixParser = StateT [Expr] Maybe
 

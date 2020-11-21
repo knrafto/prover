@@ -18,10 +18,10 @@ import Prettyprinter
 import Prover.InfixParser
 import Prover.Monad
 import Prover.Pattern
+import Prover.Position
 import Prover.Pretty
 import Prover.Syntax.Abstract qualified as A
 import Prover.Syntax.Concrete qualified as C
-import Prover.Syntax.Position
 import Prover.Term
 import Prover.Unify
 
