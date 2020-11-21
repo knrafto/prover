@@ -22,6 +22,8 @@ import Prover.Term
 newtype EquationId = EquationId Int
   deriving (Eq, Ord, Show, Enum, Hashable)
 
+-- TODO: move somewhere else?
+-- TODO: should all error names end in Error?
 data Error
   -- | A name could not be resolved.
   = UnboundNameError Range Text

@@ -46,6 +46,7 @@ data Name = Name
   } deriving (Show)
 
 -- | Type-checking information about an expression.
+-- TODO: "Expr ExprInfo Name" looks redundant. Rename to TcInfo or something?
 data ExprInfo = ExprInfo
   { -- | The location of the expression.
     exprInfoRange :: Range
