@@ -32,10 +32,10 @@ data InfixTree
   | App Range InfixTree InfixTree
   deriving (Show)
 
-instance HasRange InfixTree where
-  getRange = \case
-    Atom e -> ann e
-    App r _ _ -> r
+getRange :: InfixTree -> Range
+getRange = \case
+  Atom e -> ann e
+  App r _ _ -> r
 
 infixApp :: InfixTree -> InfixTree -> InfixTree -> InfixTree
 infixApp op l r =

@@ -53,11 +53,3 @@ instance ToJSON Range where
 -- before the second.
 rangeSpan :: Range -> Range -> Range
 rangeSpan (Range s _) (Range _ e) = Range s e
-
--- TODO: delete?
-class HasRange a where
-  getRange :: a -> Range
-
--- TODO: move to "Prover.Syntax"
-data Fixity = Infix | Infixl | Infixr
-  deriving (Eq, Show)

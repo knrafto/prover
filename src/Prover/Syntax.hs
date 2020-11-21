@@ -110,6 +110,10 @@ exprTerm = exprInfoTerm . ann
 data ParamGroup a n = ParamGroup [n] (Maybe (Expr a n))
   deriving (Show)
 
+-- | A kind of infix-ness.
+data Fixity = Infix | Infixl | Infixr
+  deriving (Eq, Show)
+
 -- | A top-level declaration.
 data Decl a n
   = Define n [ParamGroup a n] [ParamGroup a n] (Maybe (Expr a n)) (Expr a n)
