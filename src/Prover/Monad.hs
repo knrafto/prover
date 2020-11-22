@@ -38,6 +38,8 @@ data Error
   | MissingPatternVariable Range
   -- | An implicit parameter that doesn't appear at the front.
   | LateImplicitParam Range Name
+  -- | Infix operators could not be parsed.
+  | InfixParseError Range
   deriving (Show)
 
 -- | Constraints for unification.

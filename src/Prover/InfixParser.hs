@@ -3,21 +3,17 @@ module Prover.InfixParser (processModule) where
 
 import Control.Applicative
 import Data.List
-import System.Exit
 
 import Control.Monad.Combinators.Expr
-import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.Text (Text)
-import Prettyprinter
 
 import Prover.Monad
 import Prover.Position
-import Prover.Pretty
 import Prover.Syntax
 
 type InfixParser = StateT [Expr Range Ident] Maybe
@@ -88,10 +84,9 @@ processExpr = \case
     es' <- mapM processExpr es
     operators <- gets fixities
     case runInfixParser (makeParser operators) es' of
-      -- TODO: error recovery
       Nothing -> do
-        debug $ pretty r <> ": error parsing infix operators"
-        liftIO exitFailure
+        emitError $ InfixParseError r
+        return $ EApps r es'
       Just e -> return e
   EApp a e1 e2 -> EApp a <$> processExpr e1 <*> processExpr e2
   EArrow a e1 e2 -> EArrow a <$> processExpr e1 <*> processExpr e2
