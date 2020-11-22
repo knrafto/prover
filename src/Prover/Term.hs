@@ -45,11 +45,14 @@ data Term
 
 type Type = Term
 
+-- | A strict list where new things go on the right.
+data RList a
+  = Empty
+  | !(RList a) :> !a
+  deriving (Show, Functor)
+
 -- | A context for a term.
-data Ctx
-  = EmptyCtx
-  | !Ctx :> Type
-  deriving (Show)
+type Ctx = RList Type
 
 -- | Substitutions.
 -- TODO: revisit. Add comments with type-theoretic explanations, and add more
@@ -122,18 +125,18 @@ instantiate a t = applySubst (SubstTerm t) a
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
-ctxLength EmptyCtx   = 0
+ctxLength Empty = 0
 ctxLength (ctx :> _) = 1 + ctxLength ctx
 
 -- | Get the type of a variable in a context.
 ctxLookup :: Ctx -> Var -> Type
-ctxLookup EmptyCtx    _ = error "ctxLookup: empty context"
+ctxLookup Empty _ = error "ctxLookup: empty context"
 ctxLookup (_   :> ty) 0 = weaken ty
 ctxLookup (ctx :> _ ) i = weaken (ctxLookup ctx (i - 1))
 
 -- | Construct a Π-type out of a context ending with the given type.
 ctxPi :: Ctx -> Type -> Type
-ctxPi EmptyCtx    t = t
+ctxPi Empty t = t
 ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
 
 -- | Add n lambdas to a term.
@@ -150,5 +153,5 @@ ctxLam ctx = makeLam (ctxLength ctx)
 ctxVars :: Ctx -> [Term]
 ctxVars = reverse . go 0
   where
-    go _ EmptyCtx   = []
+    go _ Empty = []
     go i (ctx :> _) = var i : go (i + 1) ctx

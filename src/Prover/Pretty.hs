@@ -70,9 +70,9 @@ type MetaSubst = HashMap MetaId Term
 
 -- | Pretty-print a context.
 prettyCtx :: MetaSubst -> Ctx -> M Doc
-prettyCtx _ EmptyCtx = return mempty
-prettyCtx subst (EmptyCtx :> ty) = do
-  tyDoc  <- prettyTerm subst EmptyCtx ty
+prettyCtx _ Empty = return mempty
+prettyCtx subst (Empty :> ty) = do
+  tyDoc  <- prettyTerm subst Empty ty
   return $ prettyVar 0 <+> ":" <+> tyDoc
 prettyCtx subst (ctx :> ty) = do
   ctxDoc <- prettyCtx subst ctx

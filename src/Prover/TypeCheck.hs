@@ -24,27 +24,24 @@ import Prover.Term
 import Prover.Unify
 
 -- A context with variable names.
-data TcCtx
-  = EmptyTcCtx
-  | !TcCtx :>> (Maybe Name, Type)
+type TcCtx = RList (Maybe Name, Type)
 
 -- | Strip the names from a type-checking context.
 toCtx :: TcCtx -> Ctx
-toCtx EmptyTcCtx = EmptyCtx
-toCtx (tcCtx :>> (_, ty)) = toCtx tcCtx :> ty
+toCtx = fmap snd
 
 -- | Look up a local variable name.
 lookupLocal :: Text -> TcCtx -> Maybe (Var, Name)
 lookupLocal t = go 0
   where
-    go _ EmptyTcCtx = Nothing
-    go !i (_ :>> (Just n, _))
+    go _ Empty = Nothing
+    go !i (_ :> (Just n, _))
       | nameText n == t = Just (i, n)
-    go !i (tcCtx :>> _) = go (i + 1) tcCtx
+    go !i (tcCtx :> _) = go (i + 1) tcCtx
 
 -- | Add a param to the context.
 addParam :: TcCtx -> Name -> TcCtx
-addParam tcCtx n = tcCtx :>> (Just n, nameType n)
+addParam tcCtx n = tcCtx :> (Just n, nameType n)
 
 -- | Add a param group to the context.
 addParamGroup :: TcCtx -> ParamGroup ExprInfo Name -> TcCtx
@@ -56,7 +53,7 @@ addParamGroups = foldl' addParamGroup
 
 -- | Add an unnamed param to the environment.
 addUnnamed :: TcCtx -> Type -> TcCtx
-addUnnamed tcCtx ty = tcCtx :>> (Nothing, ty)
+addUnnamed tcCtx ty = tcCtx :> (Nothing, ty)
 
 -- | Create a metavariable with the given type in the given context.
 createMeta :: Range -> TcCtx -> Type -> M Term
@@ -145,7 +142,7 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTerms problem'))
               (HashMap.keysSet (problemMetaTerms problem))
       docs <- forM (HashSet.toList solvedMetas) $ \m -> do
-        tmDoc <- prettyTerm subst EmptyCtx (problemMetaTerms problem' HashMap.! m)
+        tmDoc <- prettyTerm subst Empty (problemMetaTerms problem' HashMap.! m)
         return $ prettyMeta m <+> "↦" <+> tmDoc
       return $ vsep docs
     , "unsolved metas" |: do
@@ -153,7 +150,7 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTypes problem'))
               (HashMap.keysSet (problemMetaTerms problem'))
       docs <- forM (HashSet.toList unsolvedMetas) $ \m -> do
-        tyDoc <- prettyTerm subst EmptyCtx (problemMetaTypes problem' HashMap.! m)
+        tyDoc <- prettyTerm subst Empty (problemMetaTypes problem' HashMap.! m)
         return $ prettyMeta m <+> ":" <+> tyDoc
       return $ vsep docs
     , "constraints" |: do
@@ -362,11 +359,11 @@ checkDecl :: Decl Range Ident -> M (Decl ExprInfo Name)
 checkDecl = \case
   Define n implicits explicits ann e -> do
     debug $ "checking definition" <+> pretty (identText n) <+> "..."
-    implicits' <- checkParamGroups EmptyTcCtx implicits
-    explicits' <- checkParamGroups (addParamGroups EmptyTcCtx implicits') explicits
+    implicits' <- checkParamGroups Empty implicits
+    explicits' <- checkParamGroups (addParamGroups Empty implicits') explicits
     id <- freshNameId
     let params' = implicits' ++ explicits'
-    let tcCtx = addParamGroups EmptyTcCtx params'
+    let tcCtx = addParamGroups Empty params'
     (ty, ann') <- case ann of
       Nothing -> do
         ty <- createMeta (identRange n) tcCtx Type
@@ -387,11 +384,11 @@ checkDecl = \case
     return $ Define n' implicits' explicits' ann' e'
   Assume n implicits explicits ann -> do
     debug $ "checking axiom" <+> pretty (identText n) <+> "..."
-    implicits' <- checkParamGroups EmptyTcCtx implicits
-    explicits' <- checkParamGroups (addParamGroups EmptyTcCtx implicits') explicits
+    implicits' <- checkParamGroups Empty implicits
+    explicits' <- checkParamGroups (addParamGroups Empty implicits') explicits
     id <- freshNameId
     let params' = implicits' ++ explicits'
-    let tcCtx = addParamGroups EmptyTcCtx params'
+    let tcCtx = addParamGroups Empty params'
     ann' <- checkExpr ann tcCtx Type
     checkSolved
     let n' = Name (identRange n) (identText n) (AxiomName id) (exprTerm ann')
@@ -404,8 +401,8 @@ checkDecl = \case
     return $ Assume n' implicits' explicits' ann'
   Rewrite n params lhs rhs -> do
     debug $ "checking rewrite" <+> pretty (identText n) <+> "..."
-    params' <- checkParamGroups EmptyTcCtx params
-    let tcCtx = addParamGroups EmptyTcCtx params'
+    params' <- checkParamGroups Empty params
+    let tcCtx = addParamGroups Empty params'
     ty <- createMeta (identRange n) tcCtx Type
     lhs' <- checkExpr lhs tcCtx ty
     rhs' <- checkExpr rhs tcCtx ty
