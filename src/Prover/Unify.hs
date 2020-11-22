@@ -284,9 +284,6 @@ solveMeta args t = runMaybeT $ do
   t' <- invertVarSubst σ t
   -- TODO: occurs check
   return $ makeLam (length args) t'
-  where
-    makeLam 0 t' = t'
-    makeLam n t' = makeLam (n - 1) (Lam t')
 
 -- A variable substitution, represented as a list of de Bruijn indices. Note
 -- that this may seem reversed, since index zero is written on the left for
