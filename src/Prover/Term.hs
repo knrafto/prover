@@ -100,16 +100,21 @@ applySubst subst = \case
 -- | Lift a term in context Γ to a term of in the extended context Γ, A
 -- (essentially adding an unused 0th variable).
 weaken :: Term -> Term
-weaken = go 0
+weaken = weakenBy 1
+
+-- | Lift a term in context Γ to a term of in the extended context by k
+-- variables.
+weakenBy :: Int -> Term -> Term
+weakenBy k = go 0
   where
-  -- Add the ith variable
+  -- Add the ith through (i + k)th variable
   go !i = \case
     Meta m args   -> Meta m (map (go i) args)
     Axiom n args  -> Axiom n (map (go i) args)
     Def n args    -> Def n (map (go i) args)
     Var j args
       | j < i     -> Var j (map (go i) args)
-      | otherwise -> Var (j + 1) (map (go i) args)
+      | otherwise -> Var (j + k) (map (go i) args)
     Lam b         -> Lam (go (i + 1) b)
     Pair a b      -> Pair (go i a) (go i b)
     Type          -> Type
@@ -138,7 +143,22 @@ strengthen = go 0
 
 -- | Given a term Γ, A ⊢ t : B and Γ ⊢ a : A, form the term Γ ⊢ t[⟨a⟩] : B[⟨a⟩]
 instantiate :: Term -> Term -> Term
-instantiate t a = applySubst (SubstTerm a) t
+instantiate t a = go 0 t
+  where
+  -- Replace the ith variable with a
+  go !i = \case
+    Meta m args   -> Meta m (map (go i) args)
+    Axiom n args  -> Axiom n (map (go i) args)
+    Def n args    -> Def n (map (go i) args)
+    Var j args
+      | j < i     -> Var j (map (go i) args)
+      | j == i    -> applyTerm (weakenBy i a) (map (go i) args)
+      | otherwise -> Var (j - 1) (map (go i) args)
+    Lam b         -> Lam (go (i + 1) b)
+    Pair a b      -> Pair (go i a) (go i b)
+    Type          -> Type
+    Pi a b        -> Pi (go i a) (go (i + 1) b)
+    Sigma a b     -> Sigma (go i a) (go (i + 1) b)
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
