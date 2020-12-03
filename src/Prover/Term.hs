@@ -97,14 +97,31 @@ applySubst subst = \case
   Pi a b        -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
   Sigma a b     -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
 
--- TODO: comment
+-- | Lift a term in context Γ to a term of in the extended context Γ, A
+-- (essentially adding an unused 0th variable).
 weaken :: Term -> Term
-weaken = applySubst (SubstWeaken 1)
+weaken = go 0
+  where
+  -- Add the ith variable
+  go !i = \case
+    Meta m args   -> Meta m (map (go i) args)
+    Axiom n args  -> Axiom n (map (go i) args)
+    Def n args    -> Def n (map (go i) args)
+    Var j args
+      | j < i     -> Var j (map (go i) args)
+      | otherwise -> Var (j + 1) (map (go i) args)
+    Lam b         -> Lam (go (i + 1) b)
+    Pair a b      -> Pair (go i a) (go i b)
+    Type          -> Type
+    Pi a b        -> Pi (go i a) (go (i + 1) b)
+    Sigma a b     -> Sigma (go i a) (go (i + 1) b)
 
+-- | Try to find a term that weakens to a given term (in other words, partially
+-- invert weaken).
 strengthen :: Term -> Maybe Term
 strengthen = go 0
   where
-  go :: Int -> Term -> Maybe Term
+  -- Remove the ith variable
   go i = \case
     Meta m args   -> Meta m <$> traverse (go i) args
     Axiom n args  -> Axiom n <$> traverse (go i) args
@@ -119,9 +136,9 @@ strengthen = go 0
     Pi a b        -> Pi <$> go i a <*> go (i + 1) b
     Sigma a b     -> Sigma <$> go i a <*> go (i + 1) b
 
--- TODO: comment
+-- | Given a term Γ, A ⊢ t : B and Γ ⊢ a : A, form the term Γ ⊢ t[⟨a⟩] : B[⟨a⟩]
 instantiate :: Term -> Term -> Term
-instantiate a t = applySubst (SubstTerm t) a
+instantiate t a = applySubst (SubstTerm a) t
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
