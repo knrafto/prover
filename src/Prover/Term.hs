@@ -54,15 +54,6 @@ data RList a
 -- | A context for a term.
 type Ctx = RList Type
 
--- | Substitutions.
--- TODO: revisit. Add comments with type-theoretic explanations, and add more
--- (e.g. identity, lift from empty context)
-data Subst
-  = SubstWeaken !Int
-  | SubstLift Subst
-  | SubstTerm Term
-  deriving (Show)
-
 -- | Construct a bound variable.
 var :: Int -> Term
 var i = Var i []
@@ -77,25 +68,6 @@ applyTerm t args@(arg:rest) = case t of
   Var v args'   -> Var v (args' ++ args)
   Lam b         -> applyTerm (instantiate b arg) rest
   _             -> error "applyTerm"
-
-lookupVar :: Subst -> Var -> Term
-lookupVar (SubstWeaken k)    i = var (i + k)
-lookupVar (SubstLift _)      0 = var 0
-lookupVar (SubstLift subst') i = weaken (lookupVar subst' (i - 1))
-lookupVar (SubstTerm t)      0 = t
-lookupVar (SubstTerm _)      i = var (i - 1)
-
-applySubst :: Subst -> Term -> Term
-applySubst subst = \case
-  Meta m args   -> Meta m (map (applySubst subst) args)
-  Axiom n args  -> Axiom n (map (applySubst subst) args)
-  Def n args    -> Def n (map (applySubst subst) args)
-  Var v args    -> applyTerm (lookupVar subst v) (map (applySubst subst) args)
-  Lam b         -> Lam (applySubst (SubstLift subst) b)
-  Pair a b      -> Pair (applySubst subst a) (applySubst subst b)
-  Type          -> Type
-  Pi a b        -> Pi (applySubst subst a) (applySubst (SubstLift subst) b)
-  Sigma a b     -> Sigma (applySubst subst a) (applySubst (SubstLift subst) b)
 
 -- | Lift a term in context Γ to a term of in the extended context Γ, A
 -- (essentially adding an unused 0th variable).
