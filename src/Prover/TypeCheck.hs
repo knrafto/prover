@@ -67,7 +67,7 @@ createMeta r tcCtx ty = do
     { metaRanges  = HashMap.insert id r (metaRanges s)
     , unificationProblem = addProblemMeta id metaTy (unificationProblem s)
     }
-  return $ Meta id (ctxVars ctx)
+  return $ Meta id Empty (ctxVars ctx)
 
 -- | The number of variables in the parameter collection.
 paramsLength :: [ParamGroup ExprInfo Name] -> Int
@@ -347,7 +347,7 @@ checkParamGroups tcCtx (n:ns) = do
 
 termToPattern :: Term -> MaybeT M Pattern
 termToPattern = \case
-  Meta id args -> lift (lookupState id metaTerms) >>= \case
+  Meta id _ args -> lift (lookupState id metaTerms) >>= \case
     Just t' -> termToPattern (applyTerm t' args)
     Nothing -> mzero
   Var i []     -> return (VarPat i)

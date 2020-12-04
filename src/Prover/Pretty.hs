@@ -89,7 +89,7 @@ prettyTerm subst ctx = prettyPrec (ctxLength ctx) 0
 
     prettyPrec :: Int -> Int -> Term -> M Doc
     prettyPrec k d = \case
-      Meta m args   ->
+      Meta m _ args   ->
         -- TODO: code is copied from whnf implementation
         case HashMap.lookup m subst of
           Just t' -> prettyPrec k d (applyTerm t' args)

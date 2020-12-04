@@ -23,8 +23,8 @@ newtype MetaId = MetaId Int
 -- A useful property of this representation that we can (ab)use is that a closed
 -- term can be used in any context without explicitly applying a substitution.
 data Term
-  -- | A metavariable applied to args.
-  = Meta !MetaId [Term]
+  -- | A metavariable under a substitution applied to args.
+  = Meta !MetaId Subst [Term]
   -- | A neutral axiom applied to args.
   | Axiom !NameId [Term]
   -- | A definition applied to args.
@@ -49,10 +49,16 @@ type Type = Term
 data RList a
   = Empty
   | !(RList a) :> !a
-  deriving (Show, Functor)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 -- | A context for a term.
 type Ctx = RList Type
+
+-- | A substitution between contexts, represented as a list of terms. A
+-- substitution from Δ to the empty context is an empty list of terms; a
+-- substitution from Δ to (Γ, A) is a substitution σ : Δ → Γ and a term in
+-- context Δ of type A[σ].
+type Subst = RList Term
 
 -- | Construct a bound variable.
 var :: Int -> Term
@@ -62,7 +68,7 @@ var i = Var i []
 applyTerm :: Term -> [Term] -> Term
 applyTerm t [] = t
 applyTerm t args@(arg:rest) = case t of
-  Meta m args'  -> Meta m (args' ++ args)
+  Meta m subst args'  -> Meta m subst (args' ++ args)
   Axiom n args' -> Axiom n (args' ++ args)
   Def n args'   -> Def n (args' ++ args)
   Var v args'   -> Var v (args' ++ args)
@@ -81,17 +87,17 @@ weakenBy k = go 0
   where
   -- Add the ith through (i + k)th variable
   go !i = \case
-    Meta m args   -> Meta m (map (go i) args)
-    Axiom n args  -> Axiom n (map (go i) args)
-    Def n args    -> Def n (map (go i) args)
+    Meta m subst args -> Meta m (fmap (go i) subst) (map (go i) args)
+    Axiom n args      -> Axiom n (map (go i) args)
+    Def n args        -> Def n (map (go i) args)
     Var j args
-      | j < i     -> Var j (map (go i) args)
-      | otherwise -> Var (j + k) (map (go i) args)
-    Lam b         -> Lam (go (i + 1) b)
-    Pair a b      -> Pair (go i a) (go i b)
-    Type          -> Type
-    Pi a b        -> Pi (go i a) (go (i + 1) b)
-    Sigma a b     -> Sigma (go i a) (go (i + 1) b)
+      | j < i         -> Var j (map (go i) args)
+      | otherwise     -> Var (j + k) (map (go i) args)
+    Lam b             -> Lam (go (i + 1) b)
+    Pair a b          -> Pair (go i a) (go i b)
+    Type              -> Type
+    Pi a b            -> Pi (go i a) (go (i + 1) b)
+    Sigma a b         -> Sigma (go i a) (go (i + 1) b)
 
 -- | Try to find a term that weakens to a given term (in other words, partially
 -- invert weaken).
@@ -100,18 +106,18 @@ strengthen = go 0
   where
   -- Remove the ith variable
   go i = \case
-    Meta m args   -> Meta m <$> traverse (go i) args
-    Axiom n args  -> Axiom n <$> traverse (go i) args
-    Def n args    -> Def n <$> traverse (go i) args
+    Meta m subst args -> Meta m <$> traverse (go i) subst <*> traverse (go i) args
+    Axiom n args      -> Axiom n <$> traverse (go i) args
+    Def n args        -> Def n <$> traverse (go i) args
     Var j args
-      | j < i     -> Var j <$> traverse (go i) args
-      | j == i    -> Nothing
-      | otherwise -> Var (j - 1) <$> traverse (go i) args
-    Lam b         -> Lam <$> go (i + 1) b
-    Pair a b      -> Pair <$> go i a <*> go i b
-    Type          -> return Type
-    Pi a b        -> Pi <$> go i a <*> go (i + 1) b
-    Sigma a b     -> Sigma <$> go i a <*> go (i + 1) b
+      | j < i         -> Var j <$> traverse (go i) args
+      | j == i        -> Nothing
+      | otherwise     -> Var (j - 1) <$> traverse (go i) args
+    Lam b             -> Lam <$> go (i + 1) b
+    Pair a b          -> Pair <$> go i a <*> go i b
+    Type              -> return Type
+    Pi a b            -> Pi <$> go i a <*> go (i + 1) b
+    Sigma a b         -> Sigma <$> go i a <*> go (i + 1) b
 
 -- | Given a term Γ, A ⊢ t : B and Γ ⊢ a : A, form the term Γ ⊢ t[⟨a⟩] : B[⟨a⟩]
 instantiate :: Term -> Term -> Term
@@ -119,18 +125,18 @@ instantiate t a = go 0 t
   where
   -- Replace the ith variable with a
   go !i = \case
-    Meta m args   -> Meta m (map (go i) args)
-    Axiom n args  -> Axiom n (map (go i) args)
-    Def n args    -> Def n (map (go i) args)
+    Meta m subst args -> Meta m (fmap (go i) subst) (map (go i) args)
+    Axiom n args      -> Axiom n (map (go i) args)
+    Def n args        -> Def n (map (go i) args)
     Var j args
-      | j < i     -> Var j (map (go i) args)
-      | j == i    -> applyTerm (weakenBy i a) (map (go i) args)
-      | otherwise -> Var (j - 1) (map (go i) args)
-    Lam b         -> Lam (go (i + 1) b)
-    Pair a b      -> Pair (go i a) (go i b)
-    Type          -> Type
-    Pi a b        -> Pi (go i a) (go (i + 1) b)
-    Sigma a b     -> Sigma (go i a) (go (i + 1) b)
+      | j < i         -> Var j (map (go i) args)
+      | j == i        -> applyTerm (weakenBy i a) (map (go i) args)
+      | otherwise     -> Var (j - 1) (map (go i) args)
+    Lam b             -> Lam (go (i + 1) b)
+    Pair a b          -> Pair (go i a) (go i b)
+    Type              -> Type
+    Pi a b            -> Pi (go i a) (go (i + 1) b)
+    Sigma a b         -> Sigma (go i a) (go (i + 1) b)
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
