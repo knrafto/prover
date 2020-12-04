@@ -149,7 +149,7 @@ applyRules id args (rule:rest)
         let n          = ruleCtxLength rule
             varTerms   = reverse [vars IntMap.! i | i <- [0..n-1]]
             extraTerms = drop (length (ruleArgs rule)) args
-        whnf $ applyTerm (ruleRhs rule) (varTerms ++ extraTerms)
+        whnf $ applyArgs (ruleRhs rule) (varTerms ++ extraTerms)
       BlockedMatch -> return $ Blocked (Axiom id args)
       NoMatch -> applyRules id args rest
   | otherwise = applyRules id args rest
@@ -161,16 +161,16 @@ whnf t = case t of
     -- TODO: path compression?
     subst <- gets problemMetaTerms
     case HashMap.lookup id subst of
-      Just t' -> whnf (applyTerm t' args)
+      Just t' -> whnf (applyArgs t' args)
       Nothing -> lift (lookupState id metaTerms) >>= \case
-        Just t' -> whnf (applyTerm t' args)
+        Just t' -> whnf (applyArgs t' args)
         Nothing -> return (Blocked t)
   Axiom id args -> do
     rules <- fromMaybe [] <$> lift (lookupState id axiomRules)
     applyRules id args rules
   Def id args -> do
     t <- lift (getState id defTerms)
-    whnf (applyTerm t args)
+    whnf (applyArgs t args)
   t -> return (Whnf t)
 
 unify :: Ctx -> Type -> Term -> Term -> UnifyM Constraint
@@ -203,8 +203,8 @@ unify ctx ty t1 t2 = do
 
     -- Π-types (with η)
     (Whnf (Pi a b), Whnf (Lam e1), Whnf (Lam e2)) -> unify (ctx :> a) b e1 e2
-    (Whnf (Pi a b), Whnf (Lam e), t) -> unify (ctx :> a) b e (applyTerm (weaken (whnfTerm t)) [var 0])
-    (Whnf (Pi a b), t, Whnf (Lam e)) -> unify (ctx :> a) b (applyTerm (weaken (whnfTerm t)) [var 0]) e
+    (Whnf (Pi a b), Whnf (Lam e), t) -> unify (ctx :> a) b e (applyArgs (weaken (whnfTerm t)) [var 0])
+    (Whnf (Pi a b), t, Whnf (Lam e)) -> unify (ctx :> a) b (applyArgs (weaken (whnfTerm t)) [var 0]) e
 
     -- Σ-types (no η)
     (Whnf (Sigma a b), Whnf (Pair a1 b1), Whnf (Pair a2 b2)) -> do

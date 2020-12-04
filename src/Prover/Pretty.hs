@@ -92,9 +92,9 @@ prettyTerm subst ctx = prettyPrec (ctxLength ctx) 0
       Meta m _ args   ->
         -- TODO: code is copied from whnf implementation
         case HashMap.lookup m subst of
-          Just t' -> prettyPrec k d (applyTerm t' args)
+          Just t' -> prettyPrec k d (applyArgs t' args)
           Nothing -> lookupState m metaTerms >>= \case
-            Just t' -> prettyPrec k d (applyTerm t' args)
+            Just t' -> prettyPrec k d (applyArgs t' args)
             Nothing -> app k d (prettyMeta m) args
       Axiom n args         -> do
         n <- getState n axiomNames

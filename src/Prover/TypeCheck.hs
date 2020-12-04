@@ -171,7 +171,7 @@ expandImplicits r tcCtx n t ty = do
     Pi a b -> return (a, b)
     _ -> error "expandImplicits: not a Π-type"
   arg <- createMeta r tcCtx a
-  expandImplicits r tcCtx (n - 1) (applyTerm t [arg]) (instantiate b arg)
+  expandImplicits r tcCtx (n - 1) (applyArgs t [arg]) (instantiate b arg)
 
 -- | Producing a judgement Γ ⊢ t : A.
 checkExpr :: Expr Range Ident -> TcCtx -> Type -> M (Expr ExprInfo Name)
@@ -278,7 +278,7 @@ checkExpr expr tcCtx expectedTy = case expr of
     -- ⟹ Γ ⊢ f a : B[a/x]
     -- TODO: a chained application is currently quadratic in the number of
     -- arguments
-    let t  = applyTerm (exprTerm f') [exprTerm a']
+    let t  = applyArgs (exprTerm f') [exprTerm a']
         ty = instantiate tyB (exprTerm a') 
     i <- expect r tcCtx t ty expectedTy
     return $ EApp i f' a'
@@ -348,7 +348,7 @@ checkParamGroups tcCtx (n:ns) = do
 termToPattern :: Term -> MaybeT M Pattern
 termToPattern = \case
   Meta id _ args -> lift (lookupState id metaTerms) >>= \case
-    Just t' -> termToPattern (applyTerm t' args)
+    Just t' -> termToPattern (applyArgs t' args)
     Nothing -> mzero
   Var i []     -> return (VarPat i)
   Axiom i args -> AxiomPat i <$> mapM termToPattern args

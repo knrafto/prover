@@ -64,17 +64,6 @@ type Subst = RList Term
 var :: Int -> Term
 var i = Var i []
 
--- | Apply a term to more terms.
-applyTerm :: Term -> [Term] -> Term
-applyTerm t [] = t
-applyTerm t args@(arg:rest) = case t of
-  Meta m subst args'  -> Meta m subst (args' ++ args)
-  Axiom n args' -> Axiom n (args' ++ args)
-  Def n args'   -> Def n (args' ++ args)
-  Var v args'   -> Var v (args' ++ args)
-  Lam b         -> applyTerm (instantiate b arg) rest
-  _             -> error "applyTerm"
-
 -- | Lift a term in context Γ to a term of in the extended context Γ, A
 -- (essentially adding an unused 0th variable).
 weaken :: Term -> Term
@@ -130,13 +119,24 @@ instantiate t a = go 0 t
     Def n args        -> Def n (map (go i) args)
     Var j args
       | j < i         -> Var j (map (go i) args)
-      | j == i        -> applyTerm (weakenBy i a) (map (go i) args)
+      | j == i        -> applyArgs (weakenBy i a) (map (go i) args)
       | otherwise     -> Var (j - 1) (map (go i) args)
     Lam b             -> Lam (go (i + 1) b)
     Pair a b          -> Pair (go i a) (go i b)
     Type              -> Type
     Pi a b            -> Pi (go i a) (go (i + 1) b)
     Sigma a b         -> Sigma (go i a) (go (i + 1) b)
+
+-- | Apply a term to arguments.
+applyArgs :: Term -> [Term] -> Term
+applyArgs t [] = t
+applyArgs t args@(arg:rest) = case t of
+  Meta m subst args'  -> Meta m subst (args' ++ args)
+  Axiom n args' -> Axiom n (args' ++ args)
+  Def n args'   -> Def n (args' ++ args)
+  Var v args'   -> Var v (args' ++ args)
+  Lam b         -> applyArgs (instantiate b arg) rest
+  _             -> error "applyArgs"
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
