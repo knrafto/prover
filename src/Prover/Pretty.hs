@@ -71,17 +71,17 @@ type MetaSubst = HashMap MetaId Term
 -- | Pretty-print a context.
 prettyCtx :: MetaSubst -> Ctx -> M Doc
 prettyCtx _ Empty = return mempty
-prettyCtx subst (Empty :> ty) = do
-  tyDoc  <- prettyTerm subst Empty ty
+prettyCtx metaSubst (Empty :> ty) = do
+  tyDoc  <- prettyTerm metaSubst Empty ty
   return $ prettyVar 0 <+> ":" <+> tyDoc
-prettyCtx subst (ctx :> ty) = do
-  ctxDoc <- prettyCtx subst ctx
-  tyDoc  <- prettyTerm subst ctx ty
+prettyCtx metaSubst (ctx :> ty) = do
+  ctxDoc <- prettyCtx metaSubst ctx
+  tyDoc  <- prettyTerm metaSubst ctx ty
   return $ ctxDoc <> "," <+> prettyVar (ctxLength ctx) <+> ":" <+> tyDoc
 
 -- | Pretty-print a term in a context.
 prettyTerm :: MetaSubst -> Ctx -> Term -> M Doc
-prettyTerm subst ctx = prettyPrec (ctxLength ctx) 0
+prettyTerm metaSubst ctx = prettyPrec (ctxLength ctx) 0
   where
     binderPrec = 0
     commaPrec = 1
@@ -91,7 +91,7 @@ prettyTerm subst ctx = prettyPrec (ctxLength ctx) 0
     prettyPrec k d = \case
       Meta m _ args   ->
         -- TODO: code is copied from whnf implementation
-        case HashMap.lookup m subst of
+        case HashMap.lookup m metaSubst of
           Just t' -> prettyPrec k d (applyArgs t' args)
           Nothing -> lookupState m metaTerms >>= \case
             Just t' -> prettyPrec k d (applyArgs t' args)

@@ -134,7 +134,7 @@ expect r tcCtx b tyB tyA = do
     , unificationProblem = problem'
     }
 
-  let subst = problemMetaTerms problem'
+  let metaSubst = problemMetaTerms problem'
   debugFields ("checking expression at" <+> pretty r)
     [ "newly solved metas" |: do
       let solvedMetas =
@@ -142,7 +142,7 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTerms problem'))
               (HashMap.keysSet (problemMetaTerms problem))
       docs <- forM (HashSet.toList solvedMetas) $ \m -> do
-        tmDoc <- prettyTerm subst Empty (problemMetaTerms problem' HashMap.! m)
+        tmDoc <- prettyTerm metaSubst Empty (problemMetaTerms problem' HashMap.! m)
         return $ prettyMeta m <+> "↦" <+> tmDoc
       return $ vsep docs
     , "unsolved metas" |: do
@@ -150,15 +150,15 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTypes problem'))
               (HashMap.keysSet (problemMetaTerms problem'))
       docs <- forM (HashSet.toList unsolvedMetas) $ \m -> do
-        tyDoc <- prettyTerm subst Empty (problemMetaTypes problem' HashMap.! m)
+        tyDoc <- prettyTerm metaSubst Empty (problemMetaTypes problem' HashMap.! m)
         return $ prettyMeta m <+> ":" <+> tyDoc
       return $ vsep docs
     , "constraints" |: do
-      docs <- mapM (prettyConstraint subst) (HashMap.elems (problemConstraints problem'))
+      docs <- mapM (prettyConstraint metaSubst) (HashMap.elems (problemConstraints problem'))
       return $ vsep docs
-    , "context" |: prettyCtx subst ctx
-    , "type" |: prettyTerm subst ctx tyA
-    , "term" |: prettyTerm subst ctx a
+    , "context" |: prettyCtx metaSubst ctx
+    , "type" |: prettyTerm metaSubst ctx tyA
+    , "term" |: prettyTerm metaSubst ctx a
     ]
 
   return $ ExprInfo r a tyA
