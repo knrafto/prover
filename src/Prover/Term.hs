@@ -147,6 +147,23 @@ applyArgs t args@(arg:rest) = case t of
   Lam b         -> applyArgs (instantiate b arg) rest
   _             -> error "applyArgs"
 
+-- | Apply a substitution to a term.
+applySubst :: Term -> Subst -> Term
+applySubst t subst' = go 0 t
+  where
+  go !i = \case
+    Meta m subst args -> Meta m (fmap (go i) subst) (map (go i) args)
+    Axiom n args      -> Axiom n (map (go i) args)
+    Def n args        -> Def n (map (go i) args)
+    Var j args
+      | j < i         -> Var j (map (go i) args)
+      | otherwise     -> applyArgs (weakenBy i (rindex subst' (j - i))) (map (go i) args)
+    Lam b             -> Lam (go (i + 1) b)
+    Pair a b          -> Pair (go i a) (go i b)
+    Type              -> Type
+    Pi a b            -> Pi (go i a) (go (i + 1) b)
+    Sigma a b         -> Sigma (go i a) (go (i + 1) b)
+
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
 ctxLength = rlength

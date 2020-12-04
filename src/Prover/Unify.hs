@@ -157,13 +157,13 @@ applyRules id args (rule:rest)
 -- | Attempts to reduce a term to a weak head normal form.
 whnf :: Term -> UnifyM WhnfResult
 whnf t = case t of
-  Meta id _ args -> do
+  Meta id subst args -> do
     -- TODO: path compression?
-    subst <- gets problemMetaTerms
-    case HashMap.lookup id subst of
+    metaSubst <- gets problemMetaTerms
+    case HashMap.lookup id metaSubst of
       Just t' -> whnf (applyArgs t' args)
       Nothing -> lift (lookupState id metaTerms) >>= \case
-        Just t' -> whnf (applyArgs t' args)
+        Just t' -> whnf (applyArgs (applySubst t' subst) args)
         Nothing -> return (Blocked t)
   Axiom id args -> do
     rules <- fromMaybe [] <$> lift (lookupState id axiomRules)
