@@ -89,33 +89,33 @@ prettyTerm metaSubst ctx = prettyPrec (ctxLength ctx) 0
 
     prettyPrec :: Int -> Int -> Term -> M Doc
     prettyPrec k d = \case
-      Meta m _ args   ->
+      Meta m subst args ->
         -- TODO: code is copied from whnf implementation
         case HashMap.lookup m metaSubst of
           Just t' -> prettyPrec k d (applyArgs t' args)
           Nothing -> lookupState m metaTerms >>= \case
-            Just t' -> prettyPrec k d (applyArgs t' args)
+            Just t' -> prettyPrec k d (applyArgs (applySubst t' subst) args)
             Nothing -> app k d (prettyMeta m) args
-      Axiom n args         -> do
+      Axiom n args -> do
         n <- getState n axiomNames
         app k d (pretty (nameText n)) args
-      Def n args         -> do
+      Def n args -> do
         n <- getState n defNames
         app k d (pretty (nameText n)) args
-      Var i args           -> app k d (prettyVar (k - i - 1)) args
-      Lam b                -> parens (d > binderPrec) $ do
+      Var i args -> app k d (prettyVar (k - i - 1)) args
+      Lam b -> parens (d > binderPrec) $ do
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "λ" <+> prettyVar k <> "." <+> bDoc
-      Pair a b             -> parens (d > commaPrec) $ do
+      Pair a b -> parens (d > commaPrec) $ do
         aDoc <- prettyPrec k (commaPrec + 1) a
         bDoc <- prettyPrec k commaPrec b
         return $ aDoc <> "," <+> bDoc
-      Type                 -> return "Type"
-      Pi a b               -> parens (d > binderPrec) $ do
+      Type -> return "Type"
+      Pi a b -> parens (d > binderPrec) $ do
         aDoc <- prettyPrec k (appPrec + 1) a
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "Π" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
-      Sigma a b            -> parens (d > binderPrec) $ do
+      Sigma a b -> parens (d > binderPrec) $ do
         aDoc <- prettyPrec k (appPrec + 1) a
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "Σ" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc

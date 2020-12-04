@@ -347,13 +347,13 @@ checkParamGroups tcCtx (n:ns) = do
 
 termToPattern :: Term -> MaybeT M Pattern
 termToPattern = \case
-  Meta id _ args -> lift (lookupState id metaTerms) >>= \case
-    Just t' -> termToPattern (applyArgs t' args)
+  Meta id subst args -> lift (lookupState id metaTerms) >>= \case
+    Just t' -> termToPattern (applyArgs (applySubst t' subst) args)
     Nothing -> mzero
-  Var i []     -> return (VarPat i)
+  Var i [] -> return (VarPat i)
   Axiom i args -> AxiomPat i <$> mapM termToPattern args
-  Pair a b     -> PairPat <$> termToPattern a <*> termToPattern b
-  _            -> mzero
+  Pair a b -> PairPat <$> termToPattern a <*> termToPattern b
+  _ -> mzero
 
 checkDecl :: Decl Range Ident -> M (Decl ExprInfo Name)
 checkDecl = \case
