@@ -95,7 +95,9 @@ prettyTerm metaSubst ctx = prettyPrec (ctxLength ctx) 0
           Just t' -> prettyPrec k d (applyArgs t' args)
           Nothing -> lookupState m metaTerms >>= \case
             Just t' -> prettyPrec k d (applyArgs (applySubst t' subst) args)
-            Nothing -> app k d (prettyMeta m) args
+            Nothing -> do
+              substDoc <- prettySubst metaSubst ctx subst
+              app k d (prettyMeta m <> "[" <> substDoc <> "]") args
       Axiom n args -> do
         n <- getState n axiomNames
         app k d (pretty (nameText n)) args
@@ -125,6 +127,15 @@ prettyTerm metaSubst ctx = prettyPrec (ctxLength ctx) 0
     app k d h args = parens (d > appPrec) $ do
         argsDocs <- mapM (prettyPrec k (appPrec + 1)) args
         return $ hsep (h : argsDocs)
+
+-- | Pretty-print a substitution.
+prettySubst :: MetaSubst -> Ctx -> Subst -> M Doc
+prettySubst _ _ Empty = return mempty
+prettySubst metaSubst ctx (Empty :> t) = prettyTerm metaSubst ctx t
+prettySubst metaSubst ctx (subst :> t) = do
+  substDoc <- prettySubst metaSubst ctx subst
+  tDoc <- prettyTerm metaSubst ctx t
+  return $ substDoc <> "," <+> tDoc
 
 -- | Pretty-print a unification constraint.
 prettyConstraint :: MetaSubst -> Constraint -> M Doc
