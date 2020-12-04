@@ -51,6 +51,15 @@ data RList a
   | !(RList a) :> !a
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+rlength :: RList a -> Int
+rlength Empty = 0
+rlength (l :> _) = length l + 1
+
+rindex :: RList a -> Int -> a
+rindex Empty _    = error "rindex"
+rindex (_ :> a) 0 = a
+rindex (l :> _) i = rindex l (i - 1)
+
 -- | A context for a term.
 type Ctx = RList Type
 
@@ -140,14 +149,11 @@ applyArgs t args@(arg:rest) = case t of
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
-ctxLength Empty = 0
-ctxLength (ctx :> _) = 1 + ctxLength ctx
+ctxLength = rlength
 
 -- | Get the type of a variable in a context.
 ctxLookup :: Ctx -> Var -> Type
-ctxLookup Empty _ = error "ctxLookup: empty context"
-ctxLookup (_   :> ty) 0 = weaken ty
-ctxLookup (ctx :> _ ) i = weaken (ctxLookup ctx (i - 1))
+ctxLookup ctx i = weakenBy (i + 1) (rindex ctx i)
 
 -- | Construct a Π-type out of a context ending with the given type.
 ctxPi :: Ctx -> Type -> Type
