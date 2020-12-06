@@ -10,6 +10,7 @@ import Data.List
 import Control.Monad.State.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.Maybe
+import Data.HashMap.Strict ((!))
 import Data.HashMap.Strict qualified as HashMap
 import Data.HashSet qualified as HashSet
 import Data.Text (Text)
@@ -143,7 +144,7 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTerms problem'))
               (HashMap.keysSet (problemMetaTerms problem))
       docs <- forM (HashSet.toList solvedMetas) $ \m -> do
-        tmDoc <- prettyTerm metaSubst Empty (problemMetaTerms problem' HashMap.! m)
+        tmDoc <- prettyTerm metaSubst Empty (problemMetaTerms problem' ! m)
         return $ prettyMeta m <+> "↦" <+> tmDoc
       return $ vsep docs
     , "unsolved metas" |: do
@@ -151,8 +152,10 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTypes problem'))
               (HashMap.keysSet (problemMetaTerms problem'))
       docs <- forM (HashSet.toList unsolvedMetas) $ \m -> do
-        tyDoc <- prettyTerm metaSubst Empty (problemMetaTypes problem' HashMap.! m)
-        return $ prettyMeta m <+> ":" <+> tyDoc
+        let ctx = problemMetaCtxs problem' ! m
+        ctxDoc <- prettyCtx metaSubst ctx
+        tyDoc <- prettyTerm metaSubst ctx (problemMetaTypes problem' ! m)
+        return $ nest 2 (ctxDoc <> line <> "⊢" <+> prettyMeta m <+> ":" <+> tyDoc)
       return $ vsep docs
     , "constraints" |: do
       docs <- mapM (prettyConstraint metaSubst) (HashMap.elems (problemConstraints problem'))
