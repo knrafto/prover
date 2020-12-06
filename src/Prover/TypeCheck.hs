@@ -65,7 +65,7 @@ createMeta r tcCtx ty = do
   let metaTy = ctxPi ctx ty
   modify $ \s -> s
     { metaRanges  = HashMap.insert id r (metaRanges s)
-    , unificationProblem = addProblemMeta id metaTy (unificationProblem s)
+    , unificationProblem = addProblemMeta id Empty metaTy (unificationProblem s)
     }
   return $ Meta id Empty (ctxVars ctx)
 
@@ -112,7 +112,8 @@ checkSolved = do
     emitError $ UnsolvedMeta r id
   -- Clear problem and merge into global substitution
   modify $ \s -> s
-    { metaTypes = HashMap.union (problemMetaTypes problem) (metaTypes s)
+    { metaCtxs  = HashMap.union (problemMetaCtxs problem) (metaCtxs s)
+    , metaTypes = HashMap.union (problemMetaTypes problem) (metaTypes s)
     , metaTerms = HashMap.union (problemMetaTerms problem) (metaTerms s)
     , unificationProblem = emptyProblem
     }

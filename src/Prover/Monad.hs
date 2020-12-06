@@ -66,8 +66,10 @@ data Constraint
 -- Any "bookkeeping" information for error message (source range, for example)
 -- is tracked separately by the type-checker. TODO: move to Unify.hs
 data UnificationProblem = UnificationProblem
-  { -- | The types of metavariables in the unification problem.
-    problemMetaTypes :: HashMap MetaId Type
+  { -- | The contexts of metavariables in the unification problem.
+    problemMetaCtxs :: HashMap MetaId Ctx
+    -- | The types of metavariables in the unification problem.
+  , problemMetaTypes :: HashMap MetaId Type
     -- | A (partial) substitution of metavariables to terms.
   , problemMetaTerms :: HashMap MetaId Term
     -- | Unification constraints.
@@ -84,15 +86,18 @@ problemUnsolvedMetas problem =
 -- | The empty unification problem.
 emptyProblem :: UnificationProblem
 emptyProblem = UnificationProblem
-  { problemMetaTypes   = HashMap.empty
+  { problemMetaCtxs    = HashMap.empty
+  , problemMetaTypes   = HashMap.empty
   , problemMetaTerms   = HashMap.empty
   , problemConstraints = HashMap.empty
   }
 
 -- | Add a metavariable to a unification problem.
-addProblemMeta :: MetaId -> Type -> UnificationProblem -> UnificationProblem
-addProblemMeta id ty problem =
-  problem { problemMetaTypes = HashMap.insert id ty (problemMetaTypes problem) }
+addProblemMeta :: MetaId -> Ctx -> Type -> UnificationProblem -> UnificationProblem
+addProblemMeta id ctx ty problem = problem
+  { problemMetaCtxs  = HashMap.insert id ctx (problemMetaCtxs problem)
+  , problemMetaTypes = HashMap.insert id ty (problemMetaTypes problem)
+  }
 
 -- | Add a constraint to a unification problem.
 addProblemConstraint :: EquationId -> Constraint -> UnificationProblem -> UnificationProblem
@@ -126,6 +131,7 @@ data State = State
     -- here and substitute "lazily" instead of substituting everywhere all at
     -- once. Any unsolved metas after type-checking will be here as well, but
     -- they will not have a term, so they effectively become constants.
+  , metaCtxs            :: HashMap MetaId Ctx
   , metaTypes           :: HashMap MetaId Type
   , metaTerms           :: HashMap MetaId Term
     -- | Type-checking information.
@@ -151,6 +157,7 @@ initialState = State
   , axiomTypes          = HashMap.empty
   , axiomRules          = HashMap.empty
   , metaRanges          = HashMap.empty
+  , metaCtxs            = HashMap.empty
   , metaTypes           = HashMap.empty
   , metaTerms           = HashMap.empty
   , equationRanges      = HashMap.empty
