@@ -60,6 +60,14 @@ rindex Empty _    = error "rindex"
 rindex (_ :> a) 0 = a
 rindex (l :> _) i = rindex l (i - 1)
 
+relemIndices :: Eq a => a -> RList a -> [Int]
+relemIndices a = go 0
+  where
+  go _ Empty = []
+  go !i (xs :> x)
+    | a == x    = i : go (i + 1) xs
+    | otherwise = go (i + 1) xs
+
 -- | A context for a term.
 type Ctx = RList Type
 

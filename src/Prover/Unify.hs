@@ -1,7 +1,6 @@
 module Prover.Unify where
 
 import Control.Monad
-import Data.List
 import Data.Maybe
 
 import Control.Monad.Trans
@@ -280,46 +279,39 @@ flexRigid ctx ty m subst args t =
 
 -- | Given α[σ] args = t, try to find a unique solution for α.
 solveMeta :: Subst -> [Term] -> Term -> UnifyM (Maybe Term)
-solveMeta _ args t = runMaybeT $ do
-  σ  <- convertMetaArgs args
-  t' <- invertVarSubst σ t
+solveMeta subst args t = runMaybeT $ do
+  varSubst <- mapM extractVar (addArgs subst args)
+  t' <- invertVarSubst varSubst t
   -- TODO: occurs check
   return $ makeLam (length args) t'
-
--- A variable substitution, represented as a list of de Bruijn indices. Note
--- that this may seem reversed, since index zero is written on the left for
--- lists but on the right in contexts.
--- TODO: use strict list
-type VarSubst = [Int]
-
--- An analogue of SubstLift. liftVarSubst σ acts like the identity on var 0,
--- and like σ on other vars.
-liftVarSubst :: VarSubst -> VarSubst
-liftVarSubst σ = 0 : map (+ 1) σ
-
--- Determine if a series of arguments (to a meta) is a variable substitution.
-convertMetaArgs :: [Term] -> MaybeT UnifyM VarSubst
-convertMetaArgs args = mapM convertMetaArg (reverse args)
   where
-    convertMetaArg t = do
+    addArgs subst [] = subst
+    addArgs subst (arg:rest) = addArgs (subst :> arg) rest
+
+    extractVar t = do
       t' <- lift $ whnf t
       case t' of
         Whnf (Var i []) -> return i
         _ -> mzero
 
--- invertVarSubst σ t tries to find a unique term u such that u[σ] = t.
+type VarSubst = RList Var
+
+liftVarSubst :: VarSubst -> VarSubst
+liftVarSubst subst = fmap (+ 1) subst :> 0
+
+-- | Try to find a unique term u such that u[σ] = t.
 invertVarSubst :: VarSubst -> Term -> MaybeT UnifyM Term
-invertVarSubst σ t = do
+invertVarSubst subst t = do
   t' <- lift $ whnf t
   case whnfTerm t' of
-    Meta m _ args -> Meta m Empty <$> mapM (invertVarSubst σ) args
-    Axiom n args -> Axiom n <$> mapM (invertVarSubst σ) args
-    Def n args -> Def n <$> mapM (invertVarSubst σ) args
-    Var i args -> case elemIndices i σ of
-        [i'] -> Var i' <$> mapM (invertVarSubst σ) args
+    Meta m _ args -> Meta m Empty <$> mapM (invertVarSubst subst) args
+    Axiom n args -> Axiom n <$> mapM (invertVarSubst subst) args
+    Def n args -> Def n <$> mapM (invertVarSubst subst) args
+    Var i args -> case relemIndices i subst of
+        [i'] -> Var i' <$> mapM (invertVarSubst subst) args
         _ -> mzero
-    Lam b -> Lam <$> invertVarSubst (liftVarSubst σ) b
-    Pair a b -> Pair <$> invertVarSubst σ a <*> invertVarSubst σ b
+    Lam b -> Lam <$> invertVarSubst (liftVarSubst subst) b
+    Pair a b -> Pair <$> invertVarSubst subst a <*> invertVarSubst subst b
     Type -> return Type
-    Pi a b -> Pi <$> invertVarSubst σ a <*> invertVarSubst (liftVarSubst σ) b
-    Sigma a b -> Sigma <$> invertVarSubst σ a <*> invertVarSubst (liftVarSubst σ) b
+    Pi a b -> Pi <$> invertVarSubst subst a <*> invertVarSubst (liftVarSubst subst) b
+    Sigma a b -> Sigma <$> invertVarSubst subst a <*> invertVarSubst (liftVarSubst subst) b
