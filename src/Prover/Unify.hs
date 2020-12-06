@@ -186,9 +186,10 @@ unify ctx ty t1 t2 = do
     (_, Blocked (Meta m1 _ _), Blocked (Meta m2 _ _)) | m1 == m2 ->
       return $ TermEq ctx (whnfTerm ty') (whnfTerm t1') (whnfTerm t2')
 
-    (_, Blocked (Meta m1 _ args1), Blocked (Meta m2 _ args2)) -> flexFlex ctx (whnfTerm ty') m1 args1 m2 args2
-    (_, Blocked (Meta m _ args), t) -> flexRigid ctx (whnfTerm ty') m args (whnfTerm t)
-    (_, t, Blocked (Meta m _ args)) -> flexRigid ctx (whnfTerm ty') m args (whnfTerm t)
+    (_, Blocked (Meta m1 subst1 args1), Blocked (Meta m2 subst2 args2)) ->
+      flexFlex ctx (whnfTerm ty') m1 subst1 args1 m2 subst2 args2
+    (_, Blocked (Meta m subst args), t) -> flexRigid ctx (whnfTerm ty') m subst args (whnfTerm t)
+    (_, t, Blocked (Meta m subst args)) -> flexRigid ctx (whnfTerm ty') m subst args (whnfTerm t)
 
     (_, Blocked (Axiom _ _), _) -> return $ TermEq ctx (whnfTerm ty') (whnfTerm t1') (whnfTerm t2')
     (_, _, Blocked (Axiom _ _)) -> return $ TermEq ctx (whnfTerm ty') (whnfTerm t1') (whnfTerm t2')
@@ -255,31 +256,31 @@ unifyDependentTypes ctx a1 b1 a2 b2 =
       simplify $ And [TermEq ctx Type a1 a2, TermEq ctx Type b1' b2']
 
 -- | Try both ways.
-flexFlex :: Ctx -> Type -> MetaId -> [Term] -> MetaId -> [Term] -> UnifyM Constraint
-flexFlex ctx ty m1 args1 m2 args2 = do
-  let t1 = Meta m1 Empty args1
-      t2 = Meta m2 Empty args2
-  solveMeta args1 t2 >>= \case
+flexFlex :: Ctx -> Type -> MetaId -> Subst -> [Term] -> MetaId -> Subst -> [Term] -> UnifyM Constraint
+flexFlex ctx ty m1 subst1 args1 m2 subst2 args2 = do
+  let t1 = Meta m1 subst1 args1
+      t2 = Meta m2 subst2 args2
+  solveMeta subst1 args1 t2 >>= \case
     Just t2' -> do
       assignMeta m1 t2'
       return Solved
-    Nothing -> solveMeta args2 t1 >>= \case
+    Nothing -> solveMeta subst2 args2 t1 >>= \case
       Just t1' -> do
         assignMeta m2 t1'
         return Solved
       Nothing -> return $ TermEq ctx ty t1 t2
 
-flexRigid :: Ctx -> Type -> MetaId -> [Term] -> Term -> UnifyM Constraint
-flexRigid ctx ty m args t =
-  solveMeta args t >>= \case
+flexRigid :: Ctx -> Type -> MetaId -> Subst -> [Term] -> Term -> UnifyM Constraint
+flexRigid ctx ty m subst args t =
+  solveMeta subst args t >>= \case
     Nothing -> return $ TermEq ctx ty (Meta m Empty args) t
     Just t' -> do
       assignMeta m t'
       return Solved
 
--- | Given α args = t, try to find a unique solution for α.
-solveMeta :: [Term] -> Term -> UnifyM (Maybe Term)
-solveMeta args t = runMaybeT $ do
+-- | Given α[σ] args = t, try to find a unique solution for α.
+solveMeta :: Subst -> [Term] -> Term -> UnifyM (Maybe Term)
+solveMeta _ args t = runMaybeT $ do
   σ  <- convertMetaArgs args
   t' <- invertVarSubst σ t
   -- TODO: occurs check
