@@ -272,7 +272,7 @@ flexFlex ctx ty m1 subst1 args1 m2 subst2 args2 = do
 flexRigid :: Ctx -> Type -> MetaId -> Subst -> [Term] -> Term -> UnifyM Constraint
 flexRigid ctx ty m subst args t =
   solveMeta subst args t >>= \case
-    Nothing -> return $ TermEq ctx ty (Meta m Empty args) t
+    Nothing -> return $ TermEq ctx ty (Meta m subst args) t
     Just t' -> do
       assignMeta m t'
       return Solved
@@ -304,7 +304,7 @@ invertVarSubst :: VarSubst -> Term -> MaybeT UnifyM Term
 invertVarSubst subst t = do
   t' <- lift $ whnf t
   case whnfTerm t' of
-    Meta m _ args -> Meta m Empty <$> mapM (invertVarSubst subst) args
+    Meta m subst' args -> Meta m <$> mapM (invertVarSubst subst) subst' <*> mapM (invertVarSubst subst) args
     Axiom n args -> Axiom n <$> mapM (invertVarSubst subst) args
     Def n args -> Def n <$> mapM (invertVarSubst subst) args
     Var i args -> case relemIndices i subst of
