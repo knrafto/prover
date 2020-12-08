@@ -144,7 +144,8 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTerms problem'))
               (HashMap.keysSet (problemMetaTerms problem))
       docs <- forM (HashSet.toList solvedMetas) $ \m -> do
-        tmDoc <- prettyTerm metaSubst Empty (problemMetaTerms problem' ! m)
+        let ctx = problemMetaCtxs problem' ! m
+        tmDoc <- prettyTerm metaSubst ctx (problemMetaTerms problem' ! m)
         return $ prettyMeta m <+> "↦" <+> tmDoc
       return $ vsep docs
     , "unsolved metas" |: do

@@ -57,7 +57,8 @@ subscript s i = pretty s <> pretty (map toSubscriptChar (show i))
       '7' -> '₇'
       '8' -> '₈'
       '9' -> '₉'
-      _   -> error "subscript: not a digit"
+      '-' -> '₋'
+      _   -> error "subscript"
 
 prettyVar :: Int -> Doc
 prettyVar = subscript "x"
@@ -96,15 +97,15 @@ prettyTerm metaSubst ctx = prettyPrec (ctxLength ctx) 0
           Nothing -> lookupState m metaTerms >>= \case
             Just t' -> prettyPrec k d (applyArgs (applySubst t' subst) args)
             Nothing -> do
-              substDoc <- prettySubst metaSubst ctx subst
-              app k d (prettyMeta m <> "[" <> substDoc <> "]") args
+              substDoc <- prettySubst k subst
+              prettyApp k d (prettyMeta m <> "[" <> substDoc <> "]") args
       Axiom n args -> do
         n <- getState n axiomNames
-        app k d (pretty (nameText n)) args
+        prettyApp k d (pretty (nameText n)) args
       Def n args -> do
         n <- getState n defNames
-        app k d (pretty (nameText n)) args
-      Var i args -> app k d (prettyVar (k - i - 1)) args
+        prettyApp k d (pretty (nameText n)) args
+      Var i args -> prettyApp k d (prettyVar (k - i - 1)) args
       Lam b -> parens (d > binderPrec) $ do
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "λ" <+> prettyVar k <> "." <+> bDoc
@@ -122,20 +123,19 @@ prettyTerm metaSubst ctx = prettyPrec (ctxLength ctx) 0
         bDoc <- prettyPrec (k + 1) binderPrec b
         return $ "Σ" <+> prettyVar k <+> ":" <+> aDoc <> "." <+> bDoc
 
-    app :: Int -> Int -> Doc -> [Term] -> M Doc
-    app _ _ h []   = return h
-    app k d h args = parens (d > appPrec) $ do
+    prettyApp :: Int -> Int -> Doc -> [Term] -> M Doc
+    prettyApp _ _ h []   = return h
+    prettyApp k d h args = parens (d > appPrec) $ do
         argsDocs <- mapM (prettyPrec k (appPrec + 1)) args
         return $ hsep (h : argsDocs)
 
--- | Pretty-print a substitution.
-prettySubst :: MetaSubst -> Ctx -> Subst -> M Doc
-prettySubst _ _ Empty = return mempty
-prettySubst metaSubst ctx (Empty :> t) = prettyTerm metaSubst ctx t
-prettySubst metaSubst ctx (subst :> t) = do
-  substDoc <- prettySubst metaSubst ctx subst
-  tDoc <- prettyTerm metaSubst ctx t
-  return $ substDoc <> "," <+> tDoc
+    prettySubst :: Int -> Subst -> M Doc
+    prettySubst _ Empty = return mempty
+    prettySubst k (Empty :> t) = prettyPrec k 0 t
+    prettySubst k (subst :> t) = do
+      substDoc <- prettySubst k subst
+      tDoc <- prettyPrec k 0 t
+      return $ substDoc <> "," <+> tDoc
 
 -- | Pretty-print a unification constraint.
 prettyConstraint :: MetaSubst -> Constraint -> M Doc
