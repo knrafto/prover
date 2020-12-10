@@ -136,6 +136,7 @@ expect r tcCtx b tyB tyA = do
     , unificationProblem = problem'
     }
 
+  -- TODO: print problem state before simplification too
   let metaSubst = problemMetaTerms problem'
   debugFields ("checking expression at" <+> pretty r)
     [ "newly solved metas" |: do
@@ -162,8 +163,10 @@ expect r tcCtx b tyB tyA = do
       docs <- mapM (prettyConstraint metaSubst) (HashMap.elems (problemConstraints problem'))
       return $ vsep docs
     , "context" |: prettyCtx metaSubst ctx
-    , "type" |: prettyTerm metaSubst ctx tyA
     , "term" |: prettyTerm metaSubst ctx a
+    , "expected type" |: prettyTerm metaSubst ctx tyA
+    , "actual term" |: prettyTerm metaSubst ctx b
+    , "actual type" |: prettyTerm metaSubst ctx tyB
     ]
 
   return $ ExprInfo r a tyA
