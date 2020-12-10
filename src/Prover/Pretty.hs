@@ -93,7 +93,7 @@ prettyTerm metaSubst ctx = prettyPrec (ctxLength ctx) 0
       Meta m subst args ->
         -- TODO: code is copied from whnf implementation
         case HashMap.lookup m metaSubst of
-          Just t' -> prettyPrec k d (applyArgs t' args)
+          Just t' -> prettyPrec k d (applyArgs (applySubst t' subst) args)
           Nothing -> lookupState m metaTerms >>= \case
             Just t' -> prettyPrec k d (applyArgs (applySubst t' subst) args)
             Nothing -> do

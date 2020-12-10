@@ -160,7 +160,7 @@ whnf t = case t of
     -- TODO: path compression?
     metaSubst <- gets problemMetaTerms
     case HashMap.lookup id metaSubst of
-      Just t' -> whnf (applyArgs t' args)
+      Just t' -> whnf (applyArgs (applySubst t' subst) args)
       Nothing -> lift (lookupState id metaTerms) >>= \case
         Just t' -> whnf (applyArgs (applySubst t' subst) args)
         Nothing -> return (Blocked t)
