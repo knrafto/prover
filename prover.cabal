@@ -32,6 +32,7 @@ executable prover
     Prover.Pattern
     Prover.Position
     Prover.Pretty
+    Prover.RList
     Prover.Search
     Prover.Syntax
     Prover.Term

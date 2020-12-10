@@ -13,6 +13,7 @@ import Prettyprinter.Render.Text
 
 import Prover.Flags qualified as Flags
 import Prover.Monad
+import Prover.RList (RList(..))
 import Prover.Syntax
 import Prover.Term
 

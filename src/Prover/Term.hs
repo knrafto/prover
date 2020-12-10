@@ -3,6 +3,9 @@ module Prover.Term where
 
 import Data.Hashable
 
+import Prover.RList (RList(..))
+import Prover.RList qualified as RList
+
 -- | A de Bruijn index.
 type Var = Int
 
@@ -44,29 +47,6 @@ data Term
   deriving (Eq, Show)
 
 type Type = Term
-
--- | A strict list where new things go on the right.
-data RList a
-  = Empty
-  | !(RList a) :> !a
-  deriving (Eq, Show, Functor, Foldable, Traversable)
-
-rlength :: RList a -> Int
-rlength Empty = 0
-rlength (l :> _) = length l + 1
-
-rindex :: RList a -> Int -> a
-rindex Empty _    = error "rindex"
-rindex (_ :> a) 0 = a
-rindex (l :> _) i = rindex l (i - 1)
-
-relemIndices :: Eq a => a -> RList a -> [Int]
-relemIndices a = go 0
-  where
-  go _ Empty = []
-  go !i (xs :> x)
-    | a == x    = i : go (i + 1) xs
-    | otherwise = go (i + 1) xs
 
 -- | A context for a term.
 type Ctx = RList Type
@@ -172,7 +152,7 @@ applySubst t subst = go 0 t
     Def n args          -> Def n (map (go i) args)
     Var j args
       | j < i           -> Var j (map (go i) args)
-      | otherwise       -> applyArgs (weakenBy i (rindex subst (j - i))) (map (go i) args)
+      | otherwise       -> applyArgs (weakenBy i (subst RList.!! (j - i))) (map (go i) args)
     Lam b               -> Lam (go (i + 1) b)
     Pair a b            -> Pair (go i a) (go i b)
     Type                -> Type
@@ -181,11 +161,11 @@ applySubst t subst = go 0 t
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
-ctxLength = rlength
+ctxLength = length
 
 -- | Get the type of a variable in a context.
 ctxLookup :: Ctx -> Var -> Type
-ctxLookup ctx i = weakenBy (i + 1) (rindex ctx i)
+ctxLookup ctx i = weakenBy (i + 1) (ctx RList.!! i)
 
 -- | Add n lambdas to a term.
 makeLam :: Int -> Term -> Term

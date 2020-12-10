@@ -20,6 +20,7 @@ import Prover.Monad
 import Prover.Pattern
 import Prover.Position
 import Prover.Pretty
+import Prover.RList (RList(..))
 import Prover.Syntax
 import Prover.Term
 import Prover.Unify

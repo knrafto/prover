@@ -13,6 +13,8 @@ import Data.HashMap.Strict qualified as HashMap
 
 import Prover.Monad
 import Prover.Pattern
+import Prover.RList (RList(..))
+import Prover.RList qualified as RList
 import Prover.Term
 
 -- TODO: Restructure unification algorithm to get rid of this.
@@ -307,7 +309,7 @@ invertVarSubst subst t = do
     Meta m subst' args -> Meta m <$> mapM (invertVarSubst subst) subst' <*> mapM (invertVarSubst subst) args
     Axiom n args -> Axiom n <$> mapM (invertVarSubst subst) args
     Def n args -> Def n <$> mapM (invertVarSubst subst) args
-    Var i args -> case relemIndices i subst of
+    Var i args -> case RList.elemIndices i subst of
         [i'] -> Var i' <$> mapM (invertVarSubst subst) args
         _ -> mzero
     Lam b -> Lam <$> invertVarSubst (liftVarSubst subst) b
