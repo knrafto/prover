@@ -60,15 +60,12 @@ addUnnamed tcCtx ty = tcCtx :> (Nothing, ty)
 createMeta :: Range -> TcCtx -> Type -> M Term
 createMeta r tcCtx ty = do
   let ctx = toCtx tcCtx
-  id  <- freshMetaId
-  -- Metavariables always represent closed terms, so in a context Γ we create
-  -- a function Γ → A and apply it to all the variables in Γ.
-  let metaTy = ctxPi ctx ty
+  id <- freshMetaId
   modify $ \s -> s
     { metaRanges  = HashMap.insert id r (metaRanges s)
-    , unificationProblem = addProblemMeta id Empty metaTy (unificationProblem s)
+    , unificationProblem = addProblemMeta id ctx ty (unificationProblem s)
     }
-  return $ Meta id Empty (ctxVars ctx)
+  return $ Meta id (idSubst ctx) []
 
 -- | The number of variables in the parameter collection.
 paramsLength :: [ParamGroup ExprInfo Name] -> Int

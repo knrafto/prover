@@ -81,6 +81,13 @@ type Subst = RList Term
 var :: Int -> Term
 var i = Var i []
 
+-- | Construct the identity substitution on a context.
+idSubst :: Ctx -> Subst
+idSubst = go 0
+  where
+  go _ Empty = Empty
+  go !i (ctx :> _) = go (i + 1) ctx :> var i
+
 -- | Lift a term in context Γ to a term of in the extended context Γ, A
 -- (essentially adding an unused 0th variable).
 weaken :: Term -> Term
@@ -157,20 +164,20 @@ applyArgs t args@(arg:rest) = case t of
 
 -- | Apply a substitution to a term.
 applySubst :: Term -> Subst -> Term
-applySubst t subst' = go 0 t
+applySubst t subst = go 0 t
   where
   go !i = \case
-    Meta m subst args -> Meta m (fmap (go i) subst) (map (go i) args)
-    Axiom n args      -> Axiom n (map (go i) args)
-    Def n args        -> Def n (map (go i) args)
+    Meta m subst' args  -> Meta m (fmap (go i) subst') (map (go i) args)
+    Axiom n args        -> Axiom n (map (go i) args)
+    Def n args          -> Def n (map (go i) args)
     Var j args
-      | j < i         -> Var j (map (go i) args)
-      | otherwise     -> applyArgs (weakenBy i (rindex subst' (j - i))) (map (go i) args)
-    Lam b             -> Lam (go (i + 1) b)
-    Pair a b          -> Pair (go i a) (go i b)
-    Type              -> Type
-    Pi a b            -> Pi (go i a) (go (i + 1) b)
-    Sigma a b         -> Sigma (go i a) (go (i + 1) b)
+      | j < i           -> Var j (map (go i) args)
+      | otherwise       -> applyArgs (weakenBy i (rindex subst (j - i))) (map (go i) args)
+    Lam b               -> Lam (go (i + 1) b)
+    Pair a b            -> Pair (go i a) (go i b)
+    Type                -> Type
+    Pi a b              -> Pi (go i a) (go (i + 1) b)
+    Sigma a b           -> Sigma (go i a) (go (i + 1) b)
 
 -- | The number of variables in a context.
 ctxLength :: Ctx -> Int
@@ -180,24 +187,7 @@ ctxLength = rlength
 ctxLookup :: Ctx -> Var -> Type
 ctxLookup ctx i = weakenBy (i + 1) (rindex ctx i)
 
--- | Construct a Π-type out of a context ending with the given type.
-ctxPi :: Ctx -> Type -> Type
-ctxPi Empty t = t
-ctxPi (ctx :> ty) t = ctxPi ctx (Pi ty t)
-
 -- | Add n lambdas to a term.
 makeLam :: Int -> Term -> Term
 makeLam 0 t = t
 makeLam n t = makeLam (n - 1) (Lam t)
-
--- | Construct a lambda out of a context with the given body.
-ctxLam :: Ctx -> Term -> Term
-ctxLam ctx = makeLam (ctxLength ctx)
-
--- | Returns all the bound variables of a context, in the same order as ctxPi
--- e.g. v₃ v₂ v₁ v₀.
-ctxVars :: Ctx -> [Term]
-ctxVars = reverse . go 0
-  where
-    go _ Empty = []
-    go i (ctx :> _) = var i : go (i + 1) ctx
