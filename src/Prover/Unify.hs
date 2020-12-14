@@ -10,6 +10,7 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.HashSet qualified as HashSet
 
 import Prover.Monad
 import Prover.Pattern
@@ -261,11 +262,11 @@ flexFlex :: Ctx -> Type -> MetaId -> Subst -> [Term] -> MetaId -> Subst -> [Term
 flexFlex ctx ty m1 subst1 args1 m2 subst2 args2 = do
   let t1 = Meta m1 subst1 args1
       t2 = Meta m2 subst2 args2
-  solveMeta subst1 args1 t2 >>= \case
+  trySolveMeta m1 subst1 args1 t2 >>= \case
     Just t2' -> do
       assignMeta m1 t2'
       return Solved
-    Nothing -> solveMeta subst2 args2 t1 >>= \case
+    Nothing -> trySolveMeta m2 subst2 args2 t1 >>= \case
       Just t1' -> do
         assignMeta m2 t1'
         return Solved
@@ -273,15 +274,20 @@ flexFlex ctx ty m1 subst1 args1 m2 subst2 args2 = do
 
 flexRigid :: Ctx -> Type -> MetaId -> Subst -> [Term] -> Term -> UnifyM Constraint
 flexRigid ctx ty m subst args t =
-  solveMeta subst args t >>= \case
+  trySolveMeta m subst args t >>= \case
     Nothing -> return $ TermEq ctx ty (Meta m subst args) t
     Just t' -> do
       assignMeta m t'
       return Solved
 
 -- | Given α[σ] args = t, try to find a unique solution for α.
-solveMeta :: Subst -> [Term] -> Term -> UnifyM (Maybe Term)
-solveMeta subst args t = runMaybeT $ do
+trySolveMeta :: MetaId -> Subst -> [Term] -> Term -> UnifyM (Maybe Term)
+trySolveMeta m subst args t = runMaybeT $ do
+  -- If the meta is not part of our unification problem, leave it unsolved.
+  -- TODO: does this have a theoretical basis?
+  solvableMetas <- gets problemMetas
+  guard $ HashSet.member m solvableMetas
+
   varSubst <- mapM extractVar (addArgs subst args)
   t' <- invertVarSubst varSubst t
   -- TODO: occurs check
