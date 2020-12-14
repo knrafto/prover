@@ -79,7 +79,7 @@ createGoal r goalKind tcCtx ty = do
     { metaCtxs = HashMap.insert id ctx (metaCtxs s)
     , metaTypes = HashMap.insert id ty (metaTypes s)
     , metaRanges  = HashMap.insert id r (metaRanges s)
-    , goalKinds = HashMap.insert id goalKind (goalKinds s)
+    , metaGoalKinds = HashMap.insert id goalKind (metaGoalKinds s)
     }
   return $ Meta id (idSubst ctx) []
 
@@ -124,9 +124,15 @@ checkSolved = do
     r <- getState id metaRanges
     -- TODO: show type of meta
     emitError $ UnsolvedMeta r id
+  -- Report goals
+  goalKinds <- gets metaGoalKinds
+  forM_ (HashMap.toList goalKinds) $ \(id, goalKind) -> do
+    r <- getState id metaRanges
+    emitError $ FoundGoal r goalKind
   -- Clear problem and merge into global substitution
   modify $ \s -> s
     { metaTerms = HashMap.union (problemMetaTerms problem) (metaTerms s)
+    , metaGoalKinds = HashMap.empty
     , unificationProblem = emptyProblem
     }
 

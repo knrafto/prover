@@ -40,6 +40,8 @@ data Error
   | LateImplicitParam Range Name
   -- | Infix operators could not be parsed.
   | InfixParseError Range
+  -- | Found a goal.
+  | FoundGoal Range GoalKind
   deriving (Show)
 
 -- | Constraints for unification.
@@ -130,8 +132,8 @@ data State = State
   , metaTerms           :: HashMap MetaId Term
     -- | Type-checking information.
   , metaRanges          :: HashMap MetaId Range
+  , metaGoalKinds       :: HashMap MetaId GoalKind
   , equationRanges      :: HashMap EquationId Range
-  , goalKinds           :: HashMap MetaId GoalKind
   , unificationProblem  :: UnificationProblem
   } deriving (Show)
 
@@ -151,12 +153,12 @@ initialState = State
   , axiomImplicits      = HashMap.empty
   , axiomTypes          = HashMap.empty
   , axiomRules          = HashMap.empty
-  , metaRanges          = HashMap.empty
   , metaCtxs            = HashMap.empty
   , metaTypes           = HashMap.empty
   , metaTerms           = HashMap.empty
   , equationRanges      = HashMap.empty
-  , goalKinds           = HashMap.empty
+  , metaRanges          = HashMap.empty
+  , metaGoalKinds       = HashMap.empty
   , unificationProblem  = emptyProblem
   }
 
