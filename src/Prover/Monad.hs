@@ -131,6 +131,7 @@ data State = State
     -- | Type-checking information.
   , metaRanges          :: HashMap MetaId Range
   , equationRanges      :: HashMap EquationId Range
+  , goalKinds           :: HashMap MetaId GoalKind
   , unificationProblem  :: UnificationProblem
   } deriving (Show)
 
@@ -155,6 +156,7 @@ initialState = State
   , metaTypes           = HashMap.empty
   , metaTerms           = HashMap.empty
   , equationRanges      = HashMap.empty
+  , goalKinds           = HashMap.empty
   , unificationProblem  = emptyProblem
   }
 

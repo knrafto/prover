@@ -70,6 +70,19 @@ createMeta r tcCtx ty = do
     }
   return $ Meta id (idSubst ctx) []
 
+-- | Create a goal with the given type in the given context.
+createGoal :: Range -> GoalKind -> TcCtx -> Type -> M Term
+createGoal r goalKind tcCtx ty = do
+  let ctx = toCtx tcCtx
+  id <- freshMetaId
+  modify $ \s -> s
+    { metaCtxs = HashMap.insert id ctx (metaCtxs s)
+    , metaTypes = HashMap.insert id ty (metaTypes s)
+    , metaRanges  = HashMap.insert id r (metaRanges s)
+    , goalKinds = HashMap.insert id goalKind (goalKinds s)
+    }
+  return $ Meta id (idSubst ctx) []
+
 -- | The number of variables in the parameter collection.
 paramsLength :: [ParamGroup ExprInfo Name] -> Int
 paramsLength = sum . map (\(ParamGroup ns _) -> length ns)
@@ -222,7 +235,9 @@ checkExpr expr tcCtx expectedTy = case expr of
     t <- createMeta r tcCtx expectedTy
     return $ EHole (ExprInfo r t expectedTy)
 
-  EGoal _ _ -> error "EGoal"
+  EGoal r k -> do
+    t <- createGoal r k tcCtx expectedTy
+    return $ EGoal (ExprInfo r t expectedTy) k
 
   EType r -> do
     i <- expect r tcCtx Type Type expectedTy

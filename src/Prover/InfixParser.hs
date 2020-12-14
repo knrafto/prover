@@ -76,6 +76,7 @@ processExpr :: Expr Range Ident -> M (Expr Range Ident)
 processExpr = \case
   EVar a n -> return $ EVar a n
   EHole a -> return $ EHole a
+  EGoal a k -> return $ EGoal a k
   EType a -> return $ EType a
   EPi a ps e -> EPi a <$> processParamGroups ps <*> processExpr e
   ELam a ps e -> ELam a <$> processParamGroups ps <*> processExpr e
