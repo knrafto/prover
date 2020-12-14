@@ -63,8 +63,10 @@ createMeta r tcCtx ty = do
   let ctx = toCtx tcCtx
   id <- freshMetaId
   modify $ \s -> s
-    { metaRanges  = HashMap.insert id r (metaRanges s)
-    , unificationProblem = addProblemMeta id ctx ty (unificationProblem s)
+    { metaCtxs = HashMap.insert id ctx (metaCtxs s)
+    , metaTypes = HashMap.insert id ty (metaTypes s)
+    , metaRanges  = HashMap.insert id r (metaRanges s)
+    , unificationProblem = addProblemMeta id (unificationProblem s)
     }
   return $ Meta id (idSubst ctx) []
 
@@ -111,9 +113,7 @@ checkSolved = do
     emitError $ UnsolvedMeta r id
   -- Clear problem and merge into global substitution
   modify $ \s -> s
-    { metaCtxs  = HashMap.union (problemMetaCtxs problem) (metaCtxs s)
-    , metaTypes = HashMap.union (problemMetaTypes problem) (metaTypes s)
-    , metaTerms = HashMap.union (problemMetaTerms problem) (metaTerms s)
+    { metaTerms = HashMap.union (problemMetaTerms problem) (metaTerms s)
     , unificationProblem = emptyProblem
     }
 
@@ -143,18 +143,19 @@ expect r tcCtx b tyB tyA = do
               (HashMap.keysSet (problemMetaTerms problem'))
               (HashMap.keysSet (problemMetaTerms problem))
       docs <- forM (HashSet.toList solvedMetas) $ \m -> do
-        let ctx = problemMetaCtxs problem' ! m
+        ctx <- getState m metaCtxs
         tmDoc <- prettyTerm metaSubst ctx (problemMetaTerms problem' ! m)
         return $ prettyMeta m <+> "↦" <+> tmDoc
       return $ vsep docs
     , "unsolved metas" |: do
       let unsolvedMetas = HashSet.difference
-              (HashMap.keysSet (problemMetaTypes problem'))
+              (problemMetas problem')
               (HashMap.keysSet (problemMetaTerms problem'))
       docs <- forM (HashSet.toList unsolvedMetas) $ \m -> do
-        let ctx = problemMetaCtxs problem' ! m
+        ctx <- getState m metaCtxs
+        ty <- getState m metaTypes
         ctxDoc <- prettyCtx metaSubst ctx
-        tyDoc <- prettyTerm metaSubst ctx (problemMetaTypes problem' ! m)
+        tyDoc <- prettyTerm metaSubst ctx ty
         return $ nest 2 (ctxDoc <> line <> "⊢" <+> prettyMeta m <+> ":" <+> tyDoc)
       return $ vsep docs
     , "constraints" |: do

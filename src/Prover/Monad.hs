@@ -66,10 +66,8 @@ data Constraint
 -- Any "bookkeeping" information for error message (source range, for example)
 -- is tracked separately by the type-checker. TODO: move to Unify.hs
 data UnificationProblem = UnificationProblem
-  { -- | The contexts of metavariables in the unification problem.
-    problemMetaCtxs :: HashMap MetaId Ctx
-    -- | The types of metavariables in the unification problem.
-  , problemMetaTypes :: HashMap MetaId Type
+  { -- | The metavariables in the unification problem.
+    problemMetas :: HashSet MetaId
     -- | A (partial) substitution of metavariables to terms.
   , problemMetaTerms :: HashMap MetaId Term
     -- | Unification constraints.
@@ -78,26 +76,22 @@ data UnificationProblem = UnificationProblem
 
 -- | Get the unsolved metas in a unification problem.
 problemUnsolvedMetas :: UnificationProblem -> HashSet MetaId
-problemUnsolvedMetas problem =
-  HashSet.difference
-    (HashMap.keysSet (problemMetaTypes problem))
-    (HashMap.keysSet (problemMetaTerms problem))
+problemUnsolvedMetas problem = HashSet.difference
+  (problemMetas problem)
+  (HashMap.keysSet (problemMetaTerms problem))
 
 -- | The empty unification problem.
 emptyProblem :: UnificationProblem
 emptyProblem = UnificationProblem
-  { problemMetaCtxs    = HashMap.empty
-  , problemMetaTypes   = HashMap.empty
+  { problemMetas       = HashSet.empty
   , problemMetaTerms   = HashMap.empty
   , problemConstraints = HashMap.empty
   }
 
 -- | Add a metavariable to a unification problem.
-addProblemMeta :: MetaId -> Ctx -> Type -> UnificationProblem -> UnificationProblem
-addProblemMeta id ctx ty problem = problem
-  { problemMetaCtxs  = HashMap.insert id ctx (problemMetaCtxs problem)
-  , problemMetaTypes = HashMap.insert id ty (problemMetaTypes problem)
-  }
+addProblemMeta :: MetaId -> UnificationProblem -> UnificationProblem
+addProblemMeta id problem =
+  problem { problemMetas  = HashSet.insert id (problemMetas problem) }
 
 -- | Add a constraint to a unification problem.
 addProblemConstraint :: EquationId -> Constraint -> UnificationProblem -> UnificationProblem
