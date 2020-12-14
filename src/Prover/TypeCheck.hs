@@ -21,6 +21,7 @@ import Prover.Pattern
 import Prover.Position
 import Prover.Pretty
 import Prover.RList (RList(..))
+import Prover.Search
 import Prover.Syntax
 import Prover.Term
 import Prover.Unify
@@ -124,16 +125,29 @@ checkSolved = do
     r <- getState id metaRanges
     -- TODO: show type of meta
     emitError $ UnsolvedMeta r id
-  -- Report goals
-  goalKinds <- gets metaGoalKinds
-  forM_ (HashMap.toList goalKinds) $ \(id, goalKind) -> do
-    r <- getState id metaRanges
-    emitError $ FoundGoal r goalKind
   -- Clear problem and merge into global substitution
   modify $ \s -> s
     { metaTerms = HashMap.union (problemMetaTerms problem) (metaTerms s)
-    , metaGoalKinds = HashMap.empty
     , unificationProblem = emptyProblem
+    }
+
+  -- Try to solve goals
+  goalKinds <- gets metaGoalKinds
+  forM_ (HashMap.toList goalKinds) $ \case
+    (id, UserGoal) -> do
+      r <- getState id metaRanges
+      emitError $ UnsolvedGoal r
+    (id, ProofSearchGoal) -> do
+      r <- getState id metaRanges
+      proofSearch id >>= \case
+        Nothing -> emitError $ UnsolvedGoal r
+        Just solution ->  modify $ \s -> s
+          { metaTerms = HashMap.union (problemMetaTerms solution) (metaTerms s)
+          }
+
+  -- Clear goals
+  modify $ \s -> s
+    { metaGoalKinds = HashMap.empty
     }
 
 -- | Generate expression info for a range, term, and type, while checking that

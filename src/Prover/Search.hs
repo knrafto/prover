@@ -7,6 +7,11 @@ import Data.Monoid
 import Data.Heap qualified as Heap
 
 import Prover.Monad
+import Prover.Term
+
+-- | Try to solve a unification problem by proof search.
+proofSearch :: MetaId -> M (Maybe UnificationProblem)
+proofSearch _ = return Nothing
 
 type Cost = Sum Int
 

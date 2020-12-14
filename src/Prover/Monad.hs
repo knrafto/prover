@@ -40,8 +40,8 @@ data Error
   | LateImplicitParam Range Name
   -- | Infix operators could not be parsed.
   | InfixParseError Range
-  -- | Found a goal.
-  | FoundGoal Range GoalKind
+  -- | A goal could not be solved.
+  | UnsolvedGoal Range
   deriving (Show)
 
 -- | Constraints for unification.

@@ -122,4 +122,4 @@ diagnoseError = \case
   MissingPatternVariable r -> Diagnostic r "missing variable in pattern"
   LateImplicitParam r _    -> Diagnostic r "implicit parameters must precede any explicit parameters"
   InfixParseError r        -> Diagnostic r "could not parse infix operators"
-  FoundGoal r _            -> Diagnostic r "found goal"
+  UnsolvedGoal r           -> Diagnostic r "unsolved goal"
