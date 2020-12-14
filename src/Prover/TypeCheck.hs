@@ -222,6 +222,8 @@ checkExpr expr tcCtx expectedTy = case expr of
     t <- createMeta r tcCtx expectedTy
     return $ EHole (ExprInfo r t expectedTy)
 
+  EGoal _ _ -> error "EGoal"
+
   EType r -> do
     i <- expect r tcCtx Type Type expectedTy
     return $ EType i

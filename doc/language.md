@@ -53,6 +53,16 @@ safely using rewrite rules.
 Infix operators can be declared using `infix`, `infixl`, and `infixr`, similar
 to Haskell or Agda.
 
+## Goals
+
+A `?` in place of a term represents a user goal, i.e. a hole to be filled in by
+the user interactively. 
+
+## Proof search
+
+A `!` in place of a term represents a proof search goal, in which the theorem
+prover will automatically try to find a term of the correct type.
+
 # Syntax
 
 ## Lexical structure
@@ -70,7 +80,7 @@ syntax:
 
 ```
 Type
-_
+_ ? !
 : ≡ →
 Π λ Σ
 define axiom rewrite where infix infixl infixr
@@ -108,6 +118,8 @@ fixity =
 
 expr =
     _
+    ?
+    !
     ident
     Type
     ( expr )

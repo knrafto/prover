@@ -36,6 +36,7 @@ let highlightStyles: Map<string, string> = new Map([
   ['unbound_name', 'red'],
   ['type', 'blue'],
   ['hole', 'cyan'],
+  ['goal', 'cyan'],
 ]);
 
 // Colors from Solarized dark: https://ethanschoonover.com/solarized/

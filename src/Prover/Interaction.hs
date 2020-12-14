@@ -25,6 +25,7 @@ data HighlightKind
   | HighlightRewriteName
   | HighlightUnboundName
   | HighlightHole
+  | HighlightGoal
   | HighlightType
   deriving (Show)
 
@@ -36,6 +37,7 @@ instance ToJSON HighlightKind where
     HighlightRewriteName  -> "rewrite_name"
     HighlightUnboundName  -> "unbound_name"
     HighlightHole         -> "hole"
+    HighlightGoal         -> "goal"
     HighlightType         -> "type"
 
 data HighlightedRange = HighlightedRange Range HighlightKind
@@ -57,6 +59,7 @@ highlightExpr :: Expr ExprInfo Name -> [HighlightedRange]
 highlightExpr = \case
   EVar     _ n     -> highlightName n
   EHole    i       -> [HighlightedRange (exprInfoRange i) HighlightHole]
+  EGoal    i _     -> [HighlightedRange (exprInfoRange i) HighlightGoal]
   EType    i       -> [HighlightedRange (exprInfoRange i) HighlightType]
   EPi      _ ps e  -> highlightParamGroups ps ++ highlightExpr e
   ELam     _ ps e  -> highlightParamGroups ps ++ highlightExpr e

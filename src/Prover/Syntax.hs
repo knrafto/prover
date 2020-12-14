@@ -56,12 +56,20 @@ data ExprInfo = ExprInfo
   , exprInfoType :: Type
   } deriving (Show)
 
+-- | A kind of goal.
+data GoalKind
+  = UserGoal
+  | ProofSearchGoal
+  deriving (Eq, Show)
+
 -- | An expression.
 data Expr a n
   -- | A variable.
   = EVar a n
   -- | A hole `_`.
   | EHole a
+  -- | A goal `?` or `!`.
+  | EGoal a GoalKind
   -- | `Type`.
   | EType a
   -- | `Π`.
@@ -86,6 +94,7 @@ ann :: Expr a n -> a
 ann = \case
   EVar   a _   -> a
   EHole  a     -> a
+  EGoal  a _   -> a
   EType  a     -> a
   EPi    a _ _ -> a
   ELam   a _ _ -> a

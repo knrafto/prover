@@ -53,6 +53,8 @@ ident = lexeme . try $ do
     reservedWords :: [Text]
     reservedWords =
         [ "_"
+        , "?"
+        , "!"
         , ":"
         , "≡"
         , "Σ"
@@ -98,12 +100,14 @@ explicitParams = many (annotated <|> bare)
     bare      = (\n -> ParamGroup [n] Nothing) <$> ident
 
 atom :: Parser (Expr Range Ident)
-atom = var <|> hole <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
+atom = var <|> hole <|> goal <|> type_ <|> parens <|> sigma <|> pi_ <|> lam
   where
     var   = do
         id <- ident
         return $ EVar (identRange id) id
     hole  = EHole <$> reservedWord "_"
+    goal  = EGoal <$> reservedWord "?" <*> pure UserGoal
+        <|> EGoal <$> reservedWord "!" <*> pure ProofSearchGoal
     type_ = EType <$> reservedWord "Type"
     parens = do
         _ <- symbol '('
