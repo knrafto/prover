@@ -1,9 +1,12 @@
 An experimental theorem prover. Everything is work in progress (including the name).
 
-Right now the theorem prover can type-check things, and even infer a few typeson
-its own. In addition, there's a VS Code extension for syntax highlighting and
-error messages. See `doc/language.md` for a description of the syntax, and
-`examples/basics.pf` for an example.
+Currently, the theorem prover can perform basic type checking and type inference
+(enough to prove properties about the natural numbers, say), but many
+quality-of-life features are still missing. See `doc/language.md` for a
+description of the syntax, and `examples/basics.pf` for some examples.
+
+In addition, there's a VS Code extension for interactive semantic highlighting and
+error messages.
 
 # Prerequisites (macOS)
 
