@@ -22,7 +22,7 @@ import Prover.Term
 type UnifyM = StateT UnificationProblem M
 
 -- | Try to "simplify" a unification problem, returning a new unification
--- problem whose solutions are in 1-to-1 correspondence with solution to the
+-- problem whose solutions are in 1-to-1 correspondence with solutions to the
 -- original problem. All metavariables in the original problem will appear in
 -- the simplified problem. Solved constraints will be removed, but unsolved or
 -- false constraints will remain.

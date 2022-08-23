@@ -152,8 +152,8 @@ checkSolved = do
 
 -- | Generate expression info for a range, term, and type, while checking that
 -- it matches the expected output type. Internally this generates a constraint
--- that two terms (of possibly different types) are equal, and simplify the
--- unification problem.
+-- that two terms (of possibly different types) are equal, and simplifies the
+-- resulting unification problem.
 expect :: Range -> TcCtx -> Term -> Type -> Type -> M ExprInfo
 expect r tcCtx b tyB tyA = do
   let ctx = toCtx tcCtx
@@ -213,7 +213,7 @@ expandImplicits r tcCtx n t ty = do
   arg <- createMeta r tcCtx a
   expandImplicits r tcCtx (n - 1) (applyArgs t [arg]) (instantiate b arg)
 
--- | Producing a judgement Γ ⊢ t : A.
+-- | Type-check an expression, producing a judgement Γ ⊢ t : A.
 checkExpr :: Expr Range Ident -> TcCtx -> Type -> M (Expr ExprInfo Name)
 checkExpr expr tcCtx expectedTy = case expr of
   EVar _ n -> do

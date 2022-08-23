@@ -28,7 +28,7 @@ debugM m = when Flags.debug $ do
   doc <- m
   liftIO $ hPutDoc stderr (doc <> line)
 
--- | Convenient infix pair (useful for debugFields) below.
+-- | Convenient infix pair, useful for debugFields below.
 (|:) :: a -> b -> (a, b)
 a |: b = (a, b)
 

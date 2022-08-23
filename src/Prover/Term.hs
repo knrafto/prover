@@ -10,7 +10,7 @@ import Prover.RList qualified as RList
 type Var = Int
 
 -- | A unique identifier for a thing with a name, used to determine if two names
--- refer to "the same thing", or two different things with the same name.
+-- refer to "the same" thing or two different things with the same name.
 newtype NameId = NameId Int
   deriving (Eq, Ord, Show, Enum, Hashable)
 
