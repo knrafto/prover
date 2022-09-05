@@ -67,9 +67,9 @@ prover will automatically try to find a term of the correct type.
 
 ## Lexical structure
 
-Whitespace are space, tab, newline, carriage return, form feed, and vertical
-tab. Line comments start with `--` and end with a newline. Block comments are
-delimited with `{-` and `-}`. Block comments may be nested.
+Whitespace are space, tab, newline, and carriage return. Line comments start
+with `--` and end with a newline. Block comments are delimited with `{-` and
+`-}`. Block comments may be nested.
 
 The characters `(){},.` are "symbols", and are always treated as a token by
 themselves.
